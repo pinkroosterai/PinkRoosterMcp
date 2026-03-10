@@ -1,6 +1,8 @@
 <div align="center">
 
-# PinkRooster
+<img src="https://github.com/pinkroosterai/Persistify/raw/main/img/logo_transparent.png" alt="PinkRoosterMcp Logo" width="200" />
+
+# PinkRoosterMcp
 
 **AI-native project management for coding agents**
 
@@ -12,15 +14,15 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 
 ---
 
-## What is PinkRooster?
+## What is PinkRoosterMcp?
 
-PinkRooster is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
+PinkRoosterMcp is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
 
 It exposes an [MCP server](https://modelcontextprotocol.io/) with 18 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
 
 ### Why not Jira / Linear / GitHub Issues?
 
-| | Traditional PM tools | PinkRooster |
+| | Traditional PM tools | PinkRoosterMcp |
 |---|---|---|
 | **Created for** | Humans typing in web UIs | AI agents calling structured tools |
 | **Work breakdown** | Manual — you write tickets | Automatic — agent scaffolds phases, tasks, and dependencies from a description |
@@ -126,7 +128,7 @@ Every API request is logged with method, path, status, duration, and caller iden
 
 ## MCP Tools
 
-PinkRooster exposes 18 MCP tools organized by entity:
+PinkRoosterMcp exposes 18 MCP tools organized by entity:
 
 | Tool | Description |
 |------|-------------|
@@ -181,7 +183,7 @@ Skills automatically propagate state to related entities. Starting a task activa
 
 ```bash
 # Clone and configure
-git clone https://github.com/your-org/PinkRoosterMcp.git
+git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
 make setup        # Copy .env from template, install dashboard deps
 
