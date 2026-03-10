@@ -25,7 +25,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
     }
 
@@ -33,7 +33,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         CreateOrUpdateProjectRequest request, CancellationToken ct = default)
     {
         var response = await httpClient.PutAsJsonAsync("/api/projects", request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize project response.");
         return (project, response.StatusCode == HttpStatusCode.Created);
@@ -60,7 +60,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<IssueResponse>(ct);
     }
 
@@ -77,7 +77,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/issues", request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<IssueResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize issue response.");
     }
@@ -91,7 +91,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<IssueResponse>(ct);
     }
 
@@ -116,7 +116,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
     }
 
@@ -133,7 +133,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages", request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize work package response.");
     }
@@ -147,7 +147,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
     }
 
@@ -156,11 +156,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/dependencies", request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await ReadErrorMessageAsync(response, ct);
-            throw new HttpRequestException(error);
-        }
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<DependencyResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize dependency response.");
     }
@@ -174,7 +170,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return response.StatusCode == HttpStatusCode.NoContent;
     }
 
@@ -185,7 +181,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/phases", request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<PhaseResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize phase response.");
     }
@@ -199,7 +195,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
     }
 
@@ -210,7 +206,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks?phaseNumber={phaseNumber}", request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<TaskResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize task response.");
     }
@@ -224,7 +220,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
     }
 
@@ -233,11 +229,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks/{taskNumber}/dependencies", request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await ReadErrorMessageAsync(response, ct);
-            throw new HttpRequestException(error);
-        }
+        await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<TaskDependencyResponse>(ct)
             ?? throw new InvalidOperationException("Failed to deserialize task dependency response.");
     }
@@ -251,8 +243,17 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;
 
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var error = await ReadErrorMessageAsync(response, ct);
+        throw new HttpRequestException(error);
     }
 
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)

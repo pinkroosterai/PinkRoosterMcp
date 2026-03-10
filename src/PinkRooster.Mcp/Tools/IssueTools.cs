@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
+using PinkRooster.Mcp.Helpers;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.Enums;
@@ -148,8 +149,8 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             Description = description,
             IssueType = parsedType,
             Severity = parsedSeverity,
-            Priority = ParseEnumOrDefault(priority, Priority.Medium),
-            State = ParseEnumOrDefault(state, CompletionState.NotStarted),
+            Priority = McpInputParser.ParseEnumOrDefault(priority, Priority.Medium),
+            State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
             StepsToReproduce = stepsToReproduce,
             ExpectedBehavior = expectedBehavior,
             ActualBehavior = actualBehavior,
@@ -157,7 +158,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             StackTrace = stackTrace,
             RootCause = rootCause,
             Resolution = resolution,
-            Attachments = ParseAttachments(attachments)
+            Attachments = McpInputParser.ParseFileReferences(attachments)
         };
 
         var created = await apiClient.CreateIssueAsync(projId, request, ct);
@@ -181,10 +182,10 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            IssueType = issueType is not null ? ParseEnum<IssueType>(issueType) : null,
-            Severity = severity is not null ? ParseEnum<IssueSeverity>(severity) : null,
-            Priority = priority is not null ? ParseEnum<Priority>(priority) : null,
-            State = state is not null ? ParseEnum<CompletionState>(state) : null,
+            IssueType = issueType is not null ? McpInputParser.ParseEnum<IssueType>(issueType) : null,
+            Severity = severity is not null ? McpInputParser.ParseEnum<IssueSeverity>(severity) : null,
+            Priority = priority is not null ? McpInputParser.ParseEnum<Priority>(priority) : null,
+            State = state is not null ? McpInputParser.ParseEnum<CompletionState>(state) : null,
             StepsToReproduce = stepsToReproduce,
             ExpectedBehavior = expectedBehavior,
             ActualBehavior = actualBehavior,
@@ -192,7 +193,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             StackTrace = stackTrace,
             RootCause = rootCause,
             Resolution = resolution,
-            Attachments = attachments is not null ? ParseAttachments(attachments) : null
+            Attachments = attachments is not null ? McpInputParser.ParseFileReferences(attachments) : null
         };
 
         var updated = await apiClient.UpdateIssueAsync(projId, issueNumber, request, ct);
@@ -200,32 +201,5 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             return OperationResult.Warning($"Issue '{issueId}' not found.");
 
         return OperationResult.Success(issueId, $"Issue '{issueId}' updated.");
-    }
-
-    private static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum defaultValue) where TEnum : struct, Enum
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return defaultValue;
-        return Enum.TryParse<TEnum>(value, true, out var parsed) ? parsed : defaultValue;
-    }
-
-    private static TEnum? ParseEnum<TEnum>(string value) where TEnum : struct, Enum
-    {
-        return Enum.TryParse<TEnum>(value, true, out var parsed) ? parsed : null;
-    }
-
-    private static List<FileReferenceDto>? ParseAttachments(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<FileReferenceDto>>(json, JsonDefaults.Indented);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

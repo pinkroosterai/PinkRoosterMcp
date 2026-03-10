@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -45,7 +46,7 @@ public sealed class IssueController(IIssueService issueService) : ControllerBase
     public async Task<ActionResult<IssueResponse>> Create(
         long projectId, CreateIssueRequest request, CancellationToken ct)
     {
-        var changedBy = GetCallerIdentity();
+        var changedBy = HttpContext.GetCallerIdentity();
         var issue = await issueService.CreateAsync(projectId, request, changedBy, ct);
         return Created($"api/projects/{projectId}/issues/{issue.IssueNumber}", issue);
     }
@@ -54,7 +55,7 @@ public sealed class IssueController(IIssueService issueService) : ControllerBase
     public async Task<ActionResult<IssueResponse>> Update(
         long projectId, int issueNumber, UpdateIssueRequest request, CancellationToken ct)
     {
-        var changedBy = GetCallerIdentity();
+        var changedBy = HttpContext.GetCallerIdentity();
         var issue = await issueService.UpdateAsync(projectId, issueNumber, request, changedBy, ct);
         return issue is null ? NotFound() : Ok(issue);
     }
@@ -67,8 +68,4 @@ public sealed class IssueController(IIssueService issueService) : ControllerBase
         return deleted ? NoContent() : NotFound();
     }
 
-    private string GetCallerIdentity()
-    {
-        return HttpContext.Items["CallerIdentity"] as string ?? "unknown";
-    }
 }

@@ -2,7 +2,7 @@ using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Data.Entities;
 
-public sealed class WorkPackagePhase
+public sealed class WorkPackagePhase : IHasUpdatedAt
 {
     public long Id { get; set; }
     public int PhaseNumber { get; set; }

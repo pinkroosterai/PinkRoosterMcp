@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
+using PinkRooster.Data.Entities;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 
@@ -36,5 +37,21 @@ public sealed class ActivityLogService(AppDbContext db) : IActivityLogService
             PageSize = pagination.PageSize,
             TotalCount = totalCount
         };
+    }
+
+    public async Task LogRequestAsync(string httpMethod, string path, int statusCode, long durationMs,
+        string? callerIdentity, CancellationToken ct = default)
+    {
+        db.ActivityLogs.Add(new ActivityLog
+        {
+            HttpMethod = httpMethod,
+            Path = path,
+            StatusCode = statusCode,
+            DurationMs = durationMs,
+            CallerIdentity = callerIdentity,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        await db.SaveChangesAsync(ct);
     }
 }

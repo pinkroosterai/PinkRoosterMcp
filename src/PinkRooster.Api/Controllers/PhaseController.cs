@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -15,7 +16,7 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
     {
         try
         {
-            var changedBy = GetCallerIdentity();
+            var changedBy = HttpContext.GetCallerIdentity();
             var phase = await phaseService.CreateAsync(projectId, wpNumber, request, changedBy, ct);
             return Created("", phase);
         }
@@ -29,7 +30,7 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
     public async Task<ActionResult<PhaseResponse>> Update(
         long projectId, int wpNumber, int phaseNumber, UpdatePhaseRequest request, CancellationToken ct)
     {
-        var changedBy = GetCallerIdentity();
+        var changedBy = HttpContext.GetCallerIdentity();
         var phase = await phaseService.UpdateAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct: ct);
         return phase is null ? NotFound() : Ok(phase);
     }
@@ -42,8 +43,4 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
         return deleted ? NoContent() : NotFound();
     }
 
-    private string GetCallerIdentity()
-    {
-        return HttpContext.Items["CallerIdentity"] as string ?? "unknown";
-    }
 }

@@ -8,7 +8,7 @@ using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
+public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cascadeService) : IWorkPackageService
 {
     public async Task<List<WorkPackageResponse>> GetByProjectAsync(
         long projectId, string? stateFilter, CancellationToken ct = default)
@@ -84,18 +84,14 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
                 EstimationRationale = request.EstimationRationale,
                 State = request.State,
                 LinkedIssueId = request.LinkedIssueId,
-                Attachments = MapAttachments(request.Attachments)
+                Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
-            // Apply blocked state logic
-            if (request.State == CompletionState.Blocked &&
-                CompletionStateConstants.ActiveStates.Contains(CompletionState.NotStarted))
-            {
-                // NotStarted is not active, so no PreviousActiveState to capture on create
-            }
+            // Apply blocked state logic (fixes: previously dead code that never set PreviousActiveState)
+            StateTransitionHelper.ApplyBlockedStateLogic(wp, CompletionState.NotStarted, request.State);
 
             // Apply state-driven timestamps
-            ApplyStateTimestamps(wp, CompletionState.NotStarted, request.State);
+            StateTransitionHelper.ApplyStateTimestamps(wp, CompletionState.NotStarted, request.State);
 
             db.WorkPackages.Add(wp);
 
@@ -157,7 +153,7 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         if (request.Attachments is not null)
         {
             var oldJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-            wp.Attachments = MapAttachments(request.Attachments);
+            wp.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
             var newJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
 
             if (oldJson != newJson)
@@ -178,23 +174,15 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         if (request.State is not null && oldState != request.State.Value)
         {
             var newState = request.State.Value;
-
-            // Transitioning TO Blocked: capture previous active state
-            if (newState == CompletionState.Blocked && CompletionStateConstants.ActiveStates.Contains(oldState))
-                wp.PreviousActiveState = oldState;
-
-            // Transitioning FROM Blocked: clear previous active state
-            if (oldState == CompletionState.Blocked && newState != CompletionState.Blocked)
-                wp.PreviousActiveState = null;
-
-            ApplyStateTimestamps(wp, oldState, newState);
+            StateTransitionHelper.ApplyBlockedStateLogic(wp, oldState, newState);
+            StateTransitionHelper.ApplyStateTimestamps(wp, oldState, newState);
         }
 
         // Dep-completion auto-unblock: if WP transitioned to terminal, unblock dependents
         if (request.State is not null && oldState != request.State.Value
             && CompletionStateConstants.TerminalStates.Contains(request.State.Value))
         {
-            await AutoUnblockDependentWpsAsync(wp, stateChanges, ct);
+            await cascadeService.AutoUnblockDependentWpsAsync(wp, stateChanges, ct);
         }
 
         if (auditEntries.Count > 0)
@@ -258,8 +246,8 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         if (exists)
             throw new InvalidOperationException("This dependency already exists.");
 
-        // Validate: no circular dependency (BFS from dependsOnWp through BlockedBy chain)
-        if (await HasCircularDependencyAsync(dependentWp.Id, dependsOnWp.Id, ct))
+        // Validate: no circular dependency
+        if (await cascadeService.HasCircularWpDependencyAsync(dependentWp.Id, dependsOnWp.Id, ct))
             throw new InvalidOperationException("Adding this dependency would create a circular dependency.");
 
         var dependency = new WorkPackageDependency
@@ -280,7 +268,7 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
             var oldState = dependentWp.State;
             dependentWp.PreviousActiveState = oldState;
             dependentWp.State = CompletionState.Blocked;
-            ApplyStateTimestamps(dependentWp, oldState, CompletionState.Blocked);
+            StateTransitionHelper.ApplyStateTimestamps(dependentWp, oldState, CompletionState.Blocked);
 
             var now = DateTimeOffset.UtcNow;
             db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
@@ -351,7 +339,7 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
                 dependentWp.State = restoredState;
                 dependentWp.PreviousActiveState = null;
 
-                ApplyStateTimestamps(dependentWp, oldState, restoredState);
+                StateTransitionHelper.ApplyStateTimestamps(dependentWp, oldState, restoredState);
 
                 var now = DateTimeOffset.UtcNow;
                 db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
@@ -381,56 +369,6 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
 
     // ── Private helpers ──
 
-    private async Task AutoUnblockDependentWpsAsync(WorkPackage completedWp, List<StateChangeDto>? stateChanges, CancellationToken ct)
-    {
-        // Find WPs that depend on this WP and are currently Blocked
-        var dependentWps = await db.WorkPackageDependencies
-            .Where(d => d.DependsOnWorkPackageId == completedWp.Id)
-            .Include(d => d.DependentWorkPackage)
-            .Where(d => d.DependentWorkPackage.State == CompletionState.Blocked)
-            .Select(d => d.DependentWorkPackage)
-            .ToListAsync(ct);
-
-        foreach (var dependentWp in dependentWps)
-        {
-            // Check if any remaining non-terminal blockers exist
-            var hasRemainingBlockers = await db.WorkPackageDependencies
-                .Where(d => d.DependentWorkPackageId == dependentWp.Id && d.DependsOnWorkPackageId != completedWp.Id)
-                .Include(d => d.DependsOnWorkPackage)
-                .AnyAsync(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnWorkPackage.State), ct);
-
-            if (!hasRemainingBlockers && dependentWp.PreviousActiveState is not null)
-            {
-                var oldState = dependentWp.State;
-                var restoredState = dependentWp.PreviousActiveState.Value;
-
-                dependentWp.State = restoredState;
-                dependentWp.PreviousActiveState = null;
-                ApplyStateTimestamps(dependentWp, oldState, restoredState);
-
-                var now = DateTimeOffset.UtcNow;
-                db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
-                {
-                    WorkPackageId = dependentWp.Id,
-                    FieldName = "State",
-                    OldValue = oldState.ToString(),
-                    NewValue = restoredState.ToString(),
-                    ChangedBy = "system",
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "WorkPackage",
-                    EntityId = $"proj-{dependentWp.ProjectId}-wp-{dependentWp.WorkPackageNumber}",
-                    OldState = oldState.ToString(),
-                    NewState = restoredState.ToString(),
-                    Reason = $"Auto-unblocked: blocker 'proj-{completedWp.ProjectId}-wp-{completedWp.WorkPackageNumber}' completed"
-                });
-            }
-        }
-    }
-
     private static IQueryable<WorkPackage> ApplyStateFilter(IQueryable<WorkPackage> query, string? stateFilter)
     {
         if (string.IsNullOrWhiteSpace(stateFilter))
@@ -445,71 +383,6 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         };
 
         return states is null ? query : query.Where(w => states.Contains(w.State));
-    }
-
-    private static void ApplyStateTimestamps(WorkPackage wp, CompletionState oldState, CompletionState newState)
-    {
-        if (oldState == newState)
-            return;
-
-        var now = DateTimeOffset.UtcNow;
-
-        // StartedAt: set once when entering an active state from inactive
-        if (wp.StartedAt is null && CompletionStateConstants.ActiveStates.Contains(newState))
-            wp.StartedAt = now;
-
-        // CompletedAt: set when entering Completed, cleared when leaving terminal
-        if (newState == CompletionState.Completed)
-            wp.CompletedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState) && !CompletionStateConstants.TerminalStates.Contains(newState))
-            wp.CompletedAt = null;
-
-        // ResolvedAt: set when entering any terminal state, cleared when leaving terminal
-        if (CompletionStateConstants.TerminalStates.Contains(newState))
-            wp.ResolvedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState))
-            wp.ResolvedAt = null;
-    }
-
-    private async Task<bool> HasCircularDependencyAsync(long dependentId, long dependsOnId, CancellationToken ct)
-    {
-        // BFS from dependsOnWp through its BlockedBy chain, checking if we reach dependentId
-        var visited = new HashSet<long>();
-        var queue = new Queue<long>();
-        queue.Enqueue(dependsOnId);
-
-        while (queue.Count > 0)
-        {
-            var currentId = queue.Dequeue();
-            if (currentId == dependentId)
-                return true;
-
-            if (!visited.Add(currentId))
-                continue;
-
-            var blockedByIds = await db.WorkPackageDependencies
-                .Where(d => d.DependentWorkPackageId == currentId)
-                .Select(d => d.DependsOnWorkPackageId)
-                .ToListAsync(ct);
-
-            foreach (var id in blockedByIds)
-                queue.Enqueue(id);
-        }
-
-        return false;
-    }
-
-    private static List<FileReference> MapAttachments(List<FileReferenceDto>? dtos)
-    {
-        if (dtos is null or { Count: 0 })
-            return [];
-
-        return dtos.Select(d => new FileReference
-        {
-            FileName = d.FileName,
-            RelativePath = d.RelativePath,
-            Description = d.Description
-        }).ToList();
     }
 
     private static List<WorkPackageAuditLog> BuildCreateAuditEntries(WorkPackage wp, string changedBy)
@@ -634,12 +507,7 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,
-        Attachments = w.Attachments.Select(a => new FileReferenceDto
-        {
-            FileName = a.FileName,
-            RelativePath = a.RelativePath,
-            Description = a.Description
-        }).ToList(),
+        Attachments = ResponseMapper.MapFileReferences(w.Attachments),
         CreatedAt = w.CreatedAt,
         UpdatedAt = w.UpdatedAt
     };
@@ -665,76 +533,8 @@ public sealed class WorkPackageService(AppDbContext db) : IWorkPackageService
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,
-        Attachments = w.Attachments.Select(a => new FileReferenceDto
-        {
-            FileName = a.FileName,
-            RelativePath = a.RelativePath,
-            Description = a.Description
-        }).ToList(),
-        Phases = w.Phases.Select(p => new PhaseResponse
-        {
-            PhaseId = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}-phase-{p.PhaseNumber}",
-            Id = p.Id,
-            PhaseNumber = p.PhaseNumber,
-            Name = p.Name,
-            Description = p.Description,
-            SortOrder = p.SortOrder,
-            State = p.State.ToString(),
-            Tasks = p.Tasks.Select(t => new TaskResponse
-            {
-                TaskId = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}-task-{t.TaskNumber}",
-                Id = t.Id,
-                TaskNumber = t.TaskNumber,
-                PhaseId = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}-phase-{p.PhaseNumber}",
-                Name = t.Name,
-                Description = t.Description,
-                SortOrder = t.SortOrder,
-                ImplementationNotes = t.ImplementationNotes,
-                State = t.State.ToString(),
-                PreviousActiveState = t.PreviousActiveState?.ToString(),
-                StartedAt = t.StartedAt,
-                CompletedAt = t.CompletedAt,
-                ResolvedAt = t.ResolvedAt,
-                TargetFiles = t.TargetFiles.Select(f => new FileReferenceDto
-                {
-                    FileName = f.FileName,
-                    RelativePath = f.RelativePath,
-                    Description = f.Description
-                }).ToList(),
-                Attachments = t.Attachments.Select(f => new FileReferenceDto
-                {
-                    FileName = f.FileName,
-                    RelativePath = f.RelativePath,
-                    Description = f.Description
-                }).ToList(),
-                BlockedBy = t.BlockedBy.Select(d => new TaskDependencyResponse
-                {
-                    TaskId = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}-task-{d.DependsOnTask.TaskNumber}",
-                    Name = d.DependsOnTask.Name,
-                    State = d.DependsOnTask.State.ToString(),
-                    Reason = d.Reason
-                }).ToList(),
-                Blocking = t.Blocking.Select(d => new TaskDependencyResponse
-                {
-                    TaskId = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}-task-{d.DependentTask.TaskNumber}",
-                    Name = d.DependentTask.Name,
-                    State = d.DependentTask.State.ToString(),
-                    Reason = d.Reason
-                }).ToList(),
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt
-            }).ToList(),
-            AcceptanceCriteria = p.AcceptanceCriteria.Select(ac => new AcceptanceCriterionDto
-            {
-                Name = ac.Name,
-                Description = ac.Description,
-                VerificationMethod = ac.VerificationMethod,
-                VerificationResult = ac.VerificationResult,
-                VerifiedAt = ac.VerifiedAt
-            }).ToList(),
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
-        }).ToList(),
+        Attachments = ResponseMapper.MapFileReferences(w.Attachments),
+        Phases = w.Phases.Select(p => ResponseMapper.MapPhase(p, w.ProjectId, w.WorkPackageNumber)).ToList(),
         BlockedBy = w.BlockedBy.Select(d => new DependencyResponse
         {
             WorkPackageId = $"proj-{d.DependsOnWorkPackage.ProjectId}-wp-{d.DependsOnWorkPackage.WorkPackageNumber}",

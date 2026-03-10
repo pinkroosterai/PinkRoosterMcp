@@ -112,11 +112,11 @@ public sealed class IssueService(AppDbContext db) : IIssueService
                 RootCause = request.RootCause,
                 Resolution = request.Resolution,
                 State = request.State,
-                Attachments = MapAttachments(request.Attachments)
+                Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
             // Apply state-driven timestamps
-            ApplyStateTimestamps(issue, CompletionState.NotStarted, request.State);
+            StateTransitionHelper.ApplyStateTimestamps(issue, CompletionState.NotStarted, request.State);
 
             db.Issues.Add(issue);
 
@@ -188,7 +188,7 @@ public sealed class IssueService(AppDbContext db) : IIssueService
         if (request.Attachments is not null)
         {
             var oldJson = JsonSerializer.Serialize(issue.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-            issue.Attachments = MapAttachments(request.Attachments);
+            issue.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
             var newJson = JsonSerializer.Serialize(issue.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
 
             if (oldJson != newJson)
@@ -207,7 +207,7 @@ public sealed class IssueService(AppDbContext db) : IIssueService
 
         // Apply state-driven timestamps if state changed
         if (request.State is not null && oldState != request.State.Value)
-            ApplyStateTimestamps(issue, oldState, request.State.Value);
+            StateTransitionHelper.ApplyStateTimestamps(issue, oldState, request.State.Value);
 
         if (auditEntries.Count > 0)
             db.IssueAuditLogs.AddRange(auditEntries);
@@ -245,43 +245,6 @@ public sealed class IssueService(AppDbContext db) : IIssueService
         };
 
         return states is null ? query : query.Where(i => states.Contains(i.State));
-    }
-
-    private static void ApplyStateTimestamps(Issue issue, CompletionState oldState, CompletionState newState)
-    {
-        if (oldState == newState)
-            return;
-
-        var now = DateTimeOffset.UtcNow;
-
-        // StartedAt: set once when entering an active state from inactive
-        if (issue.StartedAt is null && CompletionStateConstants.ActiveStates.Contains(newState))
-            issue.StartedAt = now;
-
-        // CompletedAt: set when entering Completed, cleared when leaving terminal
-        if (newState == CompletionState.Completed)
-            issue.CompletedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState) && !CompletionStateConstants.TerminalStates.Contains(newState))
-            issue.CompletedAt = null;
-
-        // ResolvedAt: set when entering any terminal state, cleared when leaving terminal
-        if (CompletionStateConstants.TerminalStates.Contains(newState))
-            issue.ResolvedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState))
-            issue.ResolvedAt = null;
-    }
-
-    private static List<FileReference> MapAttachments(List<FileReferenceDto>? dtos)
-    {
-        if (dtos is null or { Count: 0 })
-            return [];
-
-        return dtos.Select(d => new FileReference
-        {
-            FileName = d.FileName,
-            RelativePath = d.RelativePath,
-            Description = d.Description
-        }).ToList();
     }
 
     private static List<IssueAuditLog> BuildCreateAuditEntries(Issue issue, string changedBy)

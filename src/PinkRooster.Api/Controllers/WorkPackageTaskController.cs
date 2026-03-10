@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -15,7 +16,7 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
     {
         try
         {
-            var changedBy = GetCallerIdentity();
+            var changedBy = HttpContext.GetCallerIdentity();
             var task = await taskService.CreateAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
             return Created("", task);
         }
@@ -29,7 +30,7 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
     public async Task<ActionResult<TaskResponse>> Update(
         long projectId, int wpNumber, int taskNumber, UpdateTaskRequest request, CancellationToken ct)
     {
-        var changedBy = GetCallerIdentity();
+        var changedBy = HttpContext.GetCallerIdentity();
         var task = await taskService.UpdateAsync(projectId, wpNumber, taskNumber, request, changedBy, ct: ct);
         return task is null ? NotFound() : Ok(task);
     }
@@ -65,8 +66,4 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
         return removed ? NoContent() : NotFound();
     }
 
-    private string GetCallerIdentity()
-    {
-        return HttpContext.Items["CallerIdentity"] as string ?? "unknown";
-    }
 }

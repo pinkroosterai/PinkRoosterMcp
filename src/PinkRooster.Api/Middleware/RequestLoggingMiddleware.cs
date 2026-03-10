@@ -1,6 +1,5 @@
 using System.Diagnostics;
-using PinkRooster.Data;
-using PinkRooster.Data.Entities;
+using PinkRooster.Api.Services;
 using PinkRooster.Shared.Constants;
 
 namespace PinkRooster.Api.Middleware;
@@ -13,7 +12,7 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next)
         "/api/activity-logs"
     };
 
-    public async Task InvokeAsync(HttpContext context, AppDbContext db)
+    public async Task InvokeAsync(HttpContext context, IActivityLogService activityLogService)
     {
         var sw = Stopwatch.StartNew();
 
@@ -32,17 +31,12 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next)
                     ? identity as string
                     : null;
 
-                db.ActivityLogs.Add(new ActivityLog
-                {
-                    HttpMethod = context.Request.Method,
-                    Path = path,
-                    StatusCode = context.Response.StatusCode,
-                    DurationMs = sw.ElapsedMilliseconds,
-                    CallerIdentity = callerIdentity,
-                    Timestamp = DateTimeOffset.UtcNow
-                });
-
-                await db.SaveChangesAsync();
+                await activityLogService.LogRequestAsync(
+                    context.Request.Method,
+                    path,
+                    context.Response.StatusCode,
+                    sw.ElapsedMilliseconds,
+                    callerIdentity);
             }
         }
     }

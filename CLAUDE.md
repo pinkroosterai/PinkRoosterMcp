@@ -80,7 +80,7 @@ PinkRooster.Api.Tests ← integration tests (xUnit v3, Testcontainers, Respawn)
 Service layer + Controllers (not Clean Architecture/CQRS). Services are interfaces with implementations registered in DI.
 
 ### Middleware Pipeline (API)
-1. `RequestLoggingMiddleware` — logs all requests to ActivityLog table
+1. `RequestLoggingMiddleware` — logs all requests via `IActivityLogService.LogRequestAsync()`
 2. `ApiKeyAuthMiddleware` — validates `X-Api-Key` header (keys configured in `Auth:ApiKeys` array)
 
 ### MCP Server
@@ -185,7 +185,7 @@ EF Core packages are pinned to 9.0.13 and Npgsql to 9.0.4 across both Data and A
 The API returns its own DTOs (defined in Shared). The MCP layer **maps** API responses to MCP-specific response classes before returning to agents. MCP response types (`OperationResult`, `ResponseType`, tool-specific responses like `ProjectOverviewResponse`) live **exclusively in `PinkRooster.Mcp/Responses/`** — never in Shared or API. Rationale: MCP responses are tailored for AI agent consumption (fewer fields, contextual hints), while API responses serve the dashboard with full data.
 
 ### MCP Tool Error Handling
-MCP tools must **never throw exceptions**. Every code path — including API errors, validation failures, circular dependency rejection, not-found cases, and unexpected exceptions — must return an `OperationResult` string with a clear, actionable message the AI agent can act on. Wrap all API client calls in try-catch and extract the error body from non-success HTTP responses (using `PinkRoosterApiClient.ReadErrorMessageAsync`) rather than letting `EnsureSuccessStatusCode()` throw opaque messages. The agent should always understand **why** an operation failed and what it can do next.
+MCP tools must **never throw exceptions**. Every code path — including API errors, validation failures, circular dependency rejection, not-found cases, and unexpected exceptions — must return an `OperationResult` string with a clear, actionable message the AI agent can act on. Wrap all API client calls in try-catch. `PinkRoosterApiClient` uses `EnsureSuccessAsync()` which extracts the error body from non-success HTTP responses via `ReadErrorMessageAsync` — all 16 endpoints use this uniformly. The agent should always understand **why** an operation failed and what it can do next.
 
 ### Human-Readable IDs
 Business entities use human-readable ID formats derived at read-time from DB auto-increment `long` PKs. Never stored as a column. **No GUIDs** — all primary keys are `long` auto-increment.
@@ -200,14 +200,16 @@ ID parsing utility: `IdParser` in `PinkRooster.Shared/Helpers/` with `TryParsePr
 - **Viewing**: Both MCP tools and dashboard can read data, but receive different response shapes per the boundary above.
 
 ### Auto-Timestamps
-`UpdatedAt` is auto-set via `SaveChangesAsync` override in `AppDbContext`. `CreatedAt` uses DB default `now()`.
+`UpdatedAt` is auto-set via `SaveChangesAsync` override in `AppDbContext` using a single `ChangeTracker.Entries<IHasUpdatedAt>()` loop (all timestamped entities implement `IHasUpdatedAt`). `CreatedAt` uses DB default `now()`.
 
-### State-Driven Timestamps (Issues)
-Issue datetime fields (`StartedAt`, `CompletedAt`, `ResolvedAt`) are **never set by callers** — they are computed in the service layer based on `CompletionState` transitions:
+### State-Driven Timestamps (Issues, WPs, Tasks)
+Entities implementing `IHasStateTimestamps` (Issue, WorkPackage, WorkPackageTask) have `StartedAt`, `CompletedAt`, `ResolvedAt` fields **never set by callers** — they are computed via `StateTransitionHelper.ApplyStateTimestamps()` based on `CompletionState` transitions:
 - `StartedAt` — set once when transitioning from NotStarted/Blocked → any Active state (never cleared)
 - `CompletedAt` — set when → Completed (cleared if moving out of terminal)
 - `ResolvedAt` — set when → any Terminal state (cleared if moving out of terminal)
 - Same-state transitions are no-ops for timestamps
+
+Entities implementing `IHasBlockedState` (WorkPackage, WorkPackageTask) additionally have `PreviousActiveState` managed via `StateTransitionHelper.ApplyBlockedStateLogic()` — captured on transition to Blocked, cleared on transition from Blocked.
 
 ### Issue Audit Log
 Full-field audit via `IssueAuditLog` table (separate from `ActivityLog` which is HTTP request logging). Every field change on create/update produces an audit entry with FieldName, OldValue, NewValue, ChangedBy, ChangedAt. On creation, all fields logged with OldValue = null. Deletion does not create audit entries (covered by ActivityLog middleware).
@@ -239,6 +241,18 @@ Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Resp
 - Flat routes for top-level pages: `/projects`, `/activity`
 - Nested routes for entity detail: `/projects/:id` (project detail + issue list), `/projects/:id/issues/:issueNumber` (issue detail)
 - Project switcher click navigates to `/projects/:id` (not dashboard home)
+
+### Shared Infrastructure (API)
+Domain logic shared across services is centralized in:
+- **`StateTransitionHelper`** (static) — `ApplyStateTimestamps()`, `ApplyBlockedStateLogic()`, `MapFileReferences()`. Operates on `IHasStateTimestamps` / `IHasBlockedState` interfaces.
+- **`StateCascadeService`** (DI-registered) — `PropagateStateUpwardAsync()`, `AutoUnblockDependentWpsAsync()`, `AutoUnblockDependentTasksAsync()`, `HasCircularWpDependencyAsync()`, `HasCircularTaskDependencyAsync()`. Owns all cross-entity state transitions.
+- **`ResponseMapper`** (static) — `MapTask()`, `MapPhase()`, `MapFileReferences()`, `MapAcceptanceCriterion()`, dependency mapping. Shared by `WorkPackageService`, `WorkPackageTaskService`, `PhaseService`.
+- **`HttpContextExtensions`** — `GetCallerIdentity()` extension method used by all 4 controllers.
+- **Marker interfaces** in `PinkRooster.Data.Entities` — `IHasUpdatedAt`, `IHasStateTimestamps`, `IHasBlockedState`.
+
+### Shared Infrastructure (MCP)
+- **`McpInputParser`** (internal static in `Helpers/`) — `ParseEnumOrDefault()`, `ParseEnum()`, `ParseInt()`, `ParseFileReferences()`, `ParseAcceptanceCriteria()`, `ParseCreateTasks()`, `ParseUpsertTasks()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
+- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `ActivityLogTools`.
 
 ### State Change Cascade Notifications
 When automatic state transitions occur (auto-block, auto-unblock, upward propagation), the API response includes a `StateChanges` list so MCP tools can report them to AI agents. The cascade flows:
@@ -283,3 +297,5 @@ Detailed design specs live in `claudedocs/`. Current docs:
 - `claudedocs/workflow_issue_entity.md` — Issue entity implementation workflow (6 phases)
 - `claudedocs/design_work_packages.md` — Work Package entity full vertical slice design
 - `claudedocs/workflow_work_packages.md` — Work Package implementation workflow
+- `claudedocs/PROJECT_INDEX.md` — Comprehensive project documentation (architecture, entities, API endpoints, MCP tools, file tree)
+- `claudedocs/SOLID_ANALYSIS.md` — SOLID principles analysis (14 findings, all resolved)

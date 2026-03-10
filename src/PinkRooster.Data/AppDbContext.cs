@@ -28,31 +28,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var entry in ChangeTracker.Entries<Project>()
-            .Where(e => e.State == EntityState.Modified))
-        {
-            entry.Entity.UpdatedAt = now;
-        }
-
-        foreach (var entry in ChangeTracker.Entries<Issue>()
-            .Where(e => e.State == EntityState.Modified))
-        {
-            entry.Entity.UpdatedAt = now;
-        }
-
-        foreach (var entry in ChangeTracker.Entries<WorkPackage>()
-            .Where(e => e.State == EntityState.Modified))
-        {
-            entry.Entity.UpdatedAt = now;
-        }
-
-        foreach (var entry in ChangeTracker.Entries<WorkPackagePhase>()
-            .Where(e => e.State == EntityState.Modified))
-        {
-            entry.Entity.UpdatedAt = now;
-        }
-
-        foreach (var entry in ChangeTracker.Entries<WorkPackageTask>()
+        foreach (var entry in ChangeTracker.Entries<IHasUpdatedAt>()
             .Where(e => e.State == EntityState.Modified))
         {
             entry.Entity.UpdatedAt = now;

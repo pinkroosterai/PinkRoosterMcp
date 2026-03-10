@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
+using PinkRooster.Mcp.Helpers;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.Helpers;
@@ -69,9 +70,6 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
             // Enrich with work package summaries
             try
             {
-                static bool IsTerminalState(string state) =>
-                    state is "Completed" or "Cancelled" or "Replaced";
-
                 WorkPackageOverviewItem ToWpItem(Shared.DTOs.Responses.WorkPackageResponse wp) => new()
                 {
                     WorkPackageId = wp.WorkPackageId,
@@ -81,7 +79,7 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
                     State = wp.State,
                     PhaseCount = wp.Phases.Count,
                     TaskCount = wp.Phases.Sum(p => p.Tasks.Count),
-                    CompletedTaskCount = wp.Phases.Sum(p => p.Tasks.Count(t => IsTerminalState(t.State))),
+                    CompletedTaskCount = wp.Phases.Sum(p => p.Tasks.Count(t => McpInputParser.IsTerminalState(t.State))),
                     CreatedAt = wp.CreatedAt,
                     ResolvedAt = wp.ResolvedAt
                 };

@@ -2,7 +2,7 @@ using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Data.Entities;
 
-public sealed class Project
+public sealed class Project : IHasUpdatedAt
 {
     public long Id { get; set; }
     public required string Name { get; set; }

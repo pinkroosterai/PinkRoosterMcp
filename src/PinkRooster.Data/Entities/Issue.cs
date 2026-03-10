@@ -2,7 +2,7 @@ using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Data.Entities;
 
-public sealed class Issue
+public sealed class Issue : IHasStateTimestamps, IHasUpdatedAt
 {
     public long Id { get; set; }
     public int IssueNumber { get; set; }

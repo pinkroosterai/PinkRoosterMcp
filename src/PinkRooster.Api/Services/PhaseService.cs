@@ -8,7 +8,7 @@ using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class PhaseService(AppDbContext db) : IPhaseService
+public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeService) : IPhaseService
 {
     public async Task<PhaseResponse> CreateAsync(
         long projectId, int wpNumber, CreatePhaseRequest request, string changedBy, CancellationToken ct = default)
@@ -91,12 +91,12 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
                         SortOrder = taskSortOrder,
                         ImplementationNotes = taskReq.ImplementationNotes,
                         State = taskReq.State,
-                        TargetFiles = MapTargetFiles(taskReq.TargetFiles),
-                        Attachments = MapAttachments(taskReq.Attachments)
+                        TargetFiles = StateTransitionHelper.MapFileReferences(taskReq.TargetFiles),
+                        Attachments = StateTransitionHelper.MapFileReferences(taskReq.Attachments)
                     };
 
                     // Apply state timestamps if initial state is active
-                    ApplyStateTimestamps(task, CompletionState.NotStarted, taskReq.State);
+                    StateTransitionHelper.ApplyStateTimestamps(task, CompletionState.NotStarted, taskReq.State);
 
                     db.WorkPackageTasks.Add(task);
 
@@ -199,6 +199,9 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
         }
 
         // Tasks: upsert logic
+        var tasksReachingTerminal = new List<WorkPackageTask>();
+        var affectedPhaseIds = new HashSet<long> { phase.Id };
+
         if (request.Tasks is { Count: > 0 })
         {
             // Pre-fetch starting numbers for new tasks to avoid duplicate key issues in batch
@@ -257,7 +260,7 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
                     if (taskDto.TargetFiles is not null)
                     {
                         var oldJson = JsonSerializer.Serialize(existingTask.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
-                        existingTask.TargetFiles = MapTargetFiles(taskDto.TargetFiles);
+                        existingTask.TargetFiles = StateTransitionHelper.MapFileReferences(taskDto.TargetFiles);
                         var newJson = JsonSerializer.Serialize(existingTask.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
                         if (oldJson != newJson)
                         {
@@ -276,7 +279,7 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
                     if (taskDto.Attachments is not null)
                     {
                         var oldJson = JsonSerializer.Serialize(existingTask.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description }));
-                        existingTask.Attachments = MapAttachments(taskDto.Attachments);
+                        existingTask.Attachments = StateTransitionHelper.MapFileReferences(taskDto.Attachments);
                         var newJson = JsonSerializer.Serialize(existingTask.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description }));
                         if (oldJson != newJson)
                         {
@@ -292,9 +295,17 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
                         }
                     }
 
-                    // Apply state timestamps if state changed
+                    // Apply blocked state logic and state timestamps if state changed
                     if (taskDto.State is not null && oldTaskState != taskDto.State.Value)
-                        ApplyStateTimestamps(existingTask, oldTaskState, taskDto.State.Value);
+                    {
+                        StateTransitionHelper.ApplyBlockedStateLogic(existingTask, oldTaskState, taskDto.State.Value);
+                        StateTransitionHelper.ApplyStateTimestamps(existingTask, oldTaskState, taskDto.State.Value);
+
+                        // Track for cascade processing after the loop
+                        affectedPhaseIds.Add(existingTask.PhaseId);
+                        if (CompletionStateConstants.TerminalStates.Contains(taskDto.State.Value))
+                            tasksReachingTerminal.Add(existingTask);
+                    }
                 }
                 else
                 {
@@ -311,12 +322,13 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
                         SortOrder = taskSortOrder,
                         ImplementationNotes = taskDto.ImplementationNotes,
                         State = taskDto.State ?? CompletionState.NotStarted,
-                        TargetFiles = MapTargetFiles(taskDto.TargetFiles),
-                        Attachments = MapAttachments(taskDto.Attachments)
+                        TargetFiles = StateTransitionHelper.MapFileReferences(taskDto.TargetFiles),
+                        Attachments = StateTransitionHelper.MapFileReferences(taskDto.Attachments)
                     };
 
-                    // Apply state timestamps
-                    ApplyStateTimestamps(newTask, CompletionState.NotStarted, newTask.State);
+                    // Apply state timestamps and blocked state logic
+                    StateTransitionHelper.ApplyStateTimestamps(newTask, CompletionState.NotStarted, newTask.State);
+                    StateTransitionHelper.ApplyBlockedStateLogic(newTask, CompletionState.NotStarted, newTask.State);
 
                     db.WorkPackageTasks.Add(newTask);
 
@@ -327,73 +339,13 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
             }
         }
 
-        // Upward propagation: check if all tasks in this phase are terminal
-        // Reload tasks to get current state after modifications
-        var allPhaseTasks = await db.WorkPackageTasks
-            .Where(t => t.PhaseId == phase.Id)
-            .ToListAsync(ct);
+        // Auto-unblock dependent tasks for any task that reached terminal state
+        foreach (var terminalTask in tasksReachingTerminal)
+            await cascadeService.AutoUnblockDependentTasksAsync(terminalTask, wp, stateChanges, ct);
 
-        if (allPhaseTasks.Count > 0 &&
-            allPhaseTasks.All(t => CompletionStateConstants.TerminalStates.Contains(t.State)) &&
-            !CompletionStateConstants.TerminalStates.Contains(phase.State))
-        {
-            var oldPhaseState = phase.State;
-            phase.State = CompletionState.Completed;
-
-            phaseAuditEntries.Add(new PhaseAuditLog
-            {
-                PhaseId = phase.Id,
-                FieldName = "State",
-                OldValue = oldPhaseState.ToString(),
-                NewValue = CompletionState.Completed.ToString(),
-                ChangedBy = "system",
-                ChangedAt = now
-            });
-
-            stateChanges?.Add(new StateChangeDto
-            {
-                EntityType = "Phase",
-                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
-                OldState = oldPhaseState.ToString(),
-                NewState = CompletionState.Completed.ToString(),
-                Reason = "Auto-completed: all tasks reached terminal state"
-            });
-
-            // Check if all phases in WP are terminal -> auto-complete WP
-            var allWpPhases = await db.WorkPackagePhases
-                .Where(p => p.WorkPackageId == wp.Id)
-                .ToListAsync(ct);
-
-            if (allWpPhases.Count > 0 &&
-                allWpPhases.All(p => CompletionStateConstants.TerminalStates.Contains(p.State)) &&
-                !CompletionStateConstants.TerminalStates.Contains(wp.State))
-            {
-                var oldWpState = wp.State;
-                wp.State = CompletionState.Completed;
-
-                // Apply WP state timestamps
-                ApplyWpStateTimestamps(wp, oldWpState, CompletionState.Completed);
-
-                db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
-                {
-                    WorkPackageId = wp.Id,
-                    FieldName = "State",
-                    OldValue = oldWpState.ToString(),
-                    NewValue = CompletionState.Completed.ToString(),
-                    ChangedBy = "system",
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "WorkPackage",
-                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
-                    OldState = oldWpState.ToString(),
-                    NewState = CompletionState.Completed.ToString(),
-                    Reason = "Auto-completed: all phases reached terminal state"
-                });
-            }
-        }
+        // Propagate upward for all affected phases (current phase + any phase with task state changes)
+        foreach (var affectedPhaseId in affectedPhaseIds)
+            await cascadeService.PropagateStateUpwardAsync(affectedPhaseId, wp, changedBy, stateChanges, ct);
 
         if (phaseAuditEntries.Count > 0)
             db.PhaseAuditLogs.AddRange(phaseAuditEntries);
@@ -436,77 +388,6 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
     }
 
     // ── Private helpers ──
-
-    private static void ApplyStateTimestamps(WorkPackageTask task, CompletionState oldState, CompletionState newState)
-    {
-        if (oldState == newState)
-            return;
-
-        var now = DateTimeOffset.UtcNow;
-
-        // StartedAt: set once when entering an active state from inactive
-        if (task.StartedAt is null && CompletionStateConstants.ActiveStates.Contains(newState))
-            task.StartedAt = now;
-
-        // CompletedAt: set when entering Completed, cleared when leaving terminal
-        if (newState == CompletionState.Completed)
-            task.CompletedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState) && !CompletionStateConstants.TerminalStates.Contains(newState))
-            task.CompletedAt = null;
-
-        // ResolvedAt: set when entering any terminal state, cleared when leaving terminal
-        if (CompletionStateConstants.TerminalStates.Contains(newState))
-            task.ResolvedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState))
-            task.ResolvedAt = null;
-    }
-
-    private static void ApplyWpStateTimestamps(WorkPackage wp, CompletionState oldState, CompletionState newState)
-    {
-        if (oldState == newState)
-            return;
-
-        var now = DateTimeOffset.UtcNow;
-
-        if (wp.StartedAt is null && CompletionStateConstants.ActiveStates.Contains(newState))
-            wp.StartedAt = now;
-
-        if (newState == CompletionState.Completed)
-            wp.CompletedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState) && !CompletionStateConstants.TerminalStates.Contains(newState))
-            wp.CompletedAt = null;
-
-        if (CompletionStateConstants.TerminalStates.Contains(newState))
-            wp.ResolvedAt = now;
-        else if (CompletionStateConstants.TerminalStates.Contains(oldState))
-            wp.ResolvedAt = null;
-    }
-
-    private static List<FileReference> MapAttachments(List<FileReferenceDto>? dtos)
-    {
-        if (dtos is null or { Count: 0 })
-            return [];
-
-        return dtos.Select(d => new FileReference
-        {
-            FileName = d.FileName,
-            RelativePath = d.RelativePath,
-            Description = d.Description
-        }).ToList();
-    }
-
-    private static List<FileReference> MapTargetFiles(List<FileReferenceDto>? dtos)
-    {
-        if (dtos is null or { Count: 0 })
-            return [];
-
-        return dtos.Select(d => new FileReference
-        {
-            FileName = d.FileName,
-            RelativePath = d.RelativePath,
-            Description = d.Description
-        }).ToList();
-    }
 
     private static List<PhaseAuditLog> BuildPhaseCreateAuditEntries(WorkPackagePhase phase, string changedBy)
     {
@@ -643,72 +524,6 @@ public sealed class PhaseService(AppDbContext db) : IPhaseService
 
     // ── Response mapping ──
 
-    private static PhaseResponse ToResponse(WorkPackagePhase p)
-    {
-        var wp = p.WorkPackage;
-        return new PhaseResponse
-        {
-            PhaseId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{p.PhaseNumber}",
-            Id = p.Id,
-            PhaseNumber = p.PhaseNumber,
-            Name = p.Name,
-            Description = p.Description,
-            SortOrder = p.SortOrder,
-            State = p.State.ToString(),
-            Tasks = p.Tasks.Select(t => new TaskResponse
-            {
-                TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{t.TaskNumber}",
-                Id = t.Id,
-                TaskNumber = t.TaskNumber,
-                PhaseId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{p.PhaseNumber}",
-                Name = t.Name,
-                Description = t.Description,
-                SortOrder = t.SortOrder,
-                ImplementationNotes = t.ImplementationNotes,
-                State = t.State.ToString(),
-                PreviousActiveState = t.PreviousActiveState?.ToString(),
-                StartedAt = t.StartedAt,
-                CompletedAt = t.CompletedAt,
-                ResolvedAt = t.ResolvedAt,
-                TargetFiles = t.TargetFiles.Select(f => new FileReferenceDto
-                {
-                    FileName = f.FileName,
-                    RelativePath = f.RelativePath,
-                    Description = f.Description
-                }).ToList(),
-                Attachments = t.Attachments.Select(f => new FileReferenceDto
-                {
-                    FileName = f.FileName,
-                    RelativePath = f.RelativePath,
-                    Description = f.Description
-                }).ToList(),
-                BlockedBy = t.BlockedBy.Select(d => new TaskDependencyResponse
-                {
-                    TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{d.DependsOnTask.TaskNumber}",
-                    Name = d.DependsOnTask.Name,
-                    State = d.DependsOnTask.State.ToString(),
-                    Reason = d.Reason
-                }).ToList(),
-                Blocking = t.Blocking.Select(d => new TaskDependencyResponse
-                {
-                    TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{d.DependentTask.TaskNumber}",
-                    Name = d.DependentTask.Name,
-                    State = d.DependentTask.State.ToString(),
-                    Reason = d.Reason
-                }).ToList(),
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt
-            }).ToList(),
-            AcceptanceCriteria = p.AcceptanceCriteria.Select(ac => new AcceptanceCriterionDto
-            {
-                Name = ac.Name,
-                Description = ac.Description,
-                VerificationMethod = ac.VerificationMethod,
-                VerificationResult = ac.VerificationResult,
-                VerifiedAt = ac.VerifiedAt
-            }).ToList(),
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
-        };
-    }
+    private static PhaseResponse ToResponse(WorkPackagePhase p) =>
+        ResponseMapper.MapPhase(p, p.WorkPackage.ProjectId, p.WorkPackage.WorkPackageNumber);
 }
