@@ -218,7 +218,8 @@ Business entities use human-readable ID formats derived at read-time from DB aut
 ID parsing utility: `IdParser` in `PinkRooster.Shared/Helpers/` with `TryParseProjectId`, `TryParseIssueId`, and `TryParseFeatureRequestId`.
 
 ### Entity Creation & Deletion Ownership
-- **Creation**: MCP tools only (AI agents create entities). No create/edit UI in dashboard.
+- **Creation**: MCP tools and dashboard (for Issues and Feature Requests). Work Packages remain MCP-only (AI-driven scaffolding with phases/tasks/dependencies).
+- **Editing**: Dashboard has inline edit on detail pages (toggle edit mode) for Issues and Feature Requests. State/status changes via separate quick-action with confirmation dialog.
 - **Deletion**: Dashboard only (with confirmation dialog). No MCP delete tools.
 - **Viewing**: Both MCP tools and dashboard can read data, but receive different response shapes per the boundary above.
 
@@ -265,8 +266,10 @@ Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Resp
 
 ### Dashboard Routing
 - Flat routes for top-level pages: `/projects`, `/activity`
-- Nested routes for entity detail: `/projects/:id` (project detail + issue list), `/projects/:id/issues/:issueNumber` (issue detail)
-- Project switcher click navigates to `/projects/:id` (not dashboard home)
+- Entity list routes: `/projects/:id/issues`, `/projects/:id/feature-requests`, `/projects/:id/work-packages`
+- Create routes: `/projects/:id/issues/new`, `/projects/:id/feature-requests/new`
+- Detail routes: `/projects/:id/issues/:issueNumber`, `/projects/:id/feature-requests/:featureNumber`, `/projects/:id/work-packages/:wpNumber`
+- Project switcher click navigates to `/` (dashboard home)
 
 ### Shared Infrastructure (API)
 Domain logic shared across services is centralized in:
