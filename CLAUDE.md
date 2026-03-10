@@ -102,7 +102,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `get_project_status` | Read | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
 | `get_next_actions` | Read | Priority-ordered actionable items (tasks, WPs, issues) with optional limit and entity type filter |
 | `create_or_update_project` | Write | Upsert project by path |
-| `add_or_update_issue` | Write | Create (omit issueId) or update (provide issueId) an issue |
+| `create_or_update_issue` | Write | Create (omit issueId) or update (provide issueId) an issue |
 | `get_issue_details` | Read | Full issue data by composite ID (no audit trail) |
 | `get_issue_overview` | Read | List issues for a project, filterable by state category |
 | `get_work_packages` | Read | List work packages, filterable by state category |
@@ -120,9 +120,9 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 
 1. **Project setup**: `get_project_status` with `projectPath` — confirms project exists, returns `projectId` + compact status summary
 2. **Issue CRUD**:
-   - `add_or_update_issue` with `projectId` + required fields (name, description, issueType, severity) — creates issue, response has `id` field with `proj-{N}-issue-{N}`
+   - `create_or_update_issue` with `projectId` + required fields (name, description, issueType, severity) — creates issue, response has `id` field with `proj-{N}-issue-{N}`
    - `get_issue_details` with returned ID — verify all fields including auto-set timestamps
-   - `add_or_update_issue` with `projectId` + `issueId` + fields to change — partial update
+   - `create_or_update_issue` with `projectId` + `issueId` + fields to change — partial update
    - `get_issue_overview` with `projectId` and optional `stateFilter` (active/inactive/terminal)
 3. **Work Package CRUD**:
    - `create_or_update_work_package` with `projectId` + name/description — creates WP, response has `id` with `proj-{N}-wp-{N}`
@@ -254,7 +254,10 @@ Domain logic shared across services is centralized in:
 - **Marker interfaces** in `PinkRooster.Data.Entities` — `IHasUpdatedAt`, `IHasStateTimestamps`, `IHasBlockedState`.
 
 ### Shared Infrastructure (MCP)
-- **`McpInputParser`** (internal static in `Helpers/`) — `ParseEnumOrDefault()`, `ParseEnum()`, `ParseInt()`, `ParseFileReferences()`, `ParseAcceptanceCriteria()`, `ParseCreateTasks()`, `ParseUpsertTasks()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
+- **`McpInputParser`** (internal static in `Helpers/`) — `MapFileReferences()`, `MapAcceptanceCriteria()`, `MapCreateTasks()`, `MapUpsertTasks()`, `MapScaffoldPhases()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
+- **MCP-specific enums** (in `Inputs/`) — `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue). Provide schema-level validation for constrained string parameters.
+- **MCP input types** (in `Inputs/`) — `FileReferenceInput`, `AcceptanceCriterionInput`, `PhaseTaskInput`, `ScaffoldPhaseInput`/`ScaffoldTaskInput`, `BatchTaskStateInput`. Map to shared DTOs via `McpInputParser`.
+- **MCP tool annotations** — All 17 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
 - **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `ActivityLogTools`.
 
 ### State Change Cascade Notifications

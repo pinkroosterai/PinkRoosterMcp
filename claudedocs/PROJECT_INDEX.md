@@ -154,28 +154,32 @@ State categories (`CompletionStateConstants`): Active (Designing, Implementing, 
 
 ---
 
-## MCP Tools (16 total)
+## MCP Tools (17 total)
 
-Registered as `pinkrooster` in `.mcp.json` at `http://localhost:5200`.
+Registered as `pinkrooster` in `.mcp.json` at `http://localhost:5200`. All tools have MCP annotations (`Title`, `OpenWorld = false`; read tools: `ReadOnly = true`; write tools: `Destructive = false`; idempotent tools: `Idempotent = true`).
 
 | Tool | R/W | Description |
 |------|-----|-------------|
 | `get_project_status` | R | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
 | `get_next_actions` | R | Priority-ordered actionable items (tasks, WPs, issues) with limit and entity type filter |
-| `create_or_update_project` | W | Upsert project by path |
-| `add_or_update_issue` | W | Create (omit issueId) or update (provide issueId) |
+| `create_or_update_project` | W | Upsert project by path (idempotent) |
+| `create_or_update_issue` | W | Create (omit issueId) or update (provide issueId) |
 | `get_issue_details` | R | Full issue data |
-| `get_issue_overview` | R | List issues (filterable: active/inactive/terminal) |
-| `get_work_packages` | R | List WPs (filterable by state) |
+| `get_issue_overview` | R | List issues (filterable via `StateFilterCategory` enum) |
+| `get_work_packages` | R | List WPs (filterable via `StateFilterCategory` enum) |
 | `get_work_package_details` | R | Full WP tree (phases, tasks, deps, criteria) |
 | `create_or_update_work_package` | W | Create/update WP (reports state changes) |
+| `scaffold_work_package` | W | One-call WP creation with phases, tasks, dependencies |
 | `create_or_update_phase` | W | Create/update phase (optional batch tasks) |
 | `create_or_update_task` | W | Create/update task (reports state changes) |
-| `manage_work_package_dependency` | W | Add/remove WP dependency (reports auto-block/unblock) |
-| `manage_task_dependency` | W | Add/remove task dependency (reports cascades) |
+| `batch_update_task_states` | W | Update multiple task states in one call (idempotent) |
+| `manage_work_package_dependency` | W | Add/remove WP dependency via `DependencyAction` enum (idempotent, reports auto-block/unblock) |
+| `manage_task_dependency` | W | Add/remove task dependency via `DependencyAction` enum (idempotent, reports cascades) |
 | `get_activity_logs` | R | Paginated HTTP request logs |
 
 Write tools return `OperationResult` JSON: `{ responseType, message, id?, nextStep?, stateChanges? }`.
+
+MCP-specific enums for constrained parameters: `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue).
 
 ---
 
@@ -296,17 +300,30 @@ src/PinkRooster.Api/
     └── RequestLoggingMiddleware.cs — ActivityLog recording
 ```
 
-### PinkRooster.Mcp (14 files)
+### PinkRooster.Mcp (22 files)
 ```
 src/PinkRooster.Mcp/
-├── Program.cs                    — MCP server config, health endpoint
+├── Program.cs                    — MCP server config, health endpoint, server instructions
 ├── Clients/
 │   └── PinkRoosterApiClient.cs   — typed HTTP client for all API calls
+├── Helpers/
+│   └── McpInputParser.cs         — input mapping + utility methods
+├── Inputs/                       — MCP-specific input types + enums
+│   ├── DependencyAction.cs       — Add/Remove enum
+│   ├── StateFilterCategory.cs    — Active/Inactive/Terminal enum
+│   ├── EntityTypeFilter.cs       — Task/Wp/Issue enum
+│   ├── FileReferenceInput.cs
+│   ├── AcceptanceCriterionInput.cs
+│   ├── PhaseTaskInput.cs
+│   ├── ScaffoldPhaseInput.cs     — + ScaffoldTaskInput
+│   └── BatchTaskStateInput.cs    — required TaskId + State
 ├── Tools/
-│   ├── ProjectTools.cs           — 3 tools
-│   ├── IssueTools.cs             — 3 tools
-│   ├── WorkPackageTools.cs       — 7 tools
-│   └── ActivityLogTools.cs       — 1 tool
+│   ├── ProjectTools.cs           — 3 tools (get_project_status, get_next_actions, create_or_update_project)
+│   ├── IssueTools.cs             — 3 tools (create_or_update_issue, get_issue_details, get_issue_overview)
+│   ├── WorkPackageTools.cs       — 5 tools (get_work_packages, get_work_package_details, create_or_update_work_package, manage_work_package_dependency, scaffold_work_package)
+│   ├── PhaseTools.cs             — 1 tool (create_or_update_phase)
+│   ├── TaskTools.cs              — 3 tools (create_or_update_task, batch_update_task_states, manage_task_dependency)
+│   └── ActivityLogTools.cs       — 1 tool (get_activity_logs)
 └── Responses/
     ├── OperationResult.cs        — standard write response
     ├── ResponseType.cs           — Success/Warning/Error enum

@@ -3,6 +3,7 @@ using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
 using PinkRooster.Mcp.Helpers;
+using PinkRooster.Mcp.Inputs;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -16,17 +17,22 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 {
     // ── 1. get_work_packages ──
 
-    [McpServerTool(Name = "get_work_packages", ReadOnly = true)]
-    [Description("Returns a list of work packages for a project, optionally filtered by state category.")]
+    [McpServerTool(Name = "get_work_packages", ReadOnly = true,
+        Title = "Get Work Packages", OpenWorld = false)]
+    [Description(
+        "Returns a compact list of work packages (ID, name, state, task counts) for a project. " +
+        "For full WP tree (phases, tasks, dependencies), use get_work_package_details. " +
+        "For WP counts by category, use get_project_status.")]
     public async Task<string> GetWorkPackages(
-        [Description("Project ID in 'proj-{number}' format.")] string projectId,
-        [Description("Filter by state category: 'active', 'inactive', 'terminal', or omit for all.")] string? stateFilter = null,
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
+        [Description("Filter by state category. Omit for all work packages.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseProjectId(projectId, out var projId))
             return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        var workPackages = await apiClient.GetWorkPackagesByProjectAsync(projId, stateFilter, ct);
+        var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
+        var workPackages = await apiClient.GetWorkPackagesByProjectAsync(projId, stateFilterStr, ct);
 
         if (workPackages.Count == 0)
             return OperationResult.SuccessMessage($"No work packages found for project '{projectId}'" +
@@ -51,10 +57,13 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
     // ── 2. get_work_package_details ──
 
-    [McpServerTool(Name = "get_work_package_details", ReadOnly = true)]
-    [Description("Returns full details for a work package including phases, tasks, acceptance criteria, and dependencies.")]
+    [McpServerTool(Name = "get_work_package_details", ReadOnly = true,
+        Title = "Get Work Package Details", OpenWorld = false)]
+    [Description(
+        "Returns all fields for a single work package including phases, tasks, acceptance criteria, " +
+        "and dependencies. Use get_work_packages for a compact list first.")]
     public async Task<string> GetWorkPackageDetails(
-        [Description("Work package ID in 'proj-{number}-wp-{number}' format.")] string workPackageId,
+        [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
@@ -94,24 +103,26 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
     // ── 3. create_or_update_work_package ──
 
-    [McpServerTool(Name = "create_or_update_work_package")]
+    [McpServerTool(Name = "create_or_update_work_package",
+        Title = "Create or Update Work Package", Destructive = false, OpenWorld = false)]
     [Description(
-        "Creates a new work package or updates an existing one. " +
+        "Creates a new work package or updates an existing one. Returns the WP ID and any cascade state changes. " +
         "To create: provide projectId and required fields (name, description). " +
-        "To update: provide projectId and workPackageId, plus any fields to change.")]
+        "To update: provide projectId and workPackageId, plus any fields to change. " +
+        "For creating a complete WP with phases and tasks in one call, use scaffold_work_package instead.")]
     public async Task<string> CreateOrUpdateWorkPackage(
-        [Description("Project ID in 'proj-{number}' format.")] string projectId,
-        [Description("Work package ID in 'proj-{number}-wp-{number}' format. Omit to create a new work package.")] string? workPackageId = null,
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
+        [Description("Work package ID (e.g. 'proj-1-wp-2'). Omit to create a new work package.")] string? workPackageId = null,
         [Description("Work package name/title.")] string? name = null,
         [Description("Detailed description of the work package.")] string? description = null,
-        [Description("Type: Feature, BugFix, Refactor, Spike, Chore")] string? type = null,
-        [Description("Priority: Critical, High, Medium, Low")] string? priority = null,
-        [Description("Implementation plan.")] string? plan = null,
-        [Description("Estimated complexity (integer).")] string? estimatedComplexity = null,
+        [Description("Work package type. Default: Feature.")] WorkPackageType? type = null,
+        [Description("Priority level. Default: Medium.")] Priority? priority = null,
+        [Description("Implementation plan (supports markdown).")] string? plan = null,
+        [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
-        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
-        [Description("Linked issue ID in 'proj-{number}-issue-{number}' format.")] string? linkedIssueId = null,
-        [Description("File attachments as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? attachments = null,
+        [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
+        [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
+        [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseProjectId(projectId, out var projId))
@@ -127,12 +138,17 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
     // ── 4. manage_work_package_dependency ──
 
-    [McpServerTool(Name = "manage_work_package_dependency")]
-    [Description("Adds or removes a dependency between work packages. The dependent work package is blocked by the depends-on work package.")]
+    [McpServerTool(Name = "manage_work_package_dependency",
+        Title = "Manage Work Package Dependency", Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description(
+        "Adds or removes a dependency between work packages. " +
+        "When adding: if the blocker is non-terminal, the dependent auto-transitions to Blocked. " +
+        "When the blocker completes, dependents auto-unblock. " +
+        "Returns stateChanges showing any automatic state transitions.")]
     public async Task<string> ManageWorkPackageDependency(
-        [Description("Dependent work package ID in 'proj-{number}-wp-{number}' format.")] string workPackageId,
-        [Description("Depends-on work package ID in 'proj-{number}-wp-{number}' format.")] string dependsOnWorkPackageId,
-        [Description("Action: 'add' or 'remove'.")] string action,
+        [Description("Dependent work package ID (e.g. 'proj-1-wp-3').")] string workPackageId,
+        [Description("Blocker work package ID (e.g. 'proj-1-wp-1').")] string dependsOnWorkPackageId,
+        [Description("Whether to add or remove the dependency.")] DependencyAction action,
         [Description("Reason for the dependency.")] string? reason = null,
         CancellationToken ct = default)
     {
@@ -142,14 +158,13 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseWorkPackageId(dependsOnWorkPackageId, out var depProjId, out var depWpNumber))
             return OperationResult.Error($"Invalid work package ID format: '{dependsOnWorkPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
 
-        // Look up the depends-on WP to get its internal ID
         var dependsOnWp = await apiClient.GetWorkPackageAsync(depProjId, depWpNumber, ct);
         if (dependsOnWp is null)
             return OperationResult.Warning($"Depends-on work package '{dependsOnWorkPackageId}' not found.");
 
-        switch (action.ToLowerInvariant())
+        switch (action)
         {
-            case "add":
+            case DependencyAction.Add:
                 var request = new ManageDependencyRequest
                 {
                     DependsOnId = dependsOnWp.Id,
@@ -168,39 +183,41 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                     $"Dependency added: '{workPackageId}' is now blocked by '{dependsOnWorkPackageId}'.",
                     stateChanges: depResponse.StateChanges);
 
-            case "remove":
+            case DependencyAction.Remove:
                 var removed = await apiClient.RemoveWorkPackageDependencyAsync(projId, wpNumber, dependsOnWp.Id, ct);
                 return removed
                     ? OperationResult.Success(workPackageId, $"Dependency removed: '{workPackageId}' is no longer blocked by '{dependsOnWorkPackageId}'.")
                     : OperationResult.Warning($"Dependency between '{workPackageId}' and '{dependsOnWorkPackageId}' not found.");
 
             default:
-                return OperationResult.Error($"Invalid action: '{action}'. Expected 'add' or 'remove'.");
+                return OperationResult.Error($"Invalid action: '{action}'.");
         }
     }
 
     // ── 5. scaffold_work_package ──
 
-    [McpServerTool(Name = "scaffold_work_package")]
+    [McpServerTool(Name = "scaffold_work_package",
+        Title = "Scaffold Work Package", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a complete work package with phases, tasks, acceptance criteria, and task dependencies in a single call. " +
         "Tasks require name + description; all other fields are optional. " +
         "Task dependencies use 0-based indices within the same phase's task array via dependsOnTaskIndices. " +
-        "Returns a compact ID map of all created entities.")]
+        "Returns a compact ID map of all created entities. " +
+        "For creating/updating a WP without phases or tasks, use create_or_update_work_package instead.")]
     public async Task<string> ScaffoldWorkPackage(
-        [Description("Project ID in 'proj-{number}' format.")] string projectId,
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Work package name/title.")] string name,
         [Description("Detailed description of the work package.")] string description,
-        [Description("Phases with optional tasks, acceptance criteria, and task dependencies.")] List<ScaffoldPhaseRequest> phases,
-        [Description("Type: Feature, BugFix, Refactor, Spike, Chore (default: Feature)")] string? type = null,
-        [Description("Priority: Critical, High, Medium, Low (default: Medium)")] string? priority = null,
-        [Description("Implementation plan (markdown).")] string? plan = null,
-        [Description("Estimated complexity (integer).")] string? estimatedComplexity = null,
+        [Description("Phases with optional tasks, acceptance criteria, and task dependencies.")] List<ScaffoldPhaseInput> phases,
+        [Description("Work package type. Default: Feature.")] WorkPackageType? type = null,
+        [Description("Priority level. Default: Medium.")] Priority? priority = null,
+        [Description("Implementation plan (supports markdown).")] string? plan = null,
+        [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
-        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
-        [Description("Linked issue ID in 'proj-{number}-issue-{number}' format.")] string? linkedIssueId = null,
-        [Description("Existing WP IDs that block this WP, as JSON array: [\"proj-1-wp-2\"]")] string? blockedByWorkPackageIds = null,
-        [Description("File attachments as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? attachments = null,
+        [Description("Completion state (e.g. NotStarted, Implementing). Default: NotStarted.")] CompletionState? state = null,
+        [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
+        [Description("Existing WP IDs that block this WP (e.g. ['proj-1-wp-1']).")] List<string>? blockedByWorkPackageIds = null,
+        [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
         try
@@ -215,17 +232,16 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             {
                 Name = name,
                 Description = description,
-                Type = McpInputParser.ParseEnumOrDefault(type, WorkPackageType.Feature),
-                Priority = McpInputParser.ParseEnumOrDefault(priority, Priority.Medium),
+                Type = type ?? WorkPackageType.Feature,
+                Priority = priority ?? Priority.Medium,
                 Plan = plan,
-                EstimatedComplexity = McpInputParser.ParseInt(estimatedComplexity),
+                EstimatedComplexity = estimatedComplexity,
                 EstimationRationale = estimationRationale,
-                State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
-                Attachments = McpInputParser.ParseFileReferences(attachments),
-                Phases = phases
+                State = state ?? CompletionState.NotStarted,
+                Attachments = McpInputParser.MapFileReferences(attachments),
+                Phases = McpInputParser.MapScaffoldPhases(phases)
             };
 
-            // Resolve linked issue ID
             if (linkedIssueId is not null)
             {
                 if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
@@ -238,33 +254,19 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                 request.LinkedIssueId = issue.Id;
             }
 
-            // Resolve blockedBy WP IDs
-            if (!string.IsNullOrWhiteSpace(blockedByWorkPackageIds))
+            if (blockedByWorkPackageIds is { Count: > 0 })
             {
-                List<string>? blockerIdStrings;
-                try
+                request.BlockedByWpIds = [];
+                foreach (var wpIdStr in blockedByWorkPackageIds)
                 {
-                    blockerIdStrings = JsonSerializer.Deserialize<List<string>>(blockedByWorkPackageIds, JsonDefaults.Indented);
-                }
-                catch
-                {
-                    return OperationResult.Error("'blockedByWorkPackageIds' must be a valid JSON array of WP ID strings.");
-                }
+                    if (!IdParser.TryParseWorkPackageId(wpIdStr, out var bProjId, out var bWpNumber))
+                        return OperationResult.Error($"Invalid blocker WP ID format: '{wpIdStr}'. Expected 'proj-{{number}}-wp-{{number}}'.");
 
-                if (blockerIdStrings is { Count: > 0 })
-                {
-                    request.BlockedByWpIds = [];
-                    foreach (var wpIdStr in blockerIdStrings)
-                    {
-                        if (!IdParser.TryParseWorkPackageId(wpIdStr, out var bProjId, out var bWpNumber))
-                            return OperationResult.Error($"Invalid blocker WP ID format: '{wpIdStr}'. Expected 'proj-{{number}}-wp-{{number}}'.");
+                    var blockerWp = await apiClient.GetWorkPackageAsync(bProjId, bWpNumber, ct);
+                    if (blockerWp is null)
+                        return OperationResult.Warning($"Blocker work package '{wpIdStr}' not found.");
 
-                        var blockerWp = await apiClient.GetWorkPackageAsync(bProjId, bWpNumber, ct);
-                        if (blockerWp is null)
-                            return OperationResult.Warning($"Blocker work package '{wpIdStr}' not found.");
-
-                        request.BlockedByWpIds.Add(blockerWp.Id);
-                    }
+                    request.BlockedByWpIds.Add(blockerWp.Id);
                 }
             }
 
@@ -294,12 +296,12 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         }
     }
 
-    // ── Private helpers: Work Package create/update ──
+    // ── Private helpers ──
 
     private async Task<string> CreateNewWorkPackage(
-        long projId, string? name, string? description, string? type, string? priority,
-        string? plan, string? estimatedComplexity, string? estimationRationale, string? state,
-        string? linkedIssueId, string? attachments, CancellationToken ct)
+        long projId, string? name, string? description, WorkPackageType? type, Priority? priority,
+        string? plan, int? estimatedComplexity, string? estimationRationale, CompletionState? state,
+        string? linkedIssueId, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return OperationResult.Error("'name' is required when creating a work package.");
@@ -310,16 +312,15 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            Type = McpInputParser.ParseEnumOrDefault(type, WorkPackageType.Feature),
-            Priority = McpInputParser.ParseEnumOrDefault(priority, Priority.Medium),
+            Type = type ?? WorkPackageType.Feature,
+            Priority = priority ?? Priority.Medium,
             Plan = plan,
-            EstimatedComplexity = McpInputParser.ParseInt(estimatedComplexity),
+            EstimatedComplexity = estimatedComplexity,
             EstimationRationale = estimationRationale,
-            State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
-            Attachments = McpInputParser.ParseFileReferences(attachments)
+            State = state ?? CompletionState.NotStarted,
+            Attachments = McpInputParser.MapFileReferences(attachments)
         };
 
-        // Resolve linked issue ID if provided
         if (linkedIssueId is not null)
         {
             if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
@@ -337,9 +338,9 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     }
 
     private async Task<string> UpdateExistingWorkPackage(
-        long projId, string workPackageId, string? name, string? description, string? type,
-        string? priority, string? plan, string? estimatedComplexity, string? estimationRationale,
-        string? state, string? linkedIssueId, string? attachments, CancellationToken ct)
+        long projId, string workPackageId, string? name, string? description, WorkPackageType? type,
+        Priority? priority, string? plan, int? estimatedComplexity, string? estimationRationale,
+        CompletionState? state, string? linkedIssueId, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var parsedProjId, out var wpNumber))
             return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
@@ -351,16 +352,15 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            Type = type is not null ? McpInputParser.ParseEnum<WorkPackageType>(type) : null,
-            Priority = priority is not null ? McpInputParser.ParseEnum<Priority>(priority) : null,
+            Type = type,
+            Priority = priority,
             Plan = plan,
-            EstimatedComplexity = McpInputParser.ParseInt(estimatedComplexity),
+            EstimatedComplexity = estimatedComplexity,
             EstimationRationale = estimationRationale,
-            State = state is not null ? McpInputParser.ParseEnum<CompletionState>(state) : null,
-            Attachments = attachments is not null ? McpInputParser.ParseFileReferences(attachments) : null
+            State = state,
+            Attachments = attachments is not null ? McpInputParser.MapFileReferences(attachments) : null
         };
 
-        // Resolve linked issue ID if provided
         if (linkedIssueId is not null)
         {
             if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
@@ -381,7 +381,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             stateChanges: updated.StateChanges);
     }
 
-    // ── Mapping helpers (WP detail tree) ──
+    // ── Mapping helpers ──
 
     private static PhaseDetailItem MapPhaseDetail(PhaseResponse phase) => new()
     {
@@ -421,17 +421,11 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
     private static DependencyItem MapWpDependency(DependencyResponse dep) => new()
     {
-        EntityId = dep.WorkPackageId,
-        Name = dep.Name,
-        State = dep.State,
-        Reason = dep.Reason
+        EntityId = dep.WorkPackageId, Name = dep.Name, State = dep.State, Reason = dep.Reason
     };
 
     private static DependencyItem MapTaskDependency(TaskDependencyResponse dep) => new()
     {
-        EntityId = dep.TaskId,
-        Name = dep.Name,
-        State = dep.State,
-        Reason = dep.Reason
+        EntityId = dep.TaskId, Name = dep.Name, State = dep.State, Reason = dep.Reason
     };
 }

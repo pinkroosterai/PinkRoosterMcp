@@ -3,6 +3,7 @@ using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
 using PinkRooster.Mcp.Helpers;
+using PinkRooster.Mcp.Inputs;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -14,20 +15,22 @@ namespace PinkRooster.Mcp.Tools;
 [McpServerToolType]
 public sealed class IssueTools(PinkRoosterApiClient apiClient)
 {
-    [McpServerTool(Name = "add_or_update_issue")]
+    [McpServerTool(Name = "create_or_update_issue",
+        Title = "Create or Update Issue", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a new issue or updates an existing one. " +
         "To create: provide projectId and required fields (name, description, issueType, severity). " +
-        "To update: provide projectId and issueId, plus any fields to change.")]
-    public async Task<string> AddOrUpdateIssue(
-        [Description("Project ID in 'proj-{number}' format.")] string projectId,
-        [Description("Issue ID in 'proj-{number}-issue-{number}' format. Omit to create a new issue.")] string? issueId = null,
+        "To update: provide projectId and issueId, plus any fields to change. " +
+        "Issues track bugs and problems — use create_or_update_work_package for planned work.")]
+    public async Task<string> CreateOrUpdateIssue(
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
+        [Description("Issue ID (e.g. 'proj-1-issue-3'). Omit to create a new issue.")] string? issueId = null,
         [Description("Issue name/title.")] string? name = null,
         [Description("Detailed description of the issue.")] string? description = null,
-        [Description("Type: Bug, Defect, Regression, TechnicalDebt, PerformanceIssue, SecurityVulnerability")] string? issueType = null,
-        [Description("Severity: Critical, Major, Minor, Trivial")] string? severity = null,
-        [Description("Priority: Critical, High, Medium, Low")] string? priority = null,
-        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
+        [Description("Issue type. Required for create.")] IssueType? issueType = null,
+        [Description("Issue severity. Required for create.")] IssueSeverity? severity = null,
+        [Description("Priority level. Default: Medium.")] Priority? priority = null,
+        [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
         [Description("Steps to reproduce the issue.")] string? stepsToReproduce = null,
         [Description("Expected behavior.")] string? expectedBehavior = null,
         [Description("Actual behavior observed.")] string? actualBehavior = null,
@@ -35,7 +38,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("Stack trace or error output.")] string? stackTrace = null,
         [Description("Root cause analysis.")] string? rootCause = null,
         [Description("Resolution description.")] string? resolution = null,
-        [Description("File attachments as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? attachments = null,
+        [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseProjectId(projectId, out var projId))
@@ -51,10 +54,13 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             affectedComponent, stackTrace, rootCause, resolution, attachments, ct);
     }
 
-    [McpServerTool(Name = "get_issue_details", ReadOnly = true)]
-    [Description("Returns full details for a specific issue.")]
+    [McpServerTool(Name = "get_issue_details", ReadOnly = true,
+        Title = "Get Issue Details", OpenWorld = false)]
+    [Description(
+        "Returns all fields for a single issue including state timestamps, attachments, and linked work packages. " +
+        "For listing multiple issues, use get_issue_overview instead.")]
     public async Task<string> GetIssueDetails(
-        [Description("Issue ID in 'proj-{number}-issue-{number}' format.")] string issueId,
+        [Description("Issue ID (e.g. 'proj-1-issue-3').")] string issueId,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseIssueId(issueId, out var projId, out var issueNumber))
@@ -93,17 +99,22 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
     }
 
-    [McpServerTool(Name = "get_issue_overview", ReadOnly = true)]
-    [Description("Returns a list of issues for a project, optionally filtered by state category.")]
+    [McpServerTool(Name = "get_issue_overview", ReadOnly = true,
+        Title = "Get Issue Overview", OpenWorld = false)]
+    [Description(
+        "Returns a compact list of issues (ID, name, state, priority, severity) for a project. " +
+        "For full issue data, use get_issue_details instead. " +
+        "For issue counts by category, use get_project_status.")]
     public async Task<string> GetIssueOverview(
-        [Description("Project ID in 'proj-{number}' format.")] string projectId,
-        [Description("Filter by state category: 'active', 'inactive', 'terminal', or omit for all.")] string? stateFilter = null,
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
+        [Description("Filter by state category. Omit for all issues.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseProjectId(projectId, out var projId))
             return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        var issues = await apiClient.GetIssuesByProjectAsync(projId, stateFilter, ct);
+        var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
+        var issues = await apiClient.GetIssuesByProjectAsync(projId, stateFilterStr, ct);
 
         if (issues.Count == 0)
             return OperationResult.SuccessMessage($"No issues found for project '{projectId}'" +
@@ -127,33 +138,28 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
     // ── Private helpers ──
 
     private async Task<string> CreateNewIssue(
-        long projId, string? name, string? description, string? issueType, string? severity,
-        string? priority, string? state, string? stepsToReproduce, string? expectedBehavior,
+        long projId, string? name, string? description, IssueType? issueType, IssueSeverity? severity,
+        Priority? priority, CompletionState? state, string? stepsToReproduce, string? expectedBehavior,
         string? actualBehavior, string? affectedComponent, string? stackTrace,
-        string? rootCause, string? resolution, string? attachments, CancellationToken ct)
+        string? rootCause, string? resolution, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return OperationResult.Error("'name' is required when creating an issue.");
         if (string.IsNullOrWhiteSpace(description))
             return OperationResult.Error("'description' is required when creating an issue.");
-        if (string.IsNullOrWhiteSpace(issueType))
+        if (issueType is null)
             return OperationResult.Error("'issueType' is required when creating an issue.");
-        if (string.IsNullOrWhiteSpace(severity))
+        if (severity is null)
             return OperationResult.Error("'severity' is required when creating an issue.");
-
-        if (!Enum.TryParse<IssueType>(issueType, true, out var parsedType))
-            return OperationResult.Error($"Invalid issueType: '{issueType}'.");
-        if (!Enum.TryParse<IssueSeverity>(severity, true, out var parsedSeverity))
-            return OperationResult.Error($"Invalid severity: '{severity}'.");
 
         var request = new CreateIssueRequest
         {
             Name = name,
             Description = description,
-            IssueType = parsedType,
-            Severity = parsedSeverity,
-            Priority = McpInputParser.ParseEnumOrDefault(priority, Priority.Medium),
-            State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
+            IssueType = issueType.Value,
+            Severity = severity.Value,
+            Priority = priority ?? Priority.Medium,
+            State = state ?? CompletionState.NotStarted,
             StepsToReproduce = stepsToReproduce,
             ExpectedBehavior = expectedBehavior,
             ActualBehavior = actualBehavior,
@@ -161,7 +167,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             StackTrace = stackTrace,
             RootCause = rootCause,
             Resolution = resolution,
-            Attachments = McpInputParser.ParseFileReferences(attachments)
+            Attachments = McpInputParser.MapFileReferences(attachments)
         };
 
         var created = await apiClient.CreateIssueAsync(projId, request, ct);
@@ -169,10 +175,10 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
     }
 
     private async Task<string> UpdateExistingIssue(
-        long projId, string issueId, string? name, string? description, string? issueType,
-        string? severity, string? priority, string? state, string? stepsToReproduce,
+        long projId, string issueId, string? name, string? description, IssueType? issueType,
+        IssueSeverity? severity, Priority? priority, CompletionState? state, string? stepsToReproduce,
         string? expectedBehavior, string? actualBehavior, string? affectedComponent,
-        string? stackTrace, string? rootCause, string? resolution, string? attachments,
+        string? stackTrace, string? rootCause, string? resolution, List<FileReferenceInput>? attachments,
         CancellationToken ct)
     {
         if (!IdParser.TryParseIssueId(issueId, out var parsedProjId, out var issueNumber))
@@ -185,10 +191,10 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            IssueType = issueType is not null ? McpInputParser.ParseEnum<IssueType>(issueType) : null,
-            Severity = severity is not null ? McpInputParser.ParseEnum<IssueSeverity>(severity) : null,
-            Priority = priority is not null ? McpInputParser.ParseEnum<Priority>(priority) : null,
-            State = state is not null ? McpInputParser.ParseEnum<CompletionState>(state) : null,
+            IssueType = issueType,
+            Severity = severity,
+            Priority = priority,
+            State = state,
             StepsToReproduce = stepsToReproduce,
             ExpectedBehavior = expectedBehavior,
             ActualBehavior = actualBehavior,
@@ -196,7 +202,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             StackTrace = stackTrace,
             RootCause = rootCause,
             Resolution = resolution,
-            Attachments = attachments is not null ? McpInputParser.ParseFileReferences(attachments) : null
+            Attachments = attachments is not null ? McpInputParser.MapFileReferences(attachments) : null
         };
 
         var updated = await apiClient.UpdateIssueAsync(projId, issueNumber, request, ct);

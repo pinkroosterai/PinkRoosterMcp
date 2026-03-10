@@ -2,6 +2,7 @@ using System.ComponentModel;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
 using PinkRooster.Mcp.Helpers;
+using PinkRooster.Mcp.Inputs;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.Enums;
@@ -12,19 +13,21 @@ namespace PinkRooster.Mcp.Tools;
 [McpServerToolType]
 public sealed class PhaseTools(PinkRoosterApiClient apiClient)
 {
-    [McpServerTool(Name = "create_or_update_phase")]
+    [McpServerTool(Name = "create_or_update_phase",
+        Title = "Create or Update Phase", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a new phase or updates an existing one. Can include tasks for batch creation/update. " +
-        "To create: provide workPackageId and name. To update: provide phaseId plus fields to change.")]
+        "To create: provide workPackageId and name. To update: provide phaseId plus fields to change. " +
+        "For creating a full WP with phases and tasks at once, use scaffold_work_package instead.")]
     public async Task<string> CreateOrUpdatePhase(
-        [Description("Work package ID in 'proj-{number}-wp-{number}' format.")] string workPackageId,
-        [Description("Phase ID in 'proj-{number}-wp-{number}-phase-{number}' format. Omit to create a new phase.")] string? phaseId = null,
+        [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
+        [Description("Phase ID (e.g. 'proj-1-wp-2-phase-1'). Omit to create a new phase.")] string? phaseId = null,
         [Description("Phase name.")] string? name = null,
         [Description("Phase description.")] string? description = null,
-        [Description("Sort order (integer).")] string? sortOrder = null,
-        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
-        [Description("Acceptance criteria as JSON array: [{\"name\":\"...\",\"description\":\"...\",\"verificationMethod\":\"Manual|Automated|CodeReview\"}]")] string? acceptanceCriteria = null,
-        [Description("Tasks as JSON array. For create: [{\"name\":\"...\",\"description\":\"...\"}]. For update: [{\"taskNumber\":1,\"name\":\"...\"}]")] string? tasks = null,
+        [Description("Sort order for display ordering.")] int? sortOrder = null,
+        [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
+        [Description("Acceptance criteria for this phase. Replaces all existing criteria on update.")] List<AcceptanceCriterionInput>? acceptanceCriteria = null,
+        [Description("Tasks to create or update. For new tasks: provide name and description. For existing tasks: provide taskNumber and fields to change.")] List<PhaseTaskInput>? tasks = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
@@ -39,8 +42,8 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
     }
 
     private async Task<string> CreateNewPhase(
-        long projId, int wpNumber, string? name, string? description, string? sortOrder,
-        string? acceptanceCriteria, string? tasks, CancellationToken ct)
+        long projId, int wpNumber, string? name, string? description, int? sortOrder,
+        List<AcceptanceCriterionInput>? acceptanceCriteria, List<PhaseTaskInput>? tasks, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return OperationResult.Error("'name' is required when creating a phase.");
@@ -49,9 +52,9 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            SortOrder = McpInputParser.ParseInt(sortOrder),
-            AcceptanceCriteria = McpInputParser.ParseAcceptanceCriteria(acceptanceCriteria),
-            Tasks = McpInputParser.ParseCreateTasks(tasks)
+            SortOrder = sortOrder,
+            AcceptanceCriteria = McpInputParser.MapAcceptanceCriteria(acceptanceCriteria),
+            Tasks = McpInputParser.MapCreateTasks(tasks)
         };
 
         var created = await apiClient.CreatePhaseAsync(projId, wpNumber, request, ct);
@@ -60,8 +63,8 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
 
     private async Task<string> UpdateExistingPhase(
         long projId, int wpNumber, string phaseId, string? name, string? description,
-        string? sortOrder, string? state, string? acceptanceCriteria, string? tasks,
-        CancellationToken ct)
+        int? sortOrder, CompletionState? state, List<AcceptanceCriterionInput>? acceptanceCriteria,
+        List<PhaseTaskInput>? tasks, CancellationToken ct)
     {
         if (!IdParser.TryParsePhaseId(phaseId, out var parsedProjId, out var parsedWpNumber, out var phaseNumber))
             return OperationResult.Error($"Invalid phase ID format: '{phaseId}'. Expected 'proj-{{number}}-wp-{{number}}-phase-{{number}}'.");
@@ -73,10 +76,10 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            SortOrder = McpInputParser.ParseInt(sortOrder),
-            State = state is not null ? McpInputParser.ParseEnum<CompletionState>(state) : null,
-            AcceptanceCriteria = McpInputParser.ParseAcceptanceCriteria(acceptanceCriteria),
-            Tasks = McpInputParser.ParseUpsertTasks(tasks)
+            SortOrder = sortOrder,
+            State = state,
+            AcceptanceCriteria = McpInputParser.MapAcceptanceCriteria(acceptanceCriteria),
+            Tasks = McpInputParser.MapUpsertTasks(tasks)
         };
 
         var updated = await apiClient.UpdatePhaseAsync(projId, wpNumber, phaseNumber, request, ct);

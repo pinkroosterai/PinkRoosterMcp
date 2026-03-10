@@ -1,5 +1,4 @@
-using System.Text.Json;
-using PinkRooster.Mcp.Responses;
+using PinkRooster.Mcp.Inputs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.Enums;
 
@@ -13,85 +12,69 @@ internal static class McpInputParser
     internal static bool IsTerminalState(string state) =>
         TerminalStateStrings.Contains(state);
 
-    internal static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum defaultValue) where TEnum : struct, Enum
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return defaultValue;
-        return Enum.TryParse<TEnum>(value, true, out var parsed) ? parsed : defaultValue;
-    }
-
-    internal static TEnum? ParseEnum<TEnum>(string value) where TEnum : struct, Enum
-    {
-        return Enum.TryParse<TEnum>(value, true, out var parsed) ? parsed : null;
-    }
-
-    internal static int? ParseInt(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-        return int.TryParse(value, out var parsed) ? parsed : null;
-    }
-
-    internal static List<FileReferenceDto>? ParseFileReferences(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<FileReferenceDto>>(json, JsonDefaults.Indented);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    internal static List<AcceptanceCriterionDto>? ParseAcceptanceCriteria(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<AcceptanceCriterionDto>>(json, JsonDefaults.Indented);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    internal static List<CreateTaskRequest>? ParseCreateTasks(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<CreateTaskRequest>>(json, JsonDefaults.Indented);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    internal static List<UpsertTaskInPhaseDto>? ParseUpsertTasks(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<UpsertTaskInPhaseDto>>(json, JsonDefaults.Indented);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     internal static List<T>? NullIfEmpty<T>(List<T> list) =>
         list.Count == 0 ? null : list;
+
+    // ── Mapping: MCP inputs → Shared DTOs ──
+
+    internal static List<FileReferenceDto>? MapFileReferences(List<FileReferenceInput>? inputs) =>
+        inputs?.Select(f => new FileReferenceDto
+        {
+            FileName = f.FileName,
+            RelativePath = f.RelativePath,
+            Description = f.Description
+        }).ToList();
+
+    internal static List<AcceptanceCriterionDto>? MapAcceptanceCriteria(List<AcceptanceCriterionInput>? inputs) =>
+        inputs?.Select(ac => new AcceptanceCriterionDto
+        {
+            Name = ac.Name,
+            Description = ac.Description,
+            VerificationMethod = ac.VerificationMethod ?? VerificationMethod.Manual
+        }).ToList();
+
+    internal static List<CreateTaskRequest>? MapCreateTasks(List<PhaseTaskInput>? inputs) =>
+        inputs?.Select(t => new CreateTaskRequest
+        {
+            Name = t.Name ?? "",
+            Description = t.Description ?? "",
+            SortOrder = t.SortOrder,
+            ImplementationNotes = t.ImplementationNotes,
+            State = t.State ?? CompletionState.NotStarted,
+            TargetFiles = MapFileReferences(t.TargetFiles),
+            Attachments = MapFileReferences(t.Attachments)
+        }).ToList();
+
+    internal static List<UpsertTaskInPhaseDto>? MapUpsertTasks(List<PhaseTaskInput>? inputs) =>
+        inputs?.Select(t => new UpsertTaskInPhaseDto
+        {
+            TaskNumber = t.TaskNumber,
+            Name = t.Name,
+            Description = t.Description,
+            SortOrder = t.SortOrder,
+            ImplementationNotes = t.ImplementationNotes,
+            State = t.State,
+            TargetFiles = MapFileReferences(t.TargetFiles),
+            Attachments = MapFileReferences(t.Attachments)
+        }).ToList();
+
+    internal static List<ScaffoldPhaseRequest> MapScaffoldPhases(List<ScaffoldPhaseInput> inputs) =>
+        inputs.Select(p => new ScaffoldPhaseRequest
+        {
+            Name = p.Name,
+            Description = p.Description,
+            SortOrder = p.SortOrder,
+            AcceptanceCriteria = MapAcceptanceCriteria(p.AcceptanceCriteria),
+            Tasks = p.Tasks?.Select(t => new ScaffoldTaskRequest
+            {
+                Name = t.Name,
+                Description = t.Description,
+                SortOrder = t.SortOrder,
+                ImplementationNotes = t.ImplementationNotes,
+                State = t.State ?? CompletionState.NotStarted,
+                TargetFiles = MapFileReferences(t.TargetFiles),
+                Attachments = MapFileReferences(t.Attachments),
+                DependsOnTaskIndices = t.DependsOnTaskIndices
+            }).ToList()
+        }).ToList();
 }

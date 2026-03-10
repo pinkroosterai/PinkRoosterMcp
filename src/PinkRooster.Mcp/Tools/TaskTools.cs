@@ -2,6 +2,7 @@ using System.ComponentModel;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
 using PinkRooster.Mcp.Helpers;
+using PinkRooster.Mcp.Inputs;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
@@ -13,21 +14,23 @@ namespace PinkRooster.Mcp.Tools;
 [McpServerToolType]
 public sealed class TaskTools(PinkRoosterApiClient apiClient)
 {
-    [McpServerTool(Name = "create_or_update_task")]
+    [McpServerTool(Name = "create_or_update_task",
+        Title = "Create or Update Task", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a new task or updates an existing one. " +
         "To create: provide phaseId with name and description. " +
-        "To update: provide taskId plus fields to change.")]
+        "To update: provide taskId plus fields to change. " +
+        "For creating multiple tasks at once, use create_or_update_phase with the tasks parameter or scaffold_work_package instead.")]
     public async Task<string> CreateOrUpdateTask(
-        [Description("Phase ID in 'proj-{number}-wp-{number}-phase-{number}' format. Required for task creation.")] string? phaseId = null,
-        [Description("Task ID in 'proj-{number}-wp-{number}-task-{number}' format. Provide to update an existing task.")] string? taskId = null,
+        [Description("Phase ID (e.g. 'proj-1-wp-2-phase-1'). Required for task creation.")] string? phaseId = null,
+        [Description("Task ID (e.g. 'proj-1-wp-2-task-5'). Provide to update an existing task.")] string? taskId = null,
         [Description("Task name.")] string? name = null,
         [Description("Task description.")] string? description = null,
-        [Description("Sort order (integer).")] string? sortOrder = null,
-        [Description("Implementation notes.")] string? implementationNotes = null,
-        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
-        [Description("Target files as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? targetFiles = null,
-        [Description("File attachments as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? attachments = null,
+        [Description("Sort order for display ordering.")] int? sortOrder = null,
+        [Description("Implementation notes (supports markdown).")] string? implementationNotes = null,
+        [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
+        [Description("Target files for this task.")] List<FileReferenceInput>? targetFiles = null,
+        [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
         if (taskId is not null)
@@ -41,56 +44,41 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
             implementationNotes, state, targetFiles, attachments, ct);
     }
 
-    [McpServerTool(Name = "batch_update_task_states")]
+    [McpServerTool(Name = "batch_update_task_states",
+        Title = "Batch Update Task States", Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Updates the state of multiple tasks in a single work package in one operation. " +
         "Cascades (auto-unblock, phase/WP auto-complete) run once after all transitions, " +
-        "returning a consolidated list of state changes.")]
+        "returning a consolidated list of state changes. " +
+        "For updating individual task fields beyond state, use create_or_update_task instead.")]
     public async Task<string> BatchUpdateTaskStates(
-        [Description("Work package ID in 'proj-{number}-wp-{number}' format.")] string workPackageId,
-        [Description("JSON array of task state updates: [{\"taskId\":\"proj-1-wp-1-task-1\",\"state\":\"Completed\"},{\"taskId\":\"proj-1-wp-1-task-2\",\"state\":\"Completed\"}]")] string tasks,
+        [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
+        [Description("Task state updates to apply.")] List<BatchTaskStateInput> tasks,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
             return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
 
-        List<BatchTaskStateInput>? parsed;
-        try
-        {
-            parsed = System.Text.Json.JsonSerializer.Deserialize<List<BatchTaskStateInput>>(tasks, Responses.JsonDefaults.Indented);
-        }
-        catch
-        {
-            return OperationResult.Error("Invalid JSON for 'tasks'. Expected: [{\"taskId\":\"...\",\"state\":\"...\"}]");
-        }
-
-        if (parsed is null or { Count: 0 })
+        if (tasks is { Count: 0 })
             return OperationResult.Error("'tasks' array must contain at least one entry.");
 
-        var taskUpdates = new List<Shared.DTOs.Requests.TaskStateUpdate>();
-        foreach (var item in parsed)
+        var taskUpdates = new List<TaskStateUpdate>();
+        foreach (var item in tasks)
         {
-            if (string.IsNullOrWhiteSpace(item.TaskId))
-                return OperationResult.Error("Each task entry must have a 'taskId'.");
-
             if (!IdParser.TryParseTaskId(item.TaskId, out var taskProjId, out var taskWpNumber, out var taskNumber))
                 return OperationResult.Error($"Invalid task ID format: '{item.TaskId}'. Expected 'proj-{{number}}-wp-{{number}}-task-{{number}}'.");
 
             if (taskProjId != projId || taskWpNumber != wpNumber)
                 return OperationResult.Error($"Task '{item.TaskId}' does not belong to work package '{workPackageId}'.");
 
-            var state = McpInputParser.ParseEnum<CompletionState>(item.State ?? "");
-            if (state is null)
-                return OperationResult.Error($"Invalid state '{item.State}' for task '{item.TaskId}'.");
-
-            taskUpdates.Add(new Shared.DTOs.Requests.TaskStateUpdate
+            taskUpdates.Add(new TaskStateUpdate
             {
                 TaskNumber = taskNumber,
-                State = state.Value
+                State = item.State
             });
         }
 
-        var request = new Shared.DTOs.Requests.BatchUpdateTaskStatesRequest { Tasks = taskUpdates };
+        var request = new BatchUpdateTaskStatesRequest { Tasks = taskUpdates };
 
         try
         {
@@ -107,12 +95,17 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         }
     }
 
-    [McpServerTool(Name = "manage_task_dependency")]
-    [Description("Adds or removes a dependency between tasks. The dependent task is blocked by the depends-on task.")]
+    [McpServerTool(Name = "manage_task_dependency",
+        Title = "Manage Task Dependency", Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description(
+        "Adds or removes a dependency between tasks within the same project. " +
+        "When adding: if the blocker is non-terminal, the dependent auto-transitions to Blocked. " +
+        "When the blocker completes, dependents auto-unblock. " +
+        "Returns stateChanges showing any automatic state transitions.")]
     public async Task<string> ManageTaskDependency(
-        [Description("Dependent task ID in 'proj-{number}-wp-{number}-task-{number}' format.")] string taskId,
-        [Description("Depends-on task ID in 'proj-{number}-wp-{number}-task-{number}' format.")] string dependsOnTaskId,
-        [Description("Action: 'add' or 'remove'.")] string action,
+        [Description("Dependent task ID (e.g. 'proj-1-wp-2-task-3').")] string taskId,
+        [Description("Blocker task ID (e.g. 'proj-1-wp-2-task-1').")] string dependsOnTaskId,
+        [Description("Whether to add or remove the dependency.")] DependencyAction action,
         [Description("Reason for the dependency.")] string? reason = null,
         CancellationToken ct = default)
     {
@@ -122,7 +115,6 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseTaskId(dependsOnTaskId, out var depProjId, out var depWpNumber, out var depTaskNumber))
             return OperationResult.Error($"Invalid task ID format: '{dependsOnTaskId}'. Expected 'proj-{{number}}-wp-{{number}}-task-{{number}}'.");
 
-        // Look up the depends-on task's internal ID via the work package tree
         var dependsOnWp = await apiClient.GetWorkPackageAsync(depProjId, depWpNumber, ct);
         if (dependsOnWp is null)
             return OperationResult.Warning($"Work package containing depends-on task '{dependsOnTaskId}' not found.");
@@ -133,9 +125,9 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         if (dependsOnTask is null)
             return OperationResult.Warning($"Depends-on task '{dependsOnTaskId}' not found.");
 
-        switch (action.ToLowerInvariant())
+        switch (action)
         {
-            case "add":
+            case DependencyAction.Add:
                 var request = new ManageDependencyRequest
                 {
                     DependsOnId = dependsOnTask.Id,
@@ -154,21 +146,21 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
                     $"Dependency added: '{taskId}' is now blocked by '{dependsOnTaskId}'.",
                     stateChanges: taskDepResponse.StateChanges);
 
-            case "remove":
+            case DependencyAction.Remove:
                 var removed = await apiClient.RemoveTaskDependencyAsync(projId, wpNumber, taskNumber, dependsOnTask.Id, ct);
                 return removed
                     ? OperationResult.Success(taskId, $"Dependency removed: '{taskId}' is no longer blocked by '{dependsOnTaskId}'.")
                     : OperationResult.Warning($"Dependency between '{taskId}' and '{dependsOnTaskId}' not found.");
 
             default:
-                return OperationResult.Error($"Invalid action: '{action}'. Expected 'add' or 'remove'.");
+                return OperationResult.Error($"Invalid action: '{action}'.");
         }
     }
 
     private async Task<string> CreateNewTask(
-        string phaseId, string? name, string? description, string? sortOrder,
-        string? implementationNotes, string? state, string? targetFiles, string? attachments,
-        CancellationToken ct)
+        string phaseId, string? name, string? description, int? sortOrder,
+        string? implementationNotes, CompletionState? state, List<FileReferenceInput>? targetFiles,
+        List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParsePhaseId(phaseId, out var projId, out var wpNumber, out var phaseNumber))
             return OperationResult.Error($"Invalid phase ID format: '{phaseId}'. Expected 'proj-{{number}}-wp-{{number}}-phase-{{number}}'.");
@@ -182,11 +174,11 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            SortOrder = McpInputParser.ParseInt(sortOrder),
+            SortOrder = sortOrder,
             ImplementationNotes = implementationNotes,
-            State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
-            TargetFiles = McpInputParser.ParseFileReferences(targetFiles),
-            Attachments = McpInputParser.ParseFileReferences(attachments)
+            State = state ?? CompletionState.NotStarted,
+            TargetFiles = McpInputParser.MapFileReferences(targetFiles),
+            Attachments = McpInputParser.MapFileReferences(attachments)
         };
 
         var created = await apiClient.CreateTaskAsync(projId, wpNumber, phaseNumber, request, ct);
@@ -194,9 +186,9 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
     }
 
     private async Task<string> UpdateExistingTask(
-        string taskId, string? name, string? description, string? sortOrder,
-        string? implementationNotes, string? state, string? targetFiles, string? attachments,
-        CancellationToken ct)
+        string taskId, string? name, string? description, int? sortOrder,
+        string? implementationNotes, CompletionState? state, List<FileReferenceInput>? targetFiles,
+        List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParseTaskId(taskId, out var projId, out var wpNumber, out var taskNumber))
             return OperationResult.Error($"Invalid task ID format: '{taskId}'. Expected 'proj-{{number}}-wp-{{number}}-task-{{number}}'.");
@@ -205,11 +197,11 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         {
             Name = name,
             Description = description,
-            SortOrder = McpInputParser.ParseInt(sortOrder),
+            SortOrder = sortOrder,
             ImplementationNotes = implementationNotes,
-            State = state is not null ? McpInputParser.ParseEnum<CompletionState>(state) : null,
-            TargetFiles = targetFiles is not null ? McpInputParser.ParseFileReferences(targetFiles) : null,
-            Attachments = attachments is not null ? McpInputParser.ParseFileReferences(attachments) : null
+            State = state,
+            TargetFiles = targetFiles is not null ? McpInputParser.MapFileReferences(targetFiles) : null,
+            Attachments = attachments is not null ? McpInputParser.MapFileReferences(attachments) : null
         };
 
         var updated = await apiClient.UpdateTaskAsync(projId, wpNumber, taskNumber, request, ct);
