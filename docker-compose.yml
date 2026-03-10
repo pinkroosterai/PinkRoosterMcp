@@ -45,6 +45,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ApiServer__BaseUrl: "http://api:8080"
       ApiServer__ApiKey: ${API_KEY}
+      Auth__ApiKeys__0: ${MCP_API_KEY:-}
     depends_on:
       api:
         condition: service_healthy
@@ -63,6 +64,8 @@ services:
       - "3000:80"
     environment:
       API_KEY: ${API_KEY}
+      DASHBOARD_USER: ${DASHBOARD_USER:-}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     depends_on:
       api:
         condition: service_healthy

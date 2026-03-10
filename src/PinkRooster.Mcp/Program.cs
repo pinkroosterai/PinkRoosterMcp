@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ModelContextProtocol;
 using PinkRooster.Mcp.Clients;
+using PinkRooster.Mcp.Middleware;
 using PinkRooster.Shared.Constants;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -67,6 +68,7 @@ builder.Services.AddHttpClient<PinkRoosterApiClient>(client =>
 
 var app = builder.Build();
 
+app.UseMiddleware<McpApiKeyAuthMiddleware>();
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy" }));
 app.MapMcp();
 

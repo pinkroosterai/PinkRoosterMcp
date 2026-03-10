@@ -85,10 +85,13 @@ Service layer + Controllers (not Clean Architecture/CQRS). Services are interfac
 1. `RequestLoggingMiddleware` — logs all requests via `IActivityLogService.LogRequestAsync()`
 2. `ApiKeyAuthMiddleware` — validates `X-Api-Key` header (keys configured in `Auth:ApiKeys` array)
 
+### Middleware Pipeline (MCP)
+1. `McpApiKeyAuthMiddleware` — optional API key validation via `X-Api-Key` header. When `Auth:ApiKeys` config is empty (default), all requests pass (open access). Exempts `/health`.
+
 ### MCP Server
 Uses official ModelContextProtocol.AspNetCore SDK. `MapMcp()` maps to root `/`, serving Streamable HTTP (protocol 2025-03-26) and legacy SSE at `/sse` and `/message`.
 
-**Claude Code registration**: The MCP server is registered in `.mcp.json` (project scope) as `pinkrooster` with URL `http://localhost:5200` (root, NOT `/mcp`). Docker containers must be running (`make up` or `docker compose up -d`).
+**Claude Code registration**: The MCP server is registered in `.mcp.json` (project scope) as `pinkrooster` with URL `http://localhost:5200` (root, NOT `/mcp`). Docker containers must be running (`make up` or `docker compose up -d`). When `MCP_API_KEY` is configured, add `"headers": { "X-Api-Key": "<key>" }` to `.mcp.json`.
 
 ### Testing MCP Tools
 After code changes to the API or MCP server, rebuild and redeploy with:
@@ -162,12 +165,15 @@ PostgreSQL 17. EF Core with snake_case naming convention (fluent configuration).
 ### Dashboard
 Vite + React 19 + TypeScript. Shadcn/ui (new-york style) with Tailwind CSS v4. TanStack Query for data fetching, TanStack Table for tables. Recharts for data visualization (mini donut charts). Path alias `@/` → `src/`.
 
+**Authentication**: Optional single-user auth via `DASHBOARD_USER` and `DASHBOARD_PASSWORD` env vars. When both are set, a login page gates access. Auth check happens server-side (Vite dev server plugin `vite-auth-plugin.ts` + nginx-proxied `docker/auth-server.mjs` in Docker) — the secret never enters the JS bundle. Token stored in `sessionStorage` (clears on tab close). `AuthProvider` context wraps the app; `AuthGate` component in `App.tsx` conditionally renders `LoginPage` or the router tree. When env vars are unset, the dashboard runs with open access (no login).
+
 **Theming**: Dark-mode-first with pink rooster accent (`hsl(350 80% 55%)`). `ThemeProvider` context with localStorage persistence (`pinkrooster-theme` key). FOUC prevention in `main.tsx` applies `dark` class before React mount. Theme toggle (Sun/Moon) in header via `app-layout.tsx`. CSS variables for both light and dark modes defined in `index.css`.
 
 **Shared Dashboard Utilities**:
 - `src/dashboard/src/lib/state-colors.ts` — Centralized state badge colors for CompletionState, FeatureStatus, HTTP methods, status codes, and priority accents. All pages import `stateColorClass()` instead of local color maps.
 - `src/dashboard/src/lib/humanize-path.ts` — Regex-based API path humanization (e.g., `/api/projects/1/issues/7` → `Issue #7`). Used by activity log page.
 - `src/dashboard/src/components/theme-provider.tsx` — React context for theme state with dark/light toggle and localStorage persistence.
+- `src/dashboard/src/components/auth-provider.tsx` — React context for auth state with login/logout and `/auth/config` check.
 - `src/dashboard/src/components/ui/progress.tsx` — Shadcn-compatible progress bar with `indicatorClassName` prop.
 
 ### Dashboard Testing
@@ -187,7 +193,7 @@ Vitest 4.0 + React Testing Library + MSW 2.x for API mocking. Test infrastructur
 | Swagger   | localhost:5100/swagger/index.html | same |
 
 ## Key Configuration
-- `.env` — `POSTGRES_PASSWORD` and `API_KEY` (copy from `.env.example`)
+- `.env` — `POSTGRES_PASSWORD`, `API_KEY`, and optional `MCP_API_KEY`, `DASHBOARD_USER`, `DASHBOARD_PASSWORD` (copy from `.env.example`)
 - `appsettings.Development.json` — DB connection string and API keys for local dev
 - `docker-compose.override.yml` — dev overrides with hot reload via `dotnet watch` and volume mounts
 
@@ -256,6 +262,18 @@ Purpose-built lifecycle for Feature Requests with 8 states. Three categories def
 ### File Attachments
 `FileReference` is an owned type stored as a jsonb column on the Issue entity via `OwnsMany(...).ToJson()`. Metadata only (FileName, RelativePath, Description) — no file upload infrastructure.
 
+### MCP Server Authentication
+Optional API key auth via `McpApiKeyAuthMiddleware` (`src/PinkRooster.Mcp/Middleware/`). Same pattern as the API's `ApiKeyAuthMiddleware` with one key difference: **when no API keys are configured, all requests pass (open access)**. This enables zero-config local development while allowing secured deployments via `MCP_API_KEY` env var. The middleware reads from `Auth:ApiKeys` config, exempts `/health`, and is registered before `MapMcp()` in `Program.cs`. When a key is configured, clients must pass it via `X-Api-Key` header (add `"headers"` to `.mcp.json`).
+
+### Dashboard Authentication
+Optional single-user auth via `DASHBOARD_USER` and `DASHBOARD_PASSWORD` env vars. When both are set, a styled login page gates all dashboard access. When unset, the dashboard runs with open access.
+
+**Server-side auth** (secret never in JS bundle):
+- **Dev**: Vite plugin (`src/dashboard/vite-auth-plugin.ts`) adds `/auth/config`, `/auth/login`, `/auth/logout` middleware endpoints to the Vite dev server, reading credentials from `process.env`.
+- **Docker**: Lightweight Node.js auth server (`docker/auth-server.mjs`) runs alongside nginx in the same container. nginx proxies `/auth/*` to it. Started via `docker/dashboard-entrypoint.sh`.
+
+**Client-side**: `AuthProvider` context checks `GET /auth/config` on mount. `AuthGate` in `App.tsx` renders `LoginPage` when protected and unauthenticated. Token stored in `sessionStorage` (clears on tab close). Logout button appears in sidebar footer when auth is enabled.
+
 ### Testing Strategy (API)
 Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Respawn** (database reset between tests) + **WebApplicationFactory** (in-process API). Uses xUnit v3 with collection fixtures to share a single Postgres container across all test classes. Key patterns:
 - `PostgresFixture` — starts container once, runs EF migrations once, provides Respawn reset
@@ -265,10 +283,11 @@ Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Resp
 - Use `TestContext.Current.CancellationToken` in all async test methods (xUnit v3 requirement)
 
 ### Dashboard Routing
-- Flat routes for top-level pages: `/projects`, `/activity`
+- Flat routes for top-level pages: `/projects`, `/activity`, `/help`
 - Entity list routes: `/projects/:id/issues`, `/projects/:id/feature-requests`, `/projects/:id/work-packages`
 - Create routes: `/projects/:id/issues/new`, `/projects/:id/feature-requests/new`
 - Detail routes: `/projects/:id/issues/:issueNumber`, `/projects/:id/feature-requests/:featureNumber`, `/projects/:id/work-packages/:wpNumber`
+- Help page: `/help` (PM workflow skills documentation)
 - Project switcher click navigates to `/` (dashboard home)
 
 ### Shared Infrastructure (API)

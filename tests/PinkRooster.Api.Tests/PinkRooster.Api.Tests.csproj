@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PinkRooster.Api\PinkRooster.Api.csproj" />
+    <ProjectReference Include="..\..\src\PinkRooster.Mcp\PinkRooster.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

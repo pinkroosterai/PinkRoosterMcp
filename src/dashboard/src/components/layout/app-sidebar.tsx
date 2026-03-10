@@ -1,4 +1,4 @@
-import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb } from "lucide-react";
+import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -15,10 +15,12 @@ import {
 } from "@/components/ui/sidebar";
 import { ProjectSwitcher } from "./project-switcher";
 import { useProjectContext } from "@/hooks/use-project-context";
+import { useAuth } from "@/components/auth-provider";
 
 export function AppSidebar() {
   const location = useLocation();
   const { selectedProject } = useProjectContext();
+  const { isProtected, logout } = useAuth();
 
   const projectItems = selectedProject
     ? [
@@ -102,6 +104,25 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location.pathname === "/help"}
+            >
+              <Link to="/help">
+                <HelpCircle />
+                <span>Help</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          {isProtected && (
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={logout}>
+                <LogOut />
+                <span>Sign out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
