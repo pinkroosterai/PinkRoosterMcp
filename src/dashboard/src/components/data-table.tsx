@@ -46,9 +46,9 @@ interface DataTableProps<TData, TValue> {
 }
 
 function SortIcon({ isSorted }: { isSorted: false | "asc" | "desc" }) {
-  if (isSorted === "asc") return <ArrowUp className="ml-1 h-3.5 w-3.5" />;
-  if (isSorted === "desc") return <ArrowDown className="ml-1 h-3.5 w-3.5" />;
-  return <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />;
+  if (isSorted === "asc") return <ArrowUp className="ml-1.5 h-4 w-4" />;
+  if (isSorted === "desc") return <ArrowDown className="ml-1.5 h-4 w-4" />;
+  return <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-40" />;
 }
 
 export function DataTable<TData, TValue>({
@@ -95,7 +95,7 @@ export function DataTable<TData, TValue>({
                   placeholder={f.placeholder ?? `Filter ${f.columnId}...`}
                   value={value}
                   onChange={(e) => column.setFilterValue(e.target.value || undefined)}
-                  className="h-8 w-40 text-xs"
+                  className="h-9 w-48"
                 />
               );
             }
@@ -106,7 +106,7 @@ export function DataTable<TData, TValue>({
                 value={value}
                 onValueChange={(v) => column.setFilterValue(v === "__all__" ? undefined : v)}
               >
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-40">
                   <SelectValue placeholder={f.placeholder ?? f.columnId} />
                 </SelectTrigger>
                 <SelectContent>
@@ -177,7 +177,7 @@ export function DataTable<TData, TValue>({
       {/* Pagination */}
       {pageCount > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Page {currentPage + 1} of {pageCount} ({table.getFilteredRowModel().rows.length} rows)
           </p>
           <div className="flex gap-2">

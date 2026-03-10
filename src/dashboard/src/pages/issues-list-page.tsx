@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Trash2, Bug } from "lucide-react";
+import { Trash2, Bug, Plus } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,36 @@ import { DataTable, type ColumnFilterConfig } from "@/components/data-table";
 import { AnimatedCount } from "@/components/animated-count";
 import { stateColorClass } from "@/lib/state-colors";
 import type { Issue } from "@/types";
+
+function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
+  const data = [
+    { value: percent },
+    { value: 100 - percent },
+  ];
+  return (
+    <div style={{ width: size, height: size }} className="relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            innerRadius={size * 0.32}
+            outerRadius={size * 0.46}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            stroke="none"
+          >
+            <Cell fill="hsl(350, 80%, 55%)" />
+            <Cell fill="hsl(224, 15%, 18%)" className="dark:opacity-100 opacity-20" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+        {percent}%
+      </span>
+    </div>
+  );
+}
 
 const stateFilters = [
   { label: "All", value: undefined },
@@ -157,38 +188,60 @@ export function IssuesListPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
-        <Bug className="size-6" /> Issues
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
+          <Bug className="size-6" /> Issues
+        </h1>
+        <Button asChild>
+          <Link to={`/projects/${projectId}/issues/new`}>
+            <Plus className="size-4 mr-1.5" /> Create Issue
+          </Link>
+        </Button>
+      </div>
 
-      {summary && (
-        <div className="grid grid-cols-3 gap-4 stagger-children">
-          <Card className="glass-card accent-emerald">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.activeCount} /></div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card accent-blue">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.inactiveCount} /></div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card accent-purple">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Terminal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.terminalCount} /></div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {summary && (() => {
+        const total = summary.activeCount + summary.inactiveCount + summary.terminalCount;
+        const pctActive = total > 0 ? Math.round((summary.activeCount / total) * 100) : 0;
+        const pctInactive = total > 0 ? Math.round((summary.inactiveCount / total) * 100) : 0;
+        const pctTerminal = total > 0 ? Math.round((summary.terminalCount / total) * 100) : 0;
+        return (
+          <div className="grid grid-cols-3 gap-4 stagger-children">
+            <Card className="glass-card accent-emerald">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.activeCount} /></div>
+                  <MiniDonut percent={pctActive} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card accent-blue">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.inactiveCount} /></div>
+                  <MiniDonut percent={pctInactive} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card accent-purple">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Terminal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.terminalCount} /></div>
+                  <MiniDonut percent={pctTerminal} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       <div className="flex items-center gap-2">
         {stateFilters.map((f) => (
@@ -210,9 +263,14 @@ export function IssuesListPage() {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Bug className="size-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold">No issues found</h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Issues are created by AI agents via MCP tools.
+            <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
+              Create your first issue to start tracking bugs and defects.
             </p>
+            <Button asChild>
+              <Link to={`/projects/${projectId}/issues/new`}>
+                <Plus className="size-4 mr-1.5" /> Create Issue
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (

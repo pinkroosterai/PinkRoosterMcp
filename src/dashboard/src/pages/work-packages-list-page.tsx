@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Layers } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,36 @@ import { DataTable, type ColumnFilterConfig } from "@/components/data-table";
 import { AnimatedCount } from "@/components/animated-count";
 import { stateColorClass } from "@/lib/state-colors";
 import type { WorkPackage } from "@/types";
+
+function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
+  const data = [
+    { value: percent },
+    { value: 100 - percent },
+  ];
+  return (
+    <div style={{ width: size, height: size }} className="relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            innerRadius={size * 0.32}
+            outerRadius={size * 0.46}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            stroke="none"
+          >
+            <Cell fill="hsl(350, 80%, 55%)" />
+            <Cell fill="hsl(224, 15%, 18%)" className="dark:opacity-100 opacity-20" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+        {percent}%
+      </span>
+    </div>
+  );
+}
 
 const stateFilters = [
   { label: "All", value: undefined },
@@ -148,7 +179,7 @@ export function WorkPackagesListPage() {
           <div className="flex items-center gap-2">
             <Progress
               value={p.percent}
-              className="h-1.5 w-16"
+              className="h-2 w-20"
               indicatorClassName="bg-emerald-500"
             />
             <span className="text-xs text-muted-foreground">{p.completed}/{p.total}</span>
@@ -190,34 +221,49 @@ export function WorkPackagesListPage() {
         <Layers className="size-6" /> Work Packages
       </h1>
 
-      {summary && (
-        <div className="grid grid-cols-3 gap-4 stagger-children">
-          <Card className="glass-card accent-emerald">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active WPs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.activeCount} /></div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card accent-blue">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Inactive WPs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.inactiveCount} /></div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card accent-purple">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Terminal WPs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold"><AnimatedCount value={summary.terminalCount} /></div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {summary && (() => {
+        const total = summary.activeCount + summary.inactiveCount + summary.terminalCount;
+        const pctActive = total > 0 ? Math.round((summary.activeCount / total) * 100) : 0;
+        const pctInactive = total > 0 ? Math.round((summary.inactiveCount / total) * 100) : 0;
+        const pctTerminal = total > 0 ? Math.round((summary.terminalCount / total) * 100) : 0;
+        return (
+          <div className="grid grid-cols-3 gap-4 stagger-children">
+            <Card className="glass-card accent-emerald">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active WPs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.activeCount} /></div>
+                  <MiniDonut percent={pctActive} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card accent-blue">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Inactive WPs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.inactiveCount} /></div>
+                  <MiniDonut percent={pctInactive} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card accent-purple">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Terminal WPs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold"><AnimatedCount value={summary.terminalCount} /></div>
+                  <MiniDonut percent={pctTerminal} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       <div className="flex items-center gap-2">
         {stateFilters.map((f) => (

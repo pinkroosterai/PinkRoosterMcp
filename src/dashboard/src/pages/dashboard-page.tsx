@@ -40,7 +40,7 @@ function getDetailPath(projectId: number, type: string, id: string): string {
   return `/projects/${projectId}`;
 }
 
-function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
+function MiniDonut({ percent, size = 56 }: { percent: number; size?: number }) {
   const data = [
     { value: percent },
     { value: 100 - percent },
@@ -63,7 +63,7 @@ function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">
         {percent}%
       </span>
     </div>
@@ -204,7 +204,7 @@ export function DashboardPage() {
               {nextActions.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors border-l-3 ${priorityAccent[item.priority] ?? "border-l-transparent"}`}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors border-l-3 ${priorityAccent[item.priority] ?? "border-l-transparent"}`}
                   onClick={() => navigate(getDetailPath(selectedProject.id, item.type, item.id))}
                 >
                   <Badge variant={priorityVariant[item.priority] ?? "outline"} className="text-xs shrink-0">

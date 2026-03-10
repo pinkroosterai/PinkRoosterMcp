@@ -116,7 +116,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
     }
 
     [Fact]
-    public async Task GetNextActions_ExcludesNotStartedTasks_WhenWpNotStarted()
+    public async Task GetNextActions_IncludesNotStartedTasks_WhenWpNotStarted()
     {
         var ct = TestContext.Current.CancellationToken;
         var (projectId, _) = await CreateProjectAsync(ct);
@@ -139,7 +139,9 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
 
         var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "task"), ct);
 
-        Assert.Empty(items);
+        Assert.Single(items);
+        Assert.Equal("Pending task", items[0].Name);
+        Assert.Equal("NotStarted", items[0].State);
     }
 
     // ── WP inclusion (leaf WPs only) ──

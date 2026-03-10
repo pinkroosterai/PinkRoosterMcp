@@ -1,10 +1,23 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package } from "lucide-react";
-import { useIssue, useIssueAuditLog, useDeleteIssue } from "@/hooks/use-issues";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package, Pencil, X, Save } from "lucide-react";
+import { useIssue, useIssueAuditLog, useDeleteIssue, useUpdateIssue } from "@/hooks/use-issues";
+import { updateIssueSchema, type UpdateIssueInput, issueTypes, issueSeverities, priorities, completionStates } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -24,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { stateColorClass } from "@/lib/state-colors";
+import type { Issue } from "@/types";
 
 const severityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
   Critical: "destructive",
@@ -37,6 +51,37 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function issueToFormValues(issue: Issue): UpdateIssueInput {
+  return {
+    name: issue.name,
+    description: issue.description,
+    issueType: issue.issueType as UpdateIssueInput["issueType"],
+    severity: issue.severity as UpdateIssueInput["severity"],
+    priority: issue.priority as UpdateIssueInput["priority"],
+    stepsToReproduce: issue.stepsToReproduce ?? "",
+    expectedBehavior: issue.expectedBehavior ?? "",
+    actualBehavior: issue.actualBehavior ?? "",
+    affectedComponent: issue.affectedComponent ?? "",
+    stackTrace: issue.stackTrace ?? "",
+    rootCause: issue.rootCause ?? "",
+    resolution: issue.resolution ?? "",
+  };
+}
+
+function computeDiff(original: UpdateIssueInput, current: UpdateIssueInput): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+  for (const key of Object.keys(current) as (keyof UpdateIssueInput)[]) {
+    const curr = current[key];
+    const orig = original[key];
+    if (curr !== orig && curr !== undefined) {
+      // Skip empty strings for optional fields (don't send empty string as update)
+      if (curr === "" && (orig === "" || orig === undefined)) continue;
+      diff[key] = curr === "" ? null : curr;
+    }
+  }
+  return diff;
+}
+
 export function IssueDetailPage() {
   const { id, issueNumber: issueNumParam } = useParams<{ id: string; issueNumber: string }>();
   const projectId = Number(id);
@@ -46,8 +91,51 @@ export function IssueDetailPage() {
   const { data: issue, isLoading } = useIssue(projectId, issueNumber);
   const { data: auditLog, isLoading: auditLoading } = useIssueAuditLog(projectId, issueNumber);
   const deleteIssue = useDeleteIssue();
+  const updateIssue = useUpdateIssue();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [auditExpanded, setAuditExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [stateToChange, setStateToChange] = useState<string | null>(null);
+
+  const form = useForm<UpdateIssueInput>({
+    resolver: zodResolver(updateIssueSchema),
+  });
+
+  const handleEdit = () => {
+    if (!issue) return;
+    form.reset(issueToFormValues(issue));
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    form.reset();
+    setIsEditing(false);
+  };
+
+  const handleSave = () => {
+    if (!issue) return;
+    const current = form.getValues();
+    const original = issueToFormValues(issue);
+    const diff = computeDiff(original, current);
+
+    if (Object.keys(diff).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    updateIssue.mutate(
+      { projectId, issueNumber, data: diff },
+      {
+        onSuccess: () => {
+          toast.success("Issue updated");
+          setIsEditing(false);
+        },
+        onError: (error) => {
+          toast.error(`Failed to update: ${error.message}`);
+        },
+      },
+    );
+  };
 
   const handleDelete = () => {
     deleteIssue.mutate(
@@ -56,19 +144,32 @@ export function IssueDetailPage() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
+  const handleStateChange = () => {
+    if (!stateToChange) return;
+    updateIssue.mutate(
+      { projectId, issueNumber, data: { state: stateToChange } },
+      {
+        onSuccess: () => {
+          toast.success(`State changed to ${stateToChange}`);
+          setStateToChange(null);
+        },
+        onError: (error) => {
+          toast.error(`Failed to change state: ${error.message}`);
+          setStateToChange(null);
+        },
+      },
     );
+  };
+
+  if (isLoading) {
+    return <div className="text-muted-foreground">Loading...</div>;
   }
 
   if (!issue) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/issues`)}>
-          <ArrowLeft className="size-4 mr-1" /> Back to project
+          <ArrowLeft className="size-4 mr-1" /> Back
         </Button>
         <div className="text-muted-foreground">Issue not found.</div>
       </div>
@@ -82,128 +183,246 @@ export function IssueDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/issues`)}>
             <ArrowLeft className="size-4" />
           </Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">{issue.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isEditing ? (
+                <Input
+                  className="text-2xl font-bold h-auto py-0 px-1 max-w-md"
+                  {...form.register("name")}
+                />
+              ) : (
+                <h1 className="text-2xl font-bold">{issue.name}</h1>
+              )}
               <Badge variant="outline">{issue.issueId}</Badge>
-              <span className={stateColorClass(issue.state)}>
-                {issue.state}
-              </span>
+              {/* State quick-action */}
+              <Select
+                value={issue.state}
+                onValueChange={(v) => {
+                  if (v !== issue.state) setStateToChange(v);
+                }}
+              >
+                <SelectTrigger className={`w-auto h-auto py-0.5 px-2 text-xs border-0 ${stateColorClass(issue.state)}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {completionStates.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">{issue.description}</p>
+            {isEditing ? (
+              <Textarea
+                className="mt-1 text-sm"
+                rows={2}
+                {...form.register("description")}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground mt-1">{issue.description}</p>
+            )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive"
-          onClick={() => setShowDeleteDialog(true)}
-        >
-          <Trash2 className="size-4 mr-1" /> Delete
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {isEditing ? (
+            <>
+              <Button size="sm" onClick={handleSave} disabled={updateIssue.isPending}>
+                <Save className="size-4 mr-1" /> {updateIssue.isPending ? "Saving..." : "Save"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                <X className="size-4 mr-1" /> Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Pencil className="size-4 mr-1" /> Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="size-4 mr-1" /> Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
+      {/* Definition Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2.5">
             <Shield className="size-4" /> Definition
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-6">
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Type</div>
-              <Badge variant="outline">{issue.issueType}</Badge>
+              <div className="text-sm text-muted-foreground mb-1">Type</div>
+              {isEditing ? (
+                <Select onValueChange={(v) => form.setValue("issueType", v as UpdateIssueInput["issueType"])} value={form.watch("issueType") ?? issue.issueType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {issueTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="outline">{issue.issueType}</Badge>
+              )}
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Severity</div>
-              <Badge variant={severityVariant[issue.severity] ?? "outline"}>
-                {issue.severity}
-              </Badge>
+              <div className="text-sm text-muted-foreground mb-1">Severity</div>
+              {isEditing ? (
+                <Select onValueChange={(v) => form.setValue("severity", v as UpdateIssueInput["severity"])} value={form.watch("severity") ?? issue.severity}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {issueSeverities.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant={severityVariant[issue.severity] ?? "outline"}>{issue.severity}</Badge>
+              )}
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Priority</div>
-              <Badge variant="outline">{issue.priority}</Badge>
+              <div className="text-sm text-muted-foreground mb-1">Priority</div>
+              {isEditing ? (
+                <Select onValueChange={(v) => form.setValue("priority", v as UpdateIssueInput["priority"])} value={form.watch("priority") ?? issue.priority}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {priorities.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="outline">{issue.priority}</Badge>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {hasReproduction && (
+      {/* Reproduction Card */}
+      {(hasReproduction || isEditing) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2.5">
               <FileText className="size-4" /> Reproduction
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {issue.stepsToReproduce && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Steps to Reproduce</div>
-                <p className="text-sm whitespace-pre-wrap">{issue.stepsToReproduce}</p>
-              </div>
-            )}
-            {issue.expectedBehavior && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Expected Behavior</div>
-                <p className="text-sm whitespace-pre-wrap">{issue.expectedBehavior}</p>
-              </div>
-            )}
-            {issue.actualBehavior && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Actual Behavior</div>
-                <p className="text-sm whitespace-pre-wrap">{issue.actualBehavior}</p>
-              </div>
-            )}
-            {issue.affectedComponent && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Affected Component</div>
-                <p className="text-sm font-mono">{issue.affectedComponent}</p>
-              </div>
-            )}
-            {issue.stackTrace && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Stack Trace</div>
-                <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-60">
-                  {issue.stackTrace}
-                </pre>
-              </div>
+            {isEditing ? (
+              <>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Steps to Reproduce</div>
+                  <Textarea rows={3} {...form.register("stepsToReproduce")} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Expected Behavior</div>
+                    <Textarea rows={2} {...form.register("expectedBehavior")} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Actual Behavior</div>
+                    <Textarea rows={2} {...form.register("actualBehavior")} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Affected Component</div>
+                  <Input {...form.register("affectedComponent")} />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Stack Trace</div>
+                  <Textarea rows={3} className="font-mono text-xs" {...form.register("stackTrace")} />
+                </div>
+              </>
+            ) : (
+              <>
+                {issue.stepsToReproduce && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Steps to Reproduce</div>
+                    <p className="text-sm whitespace-pre-wrap">{issue.stepsToReproduce}</p>
+                  </div>
+                )}
+                {issue.expectedBehavior && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Expected Behavior</div>
+                    <p className="text-sm whitespace-pre-wrap">{issue.expectedBehavior}</p>
+                  </div>
+                )}
+                {issue.actualBehavior && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Actual Behavior</div>
+                    <p className="text-sm whitespace-pre-wrap">{issue.actualBehavior}</p>
+                  </div>
+                )}
+                {issue.affectedComponent && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Affected Component</div>
+                    <p className="text-sm font-mono">{issue.affectedComponent}</p>
+                  </div>
+                )}
+                {issue.stackTrace && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Stack Trace</div>
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-60">{issue.stackTrace}</pre>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
-      {hasResolution && (
+      {/* Resolution Card */}
+      {(hasResolution || isEditing) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Resolution</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {issue.rootCause && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Root Cause</div>
-                <p className="text-sm whitespace-pre-wrap">{issue.rootCause}</p>
-              </div>
-            )}
-            {issue.resolution && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Resolution</div>
-                <p className="text-sm whitespace-pre-wrap">{issue.resolution}</p>
-              </div>
+            {isEditing ? (
+              <>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Root Cause</div>
+                  <Textarea rows={2} {...form.register("rootCause")} />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Resolution</div>
+                  <Textarea rows={2} {...form.register("resolution")} />
+                </div>
+              </>
+            ) : (
+              <>
+                {issue.rootCause && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Root Cause</div>
+                    <p className="text-sm whitespace-pre-wrap">{issue.rootCause}</p>
+                  </div>
+                )}
+                {issue.resolution && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Resolution</div>
+                    <p className="text-sm whitespace-pre-wrap">{issue.resolution}</p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Related Work Packages */}
       {issue.linkedWorkPackages.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2.5">
               <Package className="size-4" /> Related Work Packages
             </CardTitle>
           </CardHeader>
@@ -233,9 +452,7 @@ export function IssueDetailPage() {
                         <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
                         <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
                         <TableCell>
-                          <span className={stateColorClass(wp.state)}>
-                            {wp.state}
-                          </span>
+                          <span className={stateColorClass(wp.state)}>{wp.state}</span>
                         </TableCell>
                       </TableRow>
                     );
@@ -247,10 +464,11 @@ export function IssueDetailPage() {
         </Card>
       )}
 
+      {/* Attachments */}
       {issue.attachments.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2.5">
               <Paperclip className="size-4" /> Attachments
             </CardTitle>
           </CardHeader>
@@ -279,44 +497,43 @@ export function IssueDetailPage() {
         </Card>
       )}
 
+      {/* Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2.5">
             <Clock className="size-4" /> Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Created</div>
+              <div className="text-sm text-muted-foreground mb-1">Created</div>
               <div>{formatDate(issue.createdAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Started</div>
+              <div className="text-sm text-muted-foreground mb-1">Started</div>
               <div>{formatDate(issue.startedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Completed</div>
+              <div className="text-sm text-muted-foreground mb-1">Completed</div>
               <div>{formatDate(issue.completedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Resolved</div>
+              <div className="text-sm text-muted-foreground mb-1">Resolved</div>
               <div>{formatDate(issue.resolvedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Updated</div>
+              <div className="text-sm text-muted-foreground mb-1">Updated</div>
               <div>{formatDate(issue.updatedAt)}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Audit Log */}
       <Card>
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setAuditExpanded(!auditExpanded)}
-        >
-          <CardTitle className="text-base flex items-center gap-2">
+        <CardHeader className="cursor-pointer select-none" onClick={() => setAuditExpanded(!auditExpanded)}>
+          <CardTitle className="text-base flex items-center gap-2.5">
             Audit Log
             <span className="text-xs text-muted-foreground font-normal">
               ({auditLog?.length ?? 0} entries) {auditExpanded ? "\u25B2" : "\u25BC"}
@@ -348,12 +565,8 @@ export function IssueDetailPage() {
                           {new Date(entry.changedAt).toLocaleString()}
                         </TableCell>
                         <TableCell className="font-mono text-xs">{entry.fieldName}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">
-                          {entry.oldValue ?? "\u2014"}
-                        </TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">
-                          {entry.newValue ?? "\u2014"}
-                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">{entry.oldValue ?? "\u2014"}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">{entry.newValue ?? "\u2014"}</TableCell>
                         <TableCell className="text-xs">{entry.changedBy}</TableCell>
                       </TableRow>
                     ))}
@@ -365,6 +578,24 @@ export function IssueDetailPage() {
         )}
       </Card>
 
+      {/* State change confirmation dialog */}
+      <AlertDialog open={!!stateToChange} onOpenChange={(open) => !open && setStateToChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change issue state?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Transition from <strong>{issue.state}</strong> to <strong>{stateToChange}</strong>.
+              State-driven timestamps will be updated automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStateChange}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

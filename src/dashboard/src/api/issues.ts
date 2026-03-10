@@ -29,6 +29,27 @@ export function getIssueAuditLog(
   );
 }
 
+export function createIssue(
+  projectId: number,
+  data: Record<string, unknown>,
+): Promise<Issue> {
+  return apiFetch<Issue>(`/projects/${projectId}/issues`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateIssue(
+  projectId: number,
+  issueNumber: number,
+  data: Record<string, unknown>,
+): Promise<Issue> {
+  return apiFetch<Issue>(`/projects/${projectId}/issues/${issueNumber}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export function deleteIssue(
   projectId: number,
   issueNumber: number,

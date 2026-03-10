@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Trash2, Lightbulb } from "lucide-react";
+import { Trash2, Lightbulb, Plus } from "lucide-react";
 import { useFeatureRequests, useDeleteFeatureRequest } from "@/hooks/use-feature-requests";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -149,9 +149,16 @@ export function FeatureRequestsListPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
-        <Lightbulb className="size-6" /> Feature Requests
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
+          <Lightbulb className="size-6" /> Feature Requests
+        </h1>
+        <Button asChild>
+          <Link to={`/projects/${projectId}/feature-requests/new`}>
+            <Plus className="size-4 mr-1.5" /> Create Feature Request
+          </Link>
+        </Button>
+      </div>
 
       <div className="flex items-center gap-2">
         {stateFilters.map((f) => (
@@ -173,9 +180,14 @@ export function FeatureRequestsListPage() {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Lightbulb className="size-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold">No feature requests found</h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Feature requests are created by AI agents via MCP tools.
+            <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
+              Create your first feature request to start tracking ideas.
             </p>
+            <Button asChild>
+              <Link to={`/projects/${projectId}/feature-requests/new`}>
+                <Plus className="size-4 mr-1.5" /> Create Feature Request
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (

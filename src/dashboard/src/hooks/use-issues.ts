@@ -4,6 +4,8 @@ import {
   getIssue,
   getIssueSummary,
   getIssueAuditLog,
+  createIssue,
+  updateIssue,
   deleteIssue,
 } from "@/api/issues";
 
@@ -34,6 +36,33 @@ export function useIssueAuditLog(projectId: number, issueNumber: number) {
   return useQuery({
     queryKey: ["issue-audit", projectId, issueNumber],
     queryFn: () => getIssueAuditLog(projectId, issueNumber),
+  });
+}
+
+export function useCreateIssue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, unknown> }) =>
+      createIssue(projectId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["issues"] });
+      queryClient.invalidateQueries({ queryKey: ["issue-summary"] });
+    },
+  });
+}
+
+export function useUpdateIssue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, issueNumber, data }: { projectId: number; issueNumber: number; data: Record<string, unknown> }) =>
+      updateIssue(projectId, issueNumber, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["issue", variables.projectId, variables.issueNumber] });
+      queryClient.invalidateQueries({ queryKey: ["issues"] });
+      queryClient.invalidateQueries({ queryKey: ["issue-summary"] });
+    },
   });
 }
 

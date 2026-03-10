@@ -16,6 +16,27 @@ export function getFeatureRequest(
   return apiFetch<FeatureRequest>(`/projects/${projectId}/feature-requests/${frNumber}`);
 }
 
+export function createFeatureRequest(
+  projectId: number,
+  data: Record<string, unknown>,
+): Promise<FeatureRequest> {
+  return apiFetch<FeatureRequest>(`/projects/${projectId}/feature-requests`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateFeatureRequest(
+  projectId: number,
+  frNumber: number,
+  data: Record<string, unknown>,
+): Promise<FeatureRequest> {
+  return apiFetch<FeatureRequest>(`/projects/${projectId}/feature-requests/${frNumber}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export function deleteFeatureRequest(
   projectId: number,
   frNumber: number,

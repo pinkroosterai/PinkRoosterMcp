@@ -167,7 +167,7 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
 
         var items = new List<NextActionItem>();
 
-        // Query 1: Actionable tasks — active states + NotStarted (if WP is active), never Blocked
+        // Query 1: Actionable tasks — active states + NotStarted, never Blocked/Terminal
         if (entityType is null or "task")
         {
             var tasks = await db.WorkPackageTasks
@@ -176,8 +176,7 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State))
                 .Where(t => t.State != CompletionState.Blocked)
                 .Where(t => CompletionStateConstants.ActiveStates.Contains(t.State)
-                    || (t.State == CompletionState.NotStarted
-                        && CompletionStateConstants.ActiveStates.Contains(t.WorkPackage.State)))
+                    || t.State == CompletionState.NotStarted)
                 .Select(t => new
                 {
                     t.WorkPackage.ProjectId,

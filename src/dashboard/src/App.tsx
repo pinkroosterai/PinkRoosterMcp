@@ -11,6 +11,8 @@ import { ProjectDetailPage } from "@/pages/project-detail-page";
 import { IssuesListPage } from "@/pages/issues-list-page";
 import { FeatureRequestsListPage } from "@/pages/feature-requests-list-page";
 import { WorkPackagesListPage } from "@/pages/work-packages-list-page";
+import { IssueCreatePage } from "@/pages/issue-create-page";
+import { FeatureRequestCreatePage } from "@/pages/feature-request-create-page";
 import { IssueDetailPage } from "@/pages/issue-detail-page";
 import { WorkPackageDetailPage } from "@/pages/work-package-detail-page";
 import { FeatureRequestDetailPage } from "@/pages/feature-request-detail-page";
@@ -37,8 +39,10 @@ function App() {
                   <Route path="projects" element={<ProjectListPage />} />
                   <Route path="projects/:id" element={<ProjectDetailPage />} />
                   <Route path="projects/:id/issues" element={<IssuesListPage />} />
+                  <Route path="projects/:id/issues/new" element={<IssueCreatePage />} />
                   <Route path="projects/:id/issues/:issueNumber" element={<IssueDetailPage />} />
                   <Route path="projects/:id/feature-requests" element={<FeatureRequestsListPage />} />
+                  <Route path="projects/:id/feature-requests/new" element={<FeatureRequestCreatePage />} />
                   <Route path="projects/:id/feature-requests/:featureNumber" element={<FeatureRequestDetailPage />} />
                   <Route path="projects/:id/work-packages" element={<WorkPackagesListPage />} />
                   <Route path="projects/:id/work-packages/:wpNumber" element={<WorkPackageDetailPage />} />

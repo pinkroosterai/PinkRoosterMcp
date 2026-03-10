@@ -7,24 +7,15 @@
     "config": "",
     "css": "src/index.css",
     "baseColor": "neutral",
-    "cssVariables": true
+    "cssVariables": true,
+    "prefix": ""
   },
+  "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
-  },
-  "resolvedPaths": {
-    "cwd": "/home/najgeetsrev/Development/PinkRoosterMcp/src/dashboard",
-    "tailwindConfig": "",
-    "tailwindCss": "src/index.css",
-    "components": "src/components",
-    "ui": "src/components/ui",
-    "lib": "src/lib",
-    "hooks": "src/hooks",
-    "utils": "src/lib/utils"
-  },
-  "iconLibrary": "lucide"
+  }
 }

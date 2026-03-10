@@ -170,18 +170,18 @@ export function WorkPackageDetailPage() {
       {/* Definition Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2.5">
             <Layers className="size-4" /> Definition
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <div className="text-xs font-medium text-muted-foreground mb-1">Description</div>
+            <div className="text-sm font-medium text-muted-foreground mb-1">Description</div>
             <p className="text-sm whitespace-pre-wrap">{wp.description}</p>
           </div>
           {wp.plan && (
             <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">Plan</div>
+              <div className="text-sm font-medium text-muted-foreground mb-1">Plan</div>
               <pre className="whitespace-pre-wrap text-sm bg-muted p-3 rounded-md">{wp.plan}</pre>
             </div>
           )}
@@ -197,7 +197,7 @@ export function WorkPackageDetailPage() {
           <CardContent className="space-y-4">
             {wp.estimatedComplexity != null && (
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
+                <div className="text-sm font-medium text-muted-foreground mb-1">
                   Complexity (1-5)
                 </div>
                 <div className="text-sm font-medium">{wp.estimatedComplexity}</div>
@@ -205,7 +205,7 @@ export function WorkPackageDetailPage() {
             )}
             {wp.estimationRationale && (
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Rationale</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">Rationale</div>
                 <p className="text-sm whitespace-pre-wrap">{wp.estimationRationale}</p>
               </div>
             )}
@@ -222,7 +222,7 @@ export function WorkPackageDetailPage() {
           <CardContent className="space-y-4">
             {wp.blockedBy && wp.blockedBy.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2">Blocked By</div>
+                <div className="text-sm font-medium text-muted-foreground mb-2">Blocked By</div>
                 <div className="space-y-2">
                   {wp.blockedBy.map((dep, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm">
@@ -242,7 +242,7 @@ export function WorkPackageDetailPage() {
             )}
             {wp.blocking && wp.blocking.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2">Blocking</div>
+                <div className="text-sm font-medium text-muted-foreground mb-2">Blocking</div>
                 <div className="space-y-2">
                   {wp.blocking.map((dep, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm">
@@ -299,30 +299,30 @@ export function WorkPackageDetailPage() {
       {/* Timeline Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2.5">
             <Clock className="size-4" /> Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Started</div>
+              <div className="text-sm text-muted-foreground mb-1">Started</div>
               <div>{formatDate(wp.startedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Completed</div>
+              <div className="text-sm text-muted-foreground mb-1">Completed</div>
               <div>{formatDate(wp.completedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Resolved</div>
+              <div className="text-sm text-muted-foreground mb-1">Resolved</div>
               <div>{formatDate(wp.resolvedAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Created</div>
+              <div className="text-sm text-muted-foreground mb-1">Created</div>
               <div>{formatDate(wp.createdAt)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Updated</div>
+              <div className="text-sm text-muted-foreground mb-1">Updated</div>
               <div>{formatDate(wp.updatedAt)}</div>
             </div>
           </div>
@@ -414,7 +414,7 @@ export function WorkPackageDetailPage() {
                   <CardContent className="space-y-4">
                     {phase.description && (
                       <div>
-                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">
                           Description
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{phase.description}</p>
@@ -424,7 +424,7 @@ export function WorkPackageDetailPage() {
                     {/* Acceptance Criteria */}
                     {phase.acceptanceCriteria && phase.acceptanceCriteria.length > 0 && (
                       <div>
-                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                        <div className="text-sm font-medium text-muted-foreground mb-2">
                           Acceptance Criteria
                         </div>
                         <ul className="space-y-1">
@@ -450,7 +450,7 @@ export function WorkPackageDetailPage() {
                     {/* Tasks */}
                     {phase.tasks && phase.tasks.length > 0 ? (
                       <div>
-                        <div className="text-xs font-medium text-muted-foreground mb-2">Tasks</div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">Tasks</div>
                         <div className="space-y-2">
                           {phase.tasks.map((task) => {
                             const taskKey = `${phase.id}-${task.sortOrder}`;
@@ -459,13 +459,13 @@ export function WorkPackageDetailPage() {
                             return (
                               <div key={taskKey} className="border rounded-md">
                                 <div
-                                  className="flex items-center gap-2 p-3 cursor-pointer select-none"
+                                  className="flex items-center gap-2.5 px-3 py-3.5 cursor-pointer select-none"
                                   onClick={() => toggleTask(taskKey)}
                                 >
                                   {isTaskExpanded ? (
-                                    <ChevronDown className="size-3.5" />
+                                    <ChevronDown className="size-4" />
                                   ) : (
-                                    <ChevronRight className="size-3.5" />
+                                    <ChevronRight className="size-4" />
                                   )}
                                   <span className="text-sm font-medium">{task.name}</span>
                                   <span
@@ -495,7 +495,7 @@ export function WorkPackageDetailPage() {
                                   <div className="px-3 pb-3 space-y-3 border-t pt-3">
                                     {task.description && (
                                       <div>
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        <div className="text-sm font-medium text-muted-foreground mb-1">
                                           Description
                                         </div>
                                         <p className="text-sm whitespace-pre-wrap">
@@ -505,7 +505,7 @@ export function WorkPackageDetailPage() {
                                     )}
                                     {task.implementationNotes && (
                                       <div>
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        <div className="text-sm font-medium text-muted-foreground mb-1">
                                           Implementation Notes
                                         </div>
                                         <pre className="whitespace-pre-wrap text-sm bg-muted p-3 rounded-md">
@@ -515,7 +515,7 @@ export function WorkPackageDetailPage() {
                                     )}
                                     {task.targetFiles && task.targetFiles.length > 0 && (
                                       <div>
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        <div className="text-sm font-medium text-muted-foreground mb-1">
                                           Target Files
                                         </div>
                                         <ul className="space-y-1">
@@ -532,7 +532,7 @@ export function WorkPackageDetailPage() {
                                     )}
                                     {task.attachments && task.attachments.length > 0 && (
                                       <div>
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        <div className="text-sm font-medium text-muted-foreground mb-1">
                                           Attachments
                                         </div>
                                         <div className="rounded-lg border">
@@ -565,7 +565,7 @@ export function WorkPackageDetailPage() {
                                     )}
                                     {task.blockedBy && task.blockedBy.length > 0 && (
                                       <div>
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        <div className="text-sm font-medium text-muted-foreground mb-1">
                                           Blocked By
                                         </div>
                                         <div className="space-y-1">
