@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useActivityLogs } from "@/hooks/use-activity-logs";
-import { useHealth } from "@/hooks/use-health";
+import { AnimatedCount } from "@/components/animated-count";
 import { useProjectContext } from "@/hooks/use-project-context";
 import { useProjectStatus, useNextActions } from "@/hooks/use-projects";
 import { stateColorClass, priorityAccent } from "@/lib/state-colors";
-import { ScrollText, Activity, Clock, FolderOpen, Bug, Layers, Lightbulb, ArrowRight } from "lucide-react";
+import { FolderOpen, Bug, Layers, Lightbulb, ArrowRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 const priorityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
@@ -74,15 +73,13 @@ function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
 export function DashboardPage() {
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
-  const { data } = useActivityLogs(1, 1);
-  const { data: isHealthy, isLoading: healthLoading } = useHealth();
   const { data: projectStatus } = useProjectStatus(selectedProject?.id);
   const { data: nextActions } = useNextActions(selectedProject?.id, 10);
 
   if (!selectedProject) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Card className="max-w-sm">
+        <Card className="max-w-sm animate-in-scale">
           <CardContent className="flex flex-col items-center py-12 text-center">
             <FolderOpen className="size-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold">Select a project</h2>
@@ -100,68 +97,19 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{selectedProject.name}</h1>
-
-      {/* Metric cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-l-4 border-l-primary/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Requests
-            </CardTitle>
-            <ScrollText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {data?.totalCount ?? "-"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Logged API requests
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-l-4 ${healthLoading ? "border-l-muted" : isHealthy ? "border-l-emerald-500" : "border-l-red-500"}`}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${healthLoading ? "text-muted-foreground" : isHealthy ? "text-emerald-500" : "text-red-500"}`}>
-              {healthLoading ? "Checking..." : isHealthy ? "Online" : "Offline"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              API server status
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Latest Activity
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {data?.items[0]
-                ? new Date(data.items[0].timestamp).toLocaleTimeString()
-                : "-"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Most recent request
-            </p>
-          </CardContent>
-        </Card>
+      <div className="animate-in-right">
+        <h1 className="text-2xl font-bold">{selectedProject.name}</h1>
+        {selectedProject.description && (
+          <p className="text-sm text-muted-foreground mt-1">{selectedProject.description}</p>
+        )}
       </div>
 
-      {/* Entity summary cards with progress */}
+      {/* Entity summary cards with progress — staggered entrance */}
       {projectStatus && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3 stagger-children">
           <Card
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => navigate(`/projects/${selectedProject.id}`)}
+            className="glass-card card-hover accent-emerald cursor-pointer"
+            onClick={() => navigate(`/projects/${selectedProject.id}/issues`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Issues</CardTitle>
@@ -170,9 +118,11 @@ export function DashboardPage() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{projectStatus.issues.active} active</div>
+                  <div className="text-2xl font-bold">
+                    <AnimatedCount value={projectStatus.issues.active} suffix=" active" />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {projectStatus.issues.terminal} completed
+                    <AnimatedCount value={projectStatus.issues.terminal} suffix=" completed" />
                   </p>
                 </div>
                 <MiniDonut percent={projectStatus.issues.percentComplete} />
@@ -185,8 +135,8 @@ export function DashboardPage() {
           </Card>
 
           <Card
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => navigate(`/projects/${selectedProject.id}`)}
+            className="glass-card card-hover accent-blue cursor-pointer"
+            onClick={() => navigate(`/projects/${selectedProject.id}/feature-requests`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Feature Requests</CardTitle>
@@ -195,9 +145,11 @@ export function DashboardPage() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{projectStatus.featureRequests.active} active</div>
+                  <div className="text-2xl font-bold">
+                    <AnimatedCount value={projectStatus.featureRequests.active} suffix=" active" />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {projectStatus.featureRequests.terminal} completed
+                    <AnimatedCount value={projectStatus.featureRequests.terminal} suffix=" completed" />
                   </p>
                 </div>
                 <MiniDonut percent={projectStatus.featureRequests.percentComplete} />
@@ -210,8 +162,8 @@ export function DashboardPage() {
           </Card>
 
           <Card
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => navigate(`/projects/${selectedProject.id}`)}
+            className="glass-card card-hover accent-purple cursor-pointer"
+            onClick={() => navigate(`/projects/${selectedProject.id}/work-packages`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Work Packages</CardTitle>
@@ -220,9 +172,11 @@ export function DashboardPage() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{projectStatus.workPackages.active.length} active</div>
+                  <div className="text-2xl font-bold">
+                    <AnimatedCount value={projectStatus.workPackages.active.length} suffix=" active" />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {projectStatus.workPackages.blocked.length} blocked
+                    <AnimatedCount value={projectStatus.workPackages.blocked.length} suffix=" blocked" />
                   </p>
                 </div>
                 <MiniDonut percent={projectStatus.workPackages.percentComplete} />
@@ -236,8 +190,8 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Next Actions */}
-      <Card>
+      {/* Next Actions — staggered row entrance */}
+      <Card className="glass-card animate-in-up" style={{ animationDelay: "200ms" }}>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Next Actions</CardTitle>
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -246,7 +200,7 @@ export function DashboardPage() {
           {!nextActions?.length ? (
             <p className="text-sm text-muted-foreground">No actionable items.</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1 stagger-children">
               {nextActions.map((item) => (
                 <div
                   key={item.id}

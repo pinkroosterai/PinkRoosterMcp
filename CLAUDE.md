@@ -52,8 +52,10 @@ make format             # Format .NET code
 
 ### Testing
 ```bash
-dotnet test                 # Run all tests
+dotnet test                 # Run all .NET tests
 dotnet test tests/PinkRooster.Api.Tests  # Run API integration tests only
+cd src/dashboard && npm test              # Run dashboard frontend tests
+cd src/dashboard && npm run test:coverage # Dashboard tests with coverage
 ```
 
 ## Architecture
@@ -158,7 +160,22 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 PostgreSQL 17. EF Core with snake_case naming convention (fluent configuration). `DbInitializer` auto-applies migrations on API startup.
 
 ### Dashboard
-Vite + React 19 + TypeScript. Shadcn/ui (new-york style) with Tailwind CSS v4. TanStack Query for data fetching, TanStack Table for tables. Path alias `@/` → `src/`.
+Vite + React 19 + TypeScript. Shadcn/ui (new-york style) with Tailwind CSS v4. TanStack Query for data fetching, TanStack Table for tables. Recharts for data visualization (mini donut charts). Path alias `@/` → `src/`.
+
+**Theming**: Dark-mode-first with pink rooster accent (`hsl(350 80% 55%)`). `ThemeProvider` context with localStorage persistence (`pinkrooster-theme` key). FOUC prevention in `main.tsx` applies `dark` class before React mount. Theme toggle (Sun/Moon) in header via `app-layout.tsx`. CSS variables for both light and dark modes defined in `index.css`.
+
+**Shared Dashboard Utilities**:
+- `src/dashboard/src/lib/state-colors.ts` — Centralized state badge colors for CompletionState, FeatureStatus, HTTP methods, status codes, and priority accents. All pages import `stateColorClass()` instead of local color maps.
+- `src/dashboard/src/lib/humanize-path.ts` — Regex-based API path humanization (e.g., `/api/projects/1/issues/7` → `Issue #7`). Used by activity log page.
+- `src/dashboard/src/components/theme-provider.tsx` — React context for theme state with dark/light toggle and localStorage persistence.
+- `src/dashboard/src/components/ui/progress.tsx` — Shadcn-compatible progress bar with `indicatorClassName` prop.
+
+### Dashboard Testing
+Vitest 4.0 + React Testing Library + MSW 2.x for API mocking. Test infrastructure in `src/dashboard/src/test/`:
+- `mocks/handlers.ts` — MSW request handlers for all API endpoints
+- `mocks/server.ts` — MSW server setup with `beforeAll`/`afterEach`/`afterAll` lifecycle
+- `render.tsx` — `renderWithProviders()` helper wrapping components with QueryClient + MemoryRouter
+- `setup.ts` — Global test setup (jest-dom matchers, MSW server lifecycle)
 
 ## Service URLs
 | Service   | Local Dev        | Docker           |
@@ -238,7 +255,7 @@ Purpose-built lifecycle for Feature Requests with 8 states. Three categories def
 ### File Attachments
 `FileReference` is an owned type stored as a jsonb column on the Issue entity via `OwnsMany(...).ToJson()`. Metadata only (FileName, RelativePath, Description) — no file upload infrastructure.
 
-### Testing Strategy
+### Testing Strategy (API)
 Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Respawn** (database reset between tests) + **WebApplicationFactory** (in-process API). Uses xUnit v3 with collection fixtures to share a single Postgres container across all test classes. Key patterns:
 - `PostgresFixture` — starts container once, runs EF migrations once, provides Respawn reset
 - `ApiFactory` — configures `WebApplicationFactory<Program>` with test DB + API key
@@ -316,11 +333,8 @@ Feature requests track ideas and enhancements with a purpose-built lifecycle (Fe
 
 ### Design Documents
 Detailed design specs live in `claudedocs/`. Current docs:
-- `claudedocs/design_project_entity.md` — Project entity full vertical slice (entity, API, MCP tools, dashboard)
-- `claudedocs/design_issue_entity.md` — Issue entity full vertical slice design
-- `claudedocs/workflow_issue_entity.md` — Issue entity implementation workflow (6 phases)
-- `claudedocs/design_work_packages.md` — Work Package entity full vertical slice design
-- `claudedocs/workflow_work_packages.md` — Work Package implementation workflow
-- `claudedocs/PROPOSAL_feature_request_tracking.md` — Feature request tracking proposal (3 paths analyzed, Path B implemented)
 - `claudedocs/PROJECT_INDEX.md` — Comprehensive project documentation (architecture, entities, API endpoints, MCP tools, file tree)
-- `claudedocs/SOLID_ANALYSIS.md` — SOLID principles analysis (14 findings, all resolved)
+- `claudedocs/PROPOSAL_feature_request_tracking.md` — Feature request tracking proposal (3 paths analyzed, Path B implemented)
+- `claudedocs/MCP_TOOLS.md` — MCP tool reference documentation
+- `claudedocs/DASHBOARD_FEATURE_DRIFT.md` — Dashboard feature drift analysis
+- `claudedocs/workflow_dashboard_parity.md` — Dashboard parity workflow

@@ -65,7 +65,7 @@ export function WorkPackageDetailPage() {
   const handleDelete = () => {
     deleteWorkPackage.mutate(
       { projectId, wpNumber },
-      { onSuccess: () => navigate(`/projects/${projectId}`) },
+      { onSuccess: () => navigate(`/projects/${projectId}/work-packages`) },
     );
   };
 
@@ -120,7 +120,7 @@ export function WorkPackageDetailPage() {
   if (!wp) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}`)}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/work-packages`)}>
           <ArrowLeft className="size-4 mr-1" /> Back to project
         </Button>
         <div className="text-muted-foreground">Work package not found.</div>
@@ -137,7 +137,7 @@ export function WorkPackageDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}`)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/work-packages`)}>
             <ArrowLeft className="size-4" />
           </Button>
           <div>

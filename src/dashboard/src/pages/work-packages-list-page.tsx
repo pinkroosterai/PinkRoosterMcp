@@ -1,0 +1,283 @@
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router";
+import { type ColumnDef } from "@tanstack/react-table";
+import { Trash2, Layers } from "lucide-react";
+import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { DataTable, type ColumnFilterConfig } from "@/components/data-table";
+import { AnimatedCount } from "@/components/animated-count";
+import { stateColorClass } from "@/lib/state-colors";
+import type { WorkPackage } from "@/types";
+
+const stateFilters = [
+  { label: "All", value: undefined },
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+  { label: "Terminal", value: "terminal" },
+] as const;
+
+const typeVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  Feature: "default",
+  BugFix: "destructive",
+  Refactor: "secondary",
+  Spike: "outline",
+  Chore: "outline",
+};
+
+function computeProgress(wp: WorkPackage): { completed: number; total: number; percent: number } {
+  let completed = 0;
+  let total = 0;
+  for (const phase of wp.phases) {
+    for (const task of phase.tasks) {
+      total++;
+      if (task.state === "Completed") completed++;
+    }
+  }
+  return { completed, total, percent: total > 0 ? (completed / total) * 100 : 0 };
+}
+
+const columnFilters: ColumnFilterConfig[] = [
+  { columnId: "name", type: "text", placeholder: "Filter name..." },
+  {
+    columnId: "type",
+    type: "select",
+    placeholder: "Type",
+    options: [
+      { label: "Feature", value: "Feature" },
+      { label: "BugFix", value: "BugFix" },
+      { label: "Refactor", value: "Refactor" },
+      { label: "Spike", value: "Spike" },
+      { label: "Chore", value: "Chore" },
+    ],
+  },
+  {
+    columnId: "priority",
+    type: "select",
+    placeholder: "Priority",
+    options: [
+      { label: "Critical", value: "Critical" },
+      { label: "High", value: "High" },
+      { label: "Medium", value: "Medium" },
+      { label: "Low", value: "Low" },
+    ],
+  },
+];
+
+export function WorkPackagesListPage() {
+  const { id } = useParams<{ id: string }>();
+  const projectId = Number(id);
+  const navigate = useNavigate();
+
+  const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
+  const { data: workPackages, isLoading } = useWorkPackages(projectId, stateFilter);
+  const { data: summary } = useWorkPackageSummary(projectId);
+  const deleteWp = useDeleteWorkPackage();
+  const [wpToDelete, setWpToDelete] = useState<WorkPackage | null>(null);
+
+  const handleDelete = () => {
+    if (!wpToDelete) return;
+    deleteWp.mutate(
+      { projectId, wpNumber: wpToDelete.workPackageNumber },
+      { onSettled: () => setWpToDelete(null) },
+    );
+  };
+
+  const columns: ColumnDef<WorkPackage>[] = [
+    {
+      accessorKey: "workPackageId",
+      header: "WP ID",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge variant="outline" className="text-xs">{row.getValue("workPackageId")}</Badge>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <span className="font-medium max-w-[200px] truncate block">{row.getValue("name")}</span>
+      ),
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      meta: { className: "hidden md:table-cell" },
+      cell: ({ row }) => {
+        const t = row.getValue("type") as string;
+        return <Badge variant={typeVariant[t] ?? "outline"}>{t}</Badge>;
+      },
+    },
+    {
+      accessorKey: "priority",
+      header: "Priority",
+      meta: { className: "hidden sm:table-cell" },
+      cell: ({ row }) => <span>{row.getValue("priority")}</span>,
+    },
+    {
+      accessorKey: "state",
+      header: "State",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className={stateColorClass(row.getValue("state"))}>{row.getValue("state")}</span>
+      ),
+    },
+    {
+      id: "progress",
+      header: "Progress",
+      sortingFn: (rowA, rowB) => {
+        const a = computeProgress(rowA.original);
+        const b = computeProgress(rowB.original);
+        return a.percent - b.percent;
+      },
+      cell: ({ row }) => {
+        const p = computeProgress(row.original);
+        return (
+          <div className="flex items-center gap-2">
+            <Progress
+              value={p.percent}
+              className="h-1.5 w-16"
+              indicatorClassName="bg-emerald-500"
+            />
+            <span className="text-xs text-muted-foreground">{p.completed}/{p.total}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created",
+      meta: { className: "hidden lg:table-cell" },
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {new Date(row.getValue("createdAt") as string).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            setWpToDelete(row.original);
+          }}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
+        <Layers className="size-6" /> Work Packages
+      </h1>
+
+      {summary && (
+        <div className="grid grid-cols-3 gap-4 stagger-children">
+          <Card className="glass-card accent-emerald">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active WPs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold"><AnimatedCount value={summary.activeCount} /></div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card accent-blue">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Inactive WPs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold"><AnimatedCount value={summary.inactiveCount} /></div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card accent-purple">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Terminal WPs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold"><AnimatedCount value={summary.terminalCount} /></div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        {stateFilters.map((f) => (
+          <Button
+            key={f.label}
+            variant={stateFilter === f.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStateFilter(f.value)}
+          >
+            {f.label}
+          </Button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="text-muted-foreground">Loading work packages...</div>
+      ) : !workPackages?.length ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Layers className="size-12 text-muted-foreground mb-4" />
+            <h2 className="text-lg font-semibold">No work packages found</h2>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              Work packages are created by AI agents via MCP tools.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={workPackages}
+          filters={columnFilters}
+          onRowClick={(wp) => navigate(`/projects/${projectId}/work-packages/${wp.workPackageNumber}`)}
+          emptyMessage="No work packages match the current filters."
+        />
+      )}
+
+      <AlertDialog
+        open={!!wpToDelete}
+        onOpenChange={(open) => !open && setWpToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete work package?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <strong>{wpToDelete?.name}</strong> ({wpToDelete?.workPackageId}).
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

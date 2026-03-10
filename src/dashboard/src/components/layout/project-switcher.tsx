@@ -54,7 +54,7 @@ export function ProjectSwitcher() {
               key={project.id}
               onClick={() => {
                 setSelectedProject(project);
-                navigate(`/projects/${project.id}`);
+                navigate("/");
               }}
               className="gap-2 p-2"
             >

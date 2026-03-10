@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -15,18 +16,17 @@ import {
 import { ProjectSwitcher } from "./project-switcher";
 import { useProjectContext } from "@/hooks/use-project-context";
 
-const navItems = [
-  { title: "Dashboard", href: "/", icon: LayoutDashboard },
-  { title: "Activity Log", href: "/activity", icon: ScrollText },
-];
-
-const bottomItems = [
-  { title: "All Projects", href: "/projects", icon: FolderOpen },
-];
-
 export function AppSidebar() {
   const location = useLocation();
   const { selectedProject } = useProjectContext();
+
+  const projectItems = selectedProject
+    ? [
+        { title: "Issues", href: `/projects/${selectedProject.id}/issues`, icon: Bug },
+        { title: "Feature Requests", href: `/projects/${selectedProject.id}/feature-requests`, icon: Lightbulb },
+        { title: "Work Packages", href: `/projects/${selectedProject.id}/work-packages`, icon: Layers },
+      ]
+    : [];
 
   return (
     <Sidebar>
@@ -38,80 +38,72 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.href}
-                  >
-                    <Link to={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {selectedProject && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === `/projects/${selectedProject.id}`}
-                    >
-                      <Link to={`/projects/${selectedProject.id}`}>
-                        <Bug />
-                        <span>Issues</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === `/projects/${selectedProject.id}`}
-                    >
-                      <Link to={`/projects/${selectedProject.id}`}>
-                        <Lightbulb />
-                        <span>Feature Requests</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === `/projects/${selectedProject.id}`}
-                    >
-                      <Link to={`/projects/${selectedProject.id}`}>
-                        <Layers />
-                        <span>Work Packages</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/"}
+                >
+                  <Link to="/">
+                    <LayoutDashboard />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarSeparator />
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {bottomItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.href}
-                  >
-                    <Link to={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {projectItems.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Project</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {projectItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location.pathname.startsWith(item.href)}
+                      >
+                        <Link to={item.href}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
+      <SidebarFooter className="border-t">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location.pathname === "/activity"}
+            >
+              <Link to="/activity">
+                <ScrollText />
+                <span>Activity Log</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location.pathname === "/projects"}
+            >
+              <Link to="/projects">
+                <FolderOpen />
+                <span>All Projects</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }
