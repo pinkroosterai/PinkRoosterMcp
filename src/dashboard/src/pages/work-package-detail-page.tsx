@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock } from "lucide-react";
-import { useWorkPackage, useDeleteWorkPackage } from "@/hooks/use-work-packages";
-import type { TaskDep } from "@/types";
+import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask } from "@/hooks/use-work-packages";
+import type { TaskDep, Phase as PhaseType, WpTask } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +65,11 @@ export function WorkPackageDetailPage() {
 
   const { data: wp, isLoading } = useWorkPackage(projectId, wpNumber);
   const deleteWorkPackage = useDeleteWorkPackage();
+  const deletePhase = useDeletePhase();
+  const deleteTask = useDeleteTask();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [phaseToDelete, setPhaseToDelete] = useState<PhaseType | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<WpTask | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
@@ -73,6 +77,22 @@ export function WorkPackageDetailPage() {
     deleteWorkPackage.mutate(
       { projectId, wpNumber },
       { onSuccess: () => navigate(`/projects/${projectId}`) },
+    );
+  };
+
+  const handlePhaseDelete = () => {
+    if (!phaseToDelete) return;
+    deletePhase.mutate(
+      { projectId, wpNumber, phaseNumber: phaseToDelete.phaseNumber },
+      { onSettled: () => setPhaseToDelete(null) },
+    );
+  };
+
+  const handleTaskDelete = () => {
+    if (!taskToDelete) return;
+    deleteTask.mutate(
+      { projectId, wpNumber, taskNumber: taskToDelete.taskNumber },
+      { onSettled: () => setTaskToDelete(null) },
     );
   };
 
@@ -142,6 +162,9 @@ export function WorkPackageDetailPage() {
               >
                 {wp.state}
               </span>
+              {wp.state === "Blocked" && wp.previousActiveState && (
+                <span className="text-xs text-muted-foreground">(was: {wp.previousActiveState})</span>
+              )}
             </div>
           </div>
         </div>
@@ -259,7 +282,27 @@ export function WorkPackageDetailPage() {
             <CardTitle className="text-base">Linked Issue</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant="outline">{wp.linkedIssueId}</Badge>
+            <Link to={`/projects/${id}/issues/${wp.linkedIssueId.split("-issue-")[1]}`}>
+              <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                {wp.linkedIssueId}
+              </Badge>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Linked Feature Request Card */}
+      {wp.linkedFeatureRequestId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Linked Feature Request</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Link to={`/projects/${id}/feature-requests/${wp.linkedFeatureRequestId.split("-fr-")[1]}`}>
+              <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                {wp.linkedFeatureRequestId}
+              </Badge>
+            </Link>
           </CardContent>
         </Card>
       )}
@@ -366,6 +409,16 @@ export function WorkPackageDetailPage() {
                         {taskCount} task{taskCount !== 1 ? "s" : ""}
                       </span>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPhaseToDelete(phase);
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
                 </CardHeader>
                 {isExpanded && (
@@ -431,9 +484,23 @@ export function WorkPackageDetailPage() {
                                   >
                                     {task.state}
                                   </span>
+                                  {task.state === "Blocked" && task.previousActiveState && (
+                                    <span className="text-xs text-muted-foreground">(was: {task.previousActiveState})</span>
+                                  )}
                                   <Badge variant="outline" className="text-xs">
                                     #{task.sortOrder}
                                   </Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    className="ml-auto"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTaskToDelete(task);
+                                    }}
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
                                 </div>
                                 {isTaskExpanded && (
                                   <div className="px-3 pb-3 space-y-3 border-t pt-3">
@@ -551,6 +618,56 @@ export function WorkPackageDetailPage() {
           })
         )}
       </div>
+
+      {/* Phase Delete Dialog */}
+      <AlertDialog
+        open={!!phaseToDelete}
+        onOpenChange={(open) => !open && setPhaseToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete phase?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete phase <strong>{phaseToDelete?.name}</strong>? All tasks in this phase will also be deleted.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePhaseDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Task Delete Dialog */}
+      <AlertDialog
+        open={!!taskToDelete}
+        onOpenChange={(open) => !open && setTaskToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete task <strong>{taskToDelete?.name}</strong>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTaskDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

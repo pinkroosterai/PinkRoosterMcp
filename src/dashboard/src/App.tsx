@@ -9,6 +9,7 @@ import { ProjectListPage } from "@/pages/project-list-page";
 import { ProjectDetailPage } from "@/pages/project-detail-page";
 import { IssueDetailPage } from "@/pages/issue-detail-page";
 import { WorkPackageDetailPage } from "@/pages/work-package-detail-page";
+import { FeatureRequestDetailPage } from "@/pages/feature-request-detail-page";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ function App() {
                 <Route path="projects/:id" element={<ProjectDetailPage />} />
                 <Route path="projects/:id/issues/:issueNumber" element={<IssueDetailPage />} />
                 <Route path="projects/:id/work-packages/:wpNumber" element={<WorkPackageDetailPage />} />
+                <Route path="projects/:id/feature-requests/:featureNumber" element={<FeatureRequestDetailPage />} />
                 <Route path="activity" element={<ActivityLogPage />} />
               </Route>
             </Routes>

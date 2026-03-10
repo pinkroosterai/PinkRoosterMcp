@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Trash2, Bug, Layers } from "lucide-react";
+import { ArrowLeft, Trash2, Bug, Layers, Lightbulb } from "lucide-react";
 import { useProjects } from "@/hooks/use-projects";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
+import { useFeatureRequests, useDeleteFeatureRequest } from "@/hooks/use-feature-requests";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Issue, WorkPackage } from "@/types";
+import type { Issue, WorkPackage, FeatureRequest } from "@/types";
 
 const stateFilters = [
   { label: "All", value: undefined },
@@ -52,6 +53,24 @@ const stateColors: Record<string, string> = {
   Blocked: "bg-orange-100 text-orange-700",
   Replaced: "bg-gray-200 text-gray-600",
 };
+
+const featureStatusColors: Record<string, string> = {
+  Proposed: "bg-gray-100 text-gray-700",
+  UnderReview: "bg-blue-100 text-blue-700",
+  Approved: "bg-indigo-100 text-indigo-700",
+  Scheduled: "bg-purple-100 text-purple-700",
+  InProgress: "bg-yellow-100 text-yellow-700",
+  Completed: "bg-green-100 text-green-700",
+  Rejected: "bg-red-100 text-red-700",
+  Deferred: "bg-orange-100 text-orange-700",
+};
+
+const frStateFilters = [
+  { label: "All", value: undefined },
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+  { label: "Terminal", value: "terminal" },
+] as const;
 
 const typeVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   Feature: "default",
@@ -82,13 +101,18 @@ export function ProjectDetailPage() {
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const project = projects?.find((p) => p.id === projectId);
 
-  const [activeTab, setActiveTab] = useState<"issues" | "work-packages">("issues");
+  const [activeTab, setActiveTab] = useState<"issues" | "feature-requests" | "work-packages">("issues");
 
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
   const { data: issues, isLoading: issuesLoading } = useIssues(projectId, stateFilter);
   const { data: summary } = useIssueSummary(projectId);
   const deleteIssue = useDeleteIssue();
   const [issueToDelete, setIssueToDelete] = useState<Issue | null>(null);
+
+  const [frFilter, setFrFilter] = useState<string | undefined>(undefined);
+  const { data: featureRequests, isLoading: frLoading } = useFeatureRequests(projectId, frFilter);
+  const deleteFr = useDeleteFeatureRequest();
+  const [frToDelete, setFrToDelete] = useState<FeatureRequest | null>(null);
 
   const [wpStateFilter, setWpStateFilter] = useState<string | undefined>(undefined);
   const { data: workPackages, isLoading: wpLoading } = useWorkPackages(projectId, wpStateFilter);
@@ -101,6 +125,14 @@ export function ProjectDetailPage() {
     deleteIssue.mutate(
       { projectId, issueNumber: issueToDelete.issueNumber },
       { onSettled: () => setIssueToDelete(null) },
+    );
+  };
+
+  const handleFrDelete = () => {
+    if (!frToDelete) return;
+    deleteFr.mutate(
+      { projectId, frNumber: frToDelete.featureRequestNumber },
+      { onSettled: () => setFrToDelete(null) },
     );
   };
 
@@ -157,6 +189,14 @@ export function ProjectDetailPage() {
         >
           <Bug className="size-4 mr-1" />
           Issues
+        </Button>
+        <Button
+          variant={activeTab === "feature-requests" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTab("feature-requests")}
+        >
+          <Lightbulb className="size-4 mr-1" />
+          Feature Requests {featureRequests && `(${featureRequests.length})`}
         </Button>
         <Button
           variant={activeTab === "work-packages" ? "default" : "outline"}
@@ -309,6 +349,126 @@ export function ProjectDetailPage() {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
+                  className="bg-destructive text-white hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
+
+      {activeTab === "feature-requests" && (
+        <>
+          <div className="flex items-center gap-2">
+            {frStateFilters.map((f) => (
+              <Button
+                key={f.label}
+                variant={frFilter === f.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFrFilter(f.value)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+
+          {frLoading ? (
+            <div className="text-muted-foreground">Loading feature requests...</div>
+          ) : !featureRequests?.length ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Lightbulb className="size-12 text-muted-foreground mb-4" />
+                <h2 className="text-lg font-semibold">No feature requests found</h2>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                  Feature requests are created by AI agents via MCP tools.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>FR ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Category</TableHead>
+                    <TableHead className="hidden sm:table-cell">Priority</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Requester</TableHead>
+                    <TableHead className="hidden lg:table-cell">Created</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {featureRequests.map((fr) => (
+                    <TableRow
+                      key={fr.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/projects/${projectId}/feature-requests/${fr.featureRequestNumber}`)}
+                    >
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {fr.featureRequestId}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium max-w-[200px] truncate">
+                        {fr.name}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        {fr.category}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">{fr.priority}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${featureStatusColors[fr.status] ?? ""}`}
+                        >
+                          {fr.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+                        {fr.requester ?? "\u2014"}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+                        {new Date(fr.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFrToDelete(fr);
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <AlertDialog
+            open={!!frToDelete}
+            onOpenChange={(open) => !open && setFrToDelete(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete feature request?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete{" "}
+                  <strong>{frToDelete?.name}</strong> ({frToDelete?.featureRequestId}).
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleFrDelete}
                   className="bg-destructive text-white hover:bg-destructive/90"
                 >
                   Delete

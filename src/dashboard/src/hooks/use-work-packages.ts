@@ -4,6 +4,8 @@ import {
   getWorkPackage,
   getWorkPackageSummary,
   deleteWorkPackage,
+  deletePhase,
+  deleteTask,
 } from "@/api/work-packages";
 
 export function useWorkPackages(projectId: number | undefined, stateFilter?: string) {
@@ -38,6 +40,44 @@ export function useDeleteWorkPackage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-packages"] });
       queryClient.invalidateQueries({ queryKey: ["work-package-summary"] });
+    },
+  });
+}
+
+export function useDeletePhase() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      wpNumber,
+      phaseNumber,
+    }: {
+      projectId: number;
+      wpNumber: number;
+      phaseNumber: number;
+    }) => deletePhase(projectId, wpNumber, phaseNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["work-package"] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      wpNumber,
+      taskNumber,
+    }: {
+      projectId: number;
+      wpNumber: number;
+      taskNumber: number;
+    }) => deleteTask(projectId, wpNumber, taskNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["work-package"] });
     },
   });
 }

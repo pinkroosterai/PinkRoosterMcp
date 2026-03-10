@@ -32,3 +32,25 @@ export function deleteWorkPackage(
     method: "DELETE",
   });
 }
+
+export function deletePhase(
+  projectId: number,
+  wpNumber: number,
+  phaseNumber: number,
+): Promise<void> {
+  return apiFetch(
+    `/projects/${projectId}/work-packages/${wpNumber}/phases/${phaseNumber}`,
+    { method: "DELETE" },
+  );
+}
+
+export function deleteTask(
+  projectId: number,
+  wpNumber: number,
+  taskNumber: number,
+): Promise<void> {
+  return apiFetch(
+    `/projects/${projectId}/work-packages/${wpNumber}/tasks/${taskNumber}`,
+    { method: "DELETE" },
+  );
+}

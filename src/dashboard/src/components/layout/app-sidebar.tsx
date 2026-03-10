@@ -1,4 +1,4 @@
-import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers } from "lucide-react";
+import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -61,6 +61,17 @@ export function AppSidebar() {
                       <Link to={`/projects/${selectedProject.id}`}>
                         <Bug />
                         <span>Issues</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname === `/projects/${selectedProject.id}`}
+                    >
+                      <Link to={`/projects/${selectedProject.id}`}>
+                        <Lightbulb />
+                        <span>Feature Requests</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

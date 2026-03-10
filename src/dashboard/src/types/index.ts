@@ -100,6 +100,7 @@ export interface WorkPackage {
   state: string;
   previousActiveState: string | null;
   linkedIssueId: string | null;
+  linkedFeatureRequestId: string | null;
   startedAt: string | null;
   completedAt: string | null;
   resolvedAt: string | null;
@@ -173,4 +174,69 @@ export interface WorkPackageSummary {
   activeCount: number;
   inactiveCount: number;
   terminalCount: number;
+}
+
+export interface FeatureRequest {
+  featureRequestId: string;
+  id: number;
+  featureRequestNumber: number;
+  projectId: string;
+  name: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  businessValue: string | null;
+  userStory: string | null;
+  requester: string | null;
+  acceptanceSummary: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  resolvedAt: string | null;
+  attachments: FileReference[];
+  linkedWorkPackages: LinkedWorkPackageItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StatusItem {
+  id: string;
+  name: string;
+}
+
+export interface EntityStatusSummary {
+  total: number;
+  active: number;
+  inactive: number;
+  terminal: number;
+  percentComplete: number;
+  activeItems: StatusItem[];
+  inactiveItems: StatusItem[];
+}
+
+export interface WorkPackageStatusSummary {
+  total: number;
+  terminalCount: number;
+  percentComplete: number;
+  active: StatusItem[];
+  inactive: StatusItem[];
+  blocked: StatusItem[];
+}
+
+export interface ProjectStatus {
+  projectId: string;
+  name: string;
+  status: string;
+  issues: EntityStatusSummary;
+  featureRequests: EntityStatusSummary;
+  workPackages: WorkPackageStatusSummary;
+}
+
+export interface NextActionItem {
+  type: string;
+  id: string;
+  name: string;
+  priority: string;
+  state: string;
+  parentId: string;
 }
