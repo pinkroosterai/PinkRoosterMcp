@@ -334,6 +334,26 @@ Feature requests track ideas and enhancements with a purpose-built lifecycle (Fe
 - API routes: `api/projects/{projectId}/feature-requests` (POST/PATCH/DELETE/GET, same pattern as Issues)
 - 3 MCP tools: `create_or_update_feature_request`, `get_feature_request_details`, `get_feature_requests`
 
+### PM Workflow Skills
+Claude Code skills in `.claude/skills/` provide AI-driven project management workflows. Each skill auto-propagates state changes to related entities without user prompts (only asks when ambiguous).
+
+| Skill | Purpose | Auto-State Propagation |
+|-------|---------|----------------------|
+| `/pm-status` | Read-only project dashboard (counts, blocked items, next actions) | None (read-only) |
+| `/pm-next [entityType]` | Pick highest-priority item, load context, start implementing | Task→Implementing; WP→Implementing; linked Issue→Implementing; linked FR→InProgress |
+| `/pm-done <id>` | Mark entity completed, report cascades | On WP auto-complete: linked Issue→Completed, linked FR→Completed |
+| `/pm-implement <id> [--dry-run]` | Execute task/phase/WP with full implementation loop | Same as pm-next on start; same as pm-done on finish |
+| `/pm-scaffold <desc\|id>` | Scaffold WP with phases/tasks from codebase analysis | linked Issue→Designing; linked FR→Scheduled |
+| `/pm-plan <description>` | Create issue or FR from natural language, optionally scaffold | Confirms classification before creation |
+| `/pm-triage` | Read-only priority analysis of open items (runs in Explore agent) | None (read-only) |
+
+**Auto-state propagation rules** (no user confirmation needed):
+- Starting work on a task → activates WP + linked Issue/FR (if inactive)
+- WP auto-completes (all tasks terminal) → completes linked Issue + linked FR (if not already terminal)
+- Scaffolding a WP from an entity → transitions entity to planning state (Designing/Scheduled)
+
+Skill files location: `.claude/skills/pm-*/SKILL.md`
+
 ### Design Documents
 Detailed design specs live in `claudedocs/`. Current docs:
 - `claudedocs/PROJECT_INDEX.md` — Comprehensive project documentation (architecture, entities, API endpoints, MCP tools, file tree)
@@ -341,3 +361,6 @@ Detailed design specs live in `claudedocs/`. Current docs:
 - `claudedocs/MCP_TOOLS.md` — MCP tool reference documentation
 - `claudedocs/DASHBOARD_FEATURE_DRIFT.md` — Dashboard feature drift analysis
 - `claudedocs/workflow_dashboard_parity.md` — Dashboard parity workflow
+- `claudedocs/DESIGN_pm_skills.md` — PM skills design document
+- `claudedocs/workflow_dashboard_crud.md` — Dashboard CRUD workflow
+- `claudedocs/workflow_pm_skills_implementation.md` — PM skills implementation workflow
