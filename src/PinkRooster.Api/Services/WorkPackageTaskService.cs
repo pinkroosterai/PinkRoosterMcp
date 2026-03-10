@@ -226,6 +226,98 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         return response;
     }
 
+    public async Task<BatchUpdateTaskStatesResponse?> BatchUpdateStatesAsync(
+        long projectId, int wpNumber, BatchUpdateTaskStatesRequest request, string changedBy, List<StateChangeDto>? stateChanges = null, CancellationToken ct = default)
+    {
+        stateChanges ??= [];
+
+        var wp = await db.WorkPackages
+            .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
+
+        if (wp is null)
+            return null;
+
+        var taskNumbers = request.Tasks.Select(t => t.TaskNumber).ToList();
+
+        var tasks = await db.WorkPackageTasks
+            .Include(t => t.Phase)
+            .Include(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
+            .Include(t => t.Blocking).ThenInclude(d => d.DependentTask)
+            .Where(t => t.WorkPackageId == wp.Id && taskNumbers.Contains(t.TaskNumber))
+            .ToListAsync(ct);
+
+        var taskMap = tasks.ToDictionary(t => t.TaskNumber);
+        var auditEntries = new List<TaskAuditLog>();
+        var now = DateTimeOffset.UtcNow;
+        var results = new List<TaskStateResult>();
+        var affectedPhaseIds = new HashSet<long>();
+        var terminalTasks = new List<WorkPackageTask>();
+
+        foreach (var update in request.Tasks)
+        {
+            if (!taskMap.TryGetValue(update.TaskNumber, out var task))
+                continue;
+
+            var oldState = task.State;
+            if (oldState == update.State)
+            {
+                results.Add(new TaskStateResult
+                {
+                    TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
+                    OldState = oldState.ToString(),
+                    NewState = update.State.ToString()
+                });
+                continue;
+            }
+
+            // Audit the state change
+            auditEntries.Add(new TaskAuditLog
+            {
+                TaskId = task.Id,
+                FieldName = "State",
+                OldValue = oldState.ToString(),
+                NewValue = update.State.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            task.State = update.State;
+            StateTransitionHelper.ApplyBlockedStateLogic(task, oldState, update.State);
+            StateTransitionHelper.ApplyStateTimestamps(task, oldState, update.State);
+
+            affectedPhaseIds.Add(task.PhaseId);
+
+            if (CompletionStateConstants.TerminalStates.Contains(update.State))
+                terminalTasks.Add(task);
+
+            results.Add(new TaskStateResult
+            {
+                TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
+                OldState = oldState.ToString(),
+                NewState = update.State.ToString()
+            });
+        }
+
+        if (auditEntries.Count > 0)
+            db.TaskAuditLogs.AddRange(auditEntries);
+
+        // Run cascades after all state changes are applied
+        foreach (var task in terminalTasks)
+            await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
+
+        foreach (var phaseId in affectedPhaseIds)
+            await cascadeService.PropagateStateUpwardAsync(phaseId, wp, changedBy, stateChanges, ct);
+
+        await db.SaveChangesAsync(ct);
+
+        return new BatchUpdateTaskStatesResponse
+        {
+            UpdatedCount = results.Count(r => r.OldState != r.NewState),
+            Results = results,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        };
+    }
+
     public async Task<bool> DeleteAsync(
         long projectId, int wpNumber, int taskNumber, CancellationToken ct = default)
     {

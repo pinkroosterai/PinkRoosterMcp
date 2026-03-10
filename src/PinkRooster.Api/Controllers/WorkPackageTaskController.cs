@@ -26,6 +26,15 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
         }
     }
 
+    [HttpPatch("batch-states")]
+    public async Task<ActionResult<BatchUpdateTaskStatesResponse>> BatchUpdateStates(
+        long projectId, int wpNumber, BatchUpdateTaskStatesRequest request, CancellationToken ct)
+    {
+        var changedBy = HttpContext.GetCallerIdentity();
+        var result = await taskService.BatchUpdateStatesAsync(projectId, wpNumber, request, changedBy, ct: ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpPatch("{taskNumber:int}")]
     public async Task<ActionResult<TaskResponse>> Update(
         long projectId, int wpNumber, int taskNumber, UpdateTaskRequest request, CancellationToken ct)

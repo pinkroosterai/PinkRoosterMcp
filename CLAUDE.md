@@ -109,6 +109,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `create_or_update_work_package` | Write | Create or update WP (returns state changes on cascades) |
 | `create_or_update_phase` | Write | Create or update phase, optional batch task creation |
 | `create_or_update_task` | Write | Create or update task (returns state changes on cascades) |
+| `batch_update_task_states` | Write | Update state of multiple tasks in one call (consolidated cascades) |
 | `manage_work_package_dependency` | Write | Add/remove WP dependency (returns auto-block state changes) |
 | `manage_task_dependency` | Write | Add/remove task dependency (returns auto-block state changes) |
 | `get_activity_logs` | Read | Paginated HTTP request logs |

@@ -211,6 +211,19 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             ?? throw new InvalidOperationException("Failed to deserialize task response.");
     }
 
+    public async Task<BatchUpdateTaskStatesResponse?> BatchUpdateTaskStatesAsync(
+        long projectId, int wpNumber, BatchUpdateTaskStatesRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync(
+            $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks/batch-states", request, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+    }
+
     public async Task<TaskResponse?> UpdateTaskAsync(
         long projectId, int wpNumber, int taskNumber, UpdateTaskRequest request, CancellationToken ct = default)
     {

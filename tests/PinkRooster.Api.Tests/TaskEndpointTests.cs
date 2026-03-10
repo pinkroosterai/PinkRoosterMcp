@@ -383,6 +383,147 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
         Assert.Contains("all phases reached terminal state", wpChange.Reason);
     }
 
+    // ── Batch State Updates ──
+
+    [Fact]
+    public async Task BatchUpdateStates_UpdatesMultipleTasks_Returns200()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, wpNumber, _) = await SetupAsync(ct, createPhase: false);
+
+        await Client.PostAsJsonAsync($"{BasePath}/{projectId}/work-packages/1/phases", new CreatePhaseRequest
+        {
+            Name = "P1",
+            Tasks =
+            [
+                new CreateTaskRequest { Name = "T1", Description = "d" },
+                new CreateTaskRequest { Name = "T2", Description = "d" },
+                new CreateTaskRequest { Name = "T3", Description = "d" }
+            ]
+        }, ct);
+
+        var response = await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/batch-states",
+            new BatchUpdateTaskStatesRequest
+            {
+                Tasks =
+                [
+                    new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.Completed },
+                    new TaskStateUpdate { TaskNumber = 2, State = Shared.Enums.CompletionState.Completed },
+                    new TaskStateUpdate { TaskNumber = 3, State = Shared.Enums.CompletionState.Cancelled }
+                ]
+            }, ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+
+        Assert.NotNull(result);
+        Assert.Equal(3, result.UpdatedCount);
+        Assert.Equal(3, result.Results.Count);
+    }
+
+    [Fact]
+    public async Task BatchUpdateStates_TriggersUpwardCascade()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, wpNumber, _) = await SetupAsync(ct, createPhase: false);
+
+        await Client.PostAsJsonAsync($"{BasePath}/{projectId}/work-packages/1/phases", new CreatePhaseRequest
+        {
+            Name = "P1",
+            Tasks =
+            [
+                new CreateTaskRequest { Name = "T1", Description = "d" },
+                new CreateTaskRequest { Name = "T2", Description = "d" }
+            ]
+        }, ct);
+
+        var response = await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/batch-states",
+            new BatchUpdateTaskStatesRequest
+            {
+                Tasks =
+                [
+                    new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.Completed },
+                    new TaskStateUpdate { TaskNumber = 2, State = Shared.Enums.CompletionState.Completed }
+                ]
+            }, ct);
+
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+
+        // Should cascade: phase auto-complete + WP auto-complete
+        Assert.NotNull(result!.StateChanges);
+        Assert.Contains(result.StateChanges, sc => sc.EntityType == "Phase" && sc.NewState == "Completed");
+        Assert.Contains(result.StateChanges, sc => sc.EntityType == "WorkPackage" && sc.NewState == "Completed");
+
+        // Verify via GET
+        var wp = await GetJson<WorkPackageResponse>($"{BasePath}/{projectId}/work-packages/1", ct);
+        Assert.Equal("Completed", wp.State);
+        Assert.Equal("Completed", wp.Phases[0].State);
+    }
+
+    [Fact]
+    public async Task BatchUpdateStates_SkipsNoOpTransitions()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, wpNumber, _) = await SetupAsync(ct);
+
+        await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
+            new CreateTaskRequest { Name = "T1", Description = "d" }, ct);
+
+        // NotStarted → NotStarted is a no-op
+        var response = await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/batch-states",
+            new BatchUpdateTaskStatesRequest
+            {
+                Tasks = [new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.NotStarted }]
+            }, ct);
+
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+        Assert.Equal(0, result!.UpdatedCount);
+        Assert.Single(result.Results);
+        Assert.Equal("NotStarted", result.Results[0].OldState);
+        Assert.Equal("NotStarted", result.Results[0].NewState);
+    }
+
+    [Fact]
+    public async Task BatchUpdateStates_Returns404_WhenWpNotFound()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _, _) = await SetupAsync(ct);
+
+        var response = await Client.PatchAsJsonAsync($"{TaskPath(projectId, 999)}/batch-states",
+            new BatchUpdateTaskStatesRequest
+            {
+                Tasks = [new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.Completed }]
+            }, ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BatchUpdateStates_SetsTimestamps()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, wpNumber, _) = await SetupAsync(ct);
+
+        // Create task in active state (sets StartedAt)
+        await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
+            new CreateTaskRequest { Name = "T1", Description = "d", State = Shared.Enums.CompletionState.Implementing }, ct);
+
+        // Batch transition to Completed
+        await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/batch-states",
+            new BatchUpdateTaskStatesRequest
+            {
+                Tasks = [new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.Completed }]
+            }, ct);
+
+        // Verify timestamps via GET
+        var wp = await GetJson<WorkPackageResponse>($"{BasePath}/{projectId}/work-packages/1", ct);
+        var task = wp.Phases[0].Tasks.First(t => t.TaskNumber == 1);
+        Assert.Equal("Completed", task.State);
+        Assert.NotNull(task.StartedAt);
+        Assert.NotNull(task.CompletedAt);
+        Assert.NotNull(task.ResolvedAt);
+    }
+
     [Fact]
     public async Task AddDependency_ReturnsAutoBlockStateChange()
     {

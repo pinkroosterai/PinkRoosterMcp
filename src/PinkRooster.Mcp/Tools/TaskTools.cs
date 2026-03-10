@@ -41,6 +41,72 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
             implementationNotes, state, targetFiles, attachments, ct);
     }
 
+    [McpServerTool(Name = "batch_update_task_states")]
+    [Description(
+        "Updates the state of multiple tasks in a single work package in one operation. " +
+        "Cascades (auto-unblock, phase/WP auto-complete) run once after all transitions, " +
+        "returning a consolidated list of state changes.")]
+    public async Task<string> BatchUpdateTaskStates(
+        [Description("Work package ID in 'proj-{number}-wp-{number}' format.")] string workPackageId,
+        [Description("JSON array of task state updates: [{\"taskId\":\"proj-1-wp-1-task-1\",\"state\":\"Completed\"},{\"taskId\":\"proj-1-wp-1-task-2\",\"state\":\"Completed\"}]")] string tasks,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
+            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
+
+        List<BatchTaskStateInput>? parsed;
+        try
+        {
+            parsed = System.Text.Json.JsonSerializer.Deserialize<List<BatchTaskStateInput>>(tasks, Responses.JsonDefaults.Indented);
+        }
+        catch
+        {
+            return OperationResult.Error("Invalid JSON for 'tasks'. Expected: [{\"taskId\":\"...\",\"state\":\"...\"}]");
+        }
+
+        if (parsed is null or { Count: 0 })
+            return OperationResult.Error("'tasks' array must contain at least one entry.");
+
+        var taskUpdates = new List<Shared.DTOs.Requests.TaskStateUpdate>();
+        foreach (var item in parsed)
+        {
+            if (string.IsNullOrWhiteSpace(item.TaskId))
+                return OperationResult.Error("Each task entry must have a 'taskId'.");
+
+            if (!IdParser.TryParseTaskId(item.TaskId, out var taskProjId, out var taskWpNumber, out var taskNumber))
+                return OperationResult.Error($"Invalid task ID format: '{item.TaskId}'. Expected 'proj-{{number}}-wp-{{number}}-task-{{number}}'.");
+
+            if (taskProjId != projId || taskWpNumber != wpNumber)
+                return OperationResult.Error($"Task '{item.TaskId}' does not belong to work package '{workPackageId}'.");
+
+            var state = McpInputParser.ParseEnum<CompletionState>(item.State ?? "");
+            if (state is null)
+                return OperationResult.Error($"Invalid state '{item.State}' for task '{item.TaskId}'.");
+
+            taskUpdates.Add(new Shared.DTOs.Requests.TaskStateUpdate
+            {
+                TaskNumber = taskNumber,
+                State = state.Value
+            });
+        }
+
+        var request = new Shared.DTOs.Requests.BatchUpdateTaskStatesRequest { Tasks = taskUpdates };
+
+        try
+        {
+            var response = await apiClient.BatchUpdateTaskStatesAsync(projId, wpNumber, request, ct);
+            if (response is null)
+                return OperationResult.Warning($"Work package '{workPackageId}' not found.");
+
+            var message = $"{response.UpdatedCount} task(s) updated in '{workPackageId}'.";
+            return OperationResult.Success(workPackageId, message, stateChanges: response.StateChanges);
+        }
+        catch (HttpRequestException ex)
+        {
+            return OperationResult.Error($"Batch update failed: {ex.Message}");
+        }
+    }
+
     [McpServerTool(Name = "manage_task_dependency")]
     [Description("Adds or removes a dependency between tasks. The dependent task is blocked by the depends-on task.")]
     public async Task<string> ManageTaskDependency(
