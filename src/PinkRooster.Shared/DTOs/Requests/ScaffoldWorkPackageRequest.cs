@@ -14,6 +14,7 @@ public sealed class ScaffoldWorkPackageRequest
     public string? EstimationRationale { get; set; }
     public CompletionState State { get; set; } = CompletionState.NotStarted;
     public long? LinkedIssueId { get; set; }
+    public long? LinkedFeatureRequestId { get; set; }
     public List<FileReferenceDto>? Attachments { get; set; }
     public List<long>? BlockedByWpIds { get; set; }
     public required List<ScaffoldPhaseRequest> Phases { get; set; }

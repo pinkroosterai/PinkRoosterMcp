@@ -42,20 +42,22 @@ PinkRooster.Api.Tests ← integration tests (real PostgreSQL via Testcontainers)
 
 ```
 Project (1)
- ├── Issue (N)           — per-project IssueNumber
- └── WorkPackage (N)     — per-project WpNumber, optional LinkedIssueId
+ ├── Issue (N)              — per-project IssueNumber
+ ├── FeatureRequest (N)     — per-project FeatureRequestNumber, FeatureStatus lifecycle
+ └── WorkPackage (N)        — per-project WpNumber, optional LinkedIssueId + LinkedFeatureRequestId
       ├── WorkPackagePhase (N)    — per-WP PhaseNumber
       │    ├── WorkPackageTask (N) — per-WP TaskNumber (across phases)
       │    └── AcceptanceCriterion (N)
       ├── WorkPackageDependency    — self-referencing WP↔WP
       └── WorkPackageTaskDependency — self-referencing Task↔Task
 
-ActivityLog              — HTTP request logging (middleware)
-IssueAuditLog            — full-field audit per Issue change
-WorkPackageAuditLog      — full-field audit per WP change
-PhaseAuditLog            — full-field audit per Phase change
-TaskAuditLog             — full-field audit per Task change
-FileReference            — owned type (jsonb), metadata only
+ActivityLog                 — HTTP request logging (middleware)
+IssueAuditLog               — full-field audit per Issue change
+FeatureRequestAuditLog      — full-field audit per FeatureRequest change
+WorkPackageAuditLog         — full-field audit per WP change
+PhaseAuditLog               — full-field audit per Phase change
+TaskAuditLog                — full-field audit per Task change
+FileReference               — owned type (jsonb), metadata only
 ```
 
 ### Human-Readable ID Formats
@@ -64,6 +66,7 @@ FileReference            — owned type (jsonb), metadata only
 |--------|--------|---------|
 | Project | `proj-{Id}` | `proj-1` |
 | Issue | `proj-{ProjectId}-issue-{IssueNumber}` | `proj-1-issue-3` |
+| Feature Request | `proj-{ProjectId}-fr-{FeatureRequestNumber}` | `proj-1-fr-3` |
 | Work Package | `proj-{ProjectId}-wp-{WpNumber}` | `proj-1-wp-2` |
 | Phase | `proj-{ProjectId}-wp-{WpNumber}-phase-{PhaseNumber}` | `proj-1-wp-2-phase-1` |
 | Task | `proj-{ProjectId}-wp-{WpNumber}-task-{TaskNumber}` | `proj-1-wp-2-task-5` |
@@ -75,6 +78,8 @@ IDs are derived at read-time from DB auto-increment `long` PKs. Never stored. Pa
 | Enum | Values |
 |------|--------|
 | `CompletionState` | NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced |
+| `FeatureStatus` | Proposed, UnderReview, Approved, Scheduled, InProgress, Completed, Rejected, Deferred |
+| `FeatureCategory` | Feature, Enhancement, Improvement |
 | `IssueType` | Bug, Defect, Regression, TechnicalDebt, PerformanceIssue, SecurityVulnerability |
 | `IssueSeverity` | Critical, Major, Minor, Trivial |
 | `WorkPackageType` | Feature, BugFix, Refactor, Spike, Chore |
@@ -104,6 +109,15 @@ State categories (`CompletionStateConstants`): Active (Designing, Implementing, 
 | GET | `/api/projects/{projectId}/next-actions?limit=&entityType=` | Priority-ordered actionable items |
 | PUT | `/api/projects` | Upsert project |
 | DELETE | `/api/projects/{id}` | Delete project |
+
+### Feature Requests — `api/projects/{projectId}/feature-requests`
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `.../feature-requests?state=` | List (optional state filter) |
+| GET | `.../feature-requests/{frNumber}` | Get by number |
+| POST | `.../feature-requests` | Create (201) |
+| PATCH | `.../feature-requests/{frNumber}` | Partial update |
+| DELETE | `.../feature-requests/{frNumber}` | Delete |
 
 ### Issues — `api/projects/{projectId}/issues`
 | Method | Route | Description |
@@ -154,7 +168,7 @@ State categories (`CompletionStateConstants`): Active (Designing, Implementing, 
 
 ---
 
-## MCP Tools (17 total)
+## MCP Tools (18 total)
 
 Registered as `pinkrooster` in `.mcp.json` at `http://localhost:5200`. All tools have MCP annotations (`Title`, `OpenWorld = false`; read tools: `ReadOnly = true`; write tools: `Destructive = false`; idempotent tools: `Idempotent = true`).
 
@@ -175,11 +189,13 @@ Registered as `pinkrooster` in `.mcp.json` at `http://localhost:5200`. All tools
 | `batch_update_task_states` | W | Update multiple task states in one call (idempotent) |
 | `manage_work_package_dependency` | W | Add/remove WP dependency via `DependencyAction` enum (idempotent, reports auto-block/unblock) |
 | `manage_task_dependency` | W | Add/remove task dependency via `DependencyAction` enum (idempotent, reports cascades) |
-| `get_activity_logs` | R | Paginated HTTP request logs |
+| `create_or_update_feature_request` | W | Create (omit featureRequestId) or update (provide featureRequestId) |
+| `get_feature_request_details` | R | Full feature request data by composite ID |
+| `get_feature_requests` | R | List feature requests (filterable via `StateFilterCategory` enum) |
 
 Write tools return `OperationResult` JSON: `{ responseType, message, id?, nextStep?, stateChanges? }`.
 
-MCP-specific enums for constrained parameters: `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue).
+MCP-specific enums for constrained parameters: `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue/FeatureRequest).
 
 ---
 
@@ -444,6 +460,7 @@ src/dashboard/
 | 2 | AddProjectEntity | projects |
 | 3 | AddIssueEntity | issues, issue_audit_logs |
 | 4 | AddWorkPackages | work_packages, work_package_phases, work_package_tasks, acceptance_criteria, work_package_dependencies, work_package_task_dependencies, work_package_audit_logs, phase_audit_logs, task_audit_logs |
+| 5 | AddFeatureRequestEntity | feature_requests, feature_request_audit_logs, work_packages.linked_feature_request_id |
 
 ### Key Configuration Files
 | File | Purpose |
@@ -466,6 +483,7 @@ src/dashboard/
 | `claudedocs/design_work_packages.md` | Work Package entity full vertical slice |
 | `claudedocs/workflow_issue_entity.md` | Issue implementation workflow (6 phases) |
 | `claudedocs/workflow_work_packages.md` | Work Package implementation workflow |
+| `claudedocs/PROPOSAL_feature_request_tracking.md` | Feature request tracking proposal (3 paths, Path B implemented) |
 | `claudedocs/workflow_implementation.md` | High-level 6-phase monorepo plan |
 
 ---
@@ -480,10 +498,11 @@ src/dashboard/
 | Priority-ordered next actions | Complete | 11 |
 | Issue entity (full slice) | Complete | 12 |
 | Work Packages (full slice) | Complete | 22 WP + 9 phase + 16 task |
+| Feature Requests (full slice) | Complete | 22 |
 | State change cascades | Complete | 4 (within WP/task tests) |
 | Dashboard | Complete | — |
 | Docker orchestration | Complete | — |
-| **Total integration tests** | — | **97** |
+| **Total integration tests** | — | **119** |
 
 ### Known Minor Issues (from Phase 1-6 reflection)
 1. Hardcoded API key in dashboard client — should use env var

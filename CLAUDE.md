@@ -99,8 +99,8 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 **Available MCP tools** (registered as `pinkrooster` in `.mcp.json`):
 | Tool | Type | Description |
 |------|------|-------------|
-| `get_project_status` | Read | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
-| `get_next_actions` | Read | Priority-ordered actionable items (tasks, WPs, issues) with optional limit and entity type filter |
+| `get_project_status` | Read | Compact project status: issue/FR/WP counts by state, active/inactive/blocked item lists |
+| `get_next_actions` | Read | Priority-ordered actionable items (tasks, WPs, issues, FRs) with optional limit and entity type filter |
 | `create_or_update_project` | Write | Upsert project by path |
 | `create_or_update_issue` | Write | Create (omit issueId) or update (provide issueId) an issue |
 | `get_issue_details` | Read | Full issue data by composite ID (no audit trail) |
@@ -114,6 +114,9 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `manage_work_package_dependency` | Write | Add/remove WP dependency (returns auto-block state changes) |
 | `manage_task_dependency` | Write | Add/remove task dependency (returns auto-block state changes) |
 | `scaffold_work_package` | Write | One-call WP creation with phases, tasks, dependencies, and WP blockers |
+| `create_or_update_feature_request` | Write | Create (omit featureRequestId) or update (provide featureRequestId) a feature request |
+| `get_feature_request_details` | Read | Full feature request data by composite ID |
+| `get_feature_requests` | Read | List feature requests for a project, filterable by state category |
 
 **Testing flow for MCP tools (E2E):**
 
@@ -187,14 +190,15 @@ EF Core packages are pinned to 9.0.13 and Npgsql to 9.0.4 across both Data and A
 The API returns its own DTOs (defined in Shared). The MCP layer **maps** API responses to MCP-specific response classes before returning to agents. MCP response types (`OperationResult`, `ResponseType`, tool-specific detail responses) live **exclusively in `PinkRooster.Mcp/Responses/`** — never in Shared or API. Exception: `ProjectStatusResponse` lives in Shared because the API response is already agent-optimized (compact counts + item lists). Rationale: MCP responses are tailored for AI agent consumption (fewer fields, contextual hints), while API responses serve the dashboard with full data.
 
 ### MCP Tool Error Handling
-MCP tools must **never throw exceptions**. Every code path — including API errors, validation failures, circular dependency rejection, not-found cases, and unexpected exceptions — must return an `OperationResult` string with a clear, actionable message the AI agent can act on. Wrap all API client calls in try-catch. `PinkRoosterApiClient` uses `EnsureSuccessAsync()` which extracts the error body from non-success HTTP responses via `ReadErrorMessageAsync` — all 16 endpoints use this uniformly. The agent should always understand **why** an operation failed and what it can do next.
+MCP tools must **never throw exceptions**. Every code path — including API errors, validation failures, circular dependency rejection, not-found cases, and unexpected exceptions — must return an `OperationResult` string with a clear, actionable message the AI agent can act on. Wrap all API client calls in try-catch. `PinkRoosterApiClient` uses `EnsureSuccessAsync()` which extracts the error body from non-success HTTP responses via `ReadErrorMessageAsync` — all 20 endpoints use this uniformly. The agent should always understand **why** an operation failed and what it can do next.
 
 ### Human-Readable IDs
 Business entities use human-readable ID formats derived at read-time from DB auto-increment `long` PKs. Never stored as a column. **No GUIDs** — all primary keys are `long` auto-increment.
 - Projects: `proj-{Id}` (e.g., `proj-1`)
 - Issues: `proj-{ProjectId}-issue-{IssueNumber}` (e.g., `proj-1-issue-3`) — IssueNumber is per-project sequential (not global), stored as `int` column on Issue entity
+- Feature Requests: `proj-{ProjectId}-fr-{FeatureRequestNumber}` (e.g., `proj-1-fr-3`) — FeatureRequestNumber is per-project sequential
 
-ID parsing utility: `IdParser` in `PinkRooster.Shared/Helpers/` with `TryParseProjectId` and `TryParseIssueId`.
+ID parsing utility: `IdParser` in `PinkRooster.Shared/Helpers/` with `TryParseProjectId`, `TryParseIssueId`, and `TryParseFeatureRequestId`.
 
 ### Entity Creation & Deletion Ownership
 - **Creation**: MCP tools only (AI agents create entities). No create/edit UI in dashboard.
@@ -204,8 +208,8 @@ ID parsing utility: `IdParser` in `PinkRooster.Shared/Helpers/` with `TryParsePr
 ### Auto-Timestamps
 `UpdatedAt` is auto-set via `SaveChangesAsync` override in `AppDbContext` using a single `ChangeTracker.Entries<IHasUpdatedAt>()` loop (all timestamped entities implement `IHasUpdatedAt`). `CreatedAt` uses DB default `now()`.
 
-### State-Driven Timestamps (Issues, WPs, Tasks)
-Entities implementing `IHasStateTimestamps` (Issue, WorkPackage, WorkPackageTask) have `StartedAt`, `CompletedAt`, `ResolvedAt` fields **never set by callers** — they are computed via `StateTransitionHelper.ApplyStateTimestamps()` based on `CompletionState` transitions:
+### State-Driven Timestamps (Issues, WPs, Tasks, Feature Requests)
+Entities implementing `IHasStateTimestamps` (Issue, WorkPackage, WorkPackageTask, FeatureRequest) have `StartedAt`, `CompletedAt`, `ResolvedAt` fields **never set by callers** — they are computed via `StateTransitionHelper.ApplyStateTimestamps()` (for CompletionState) or `ApplyFeatureStatusTimestamps()` (for FeatureStatus) based on state transitions:
 - `StartedAt` — set once when transitioning from NotStarted/Blocked → any Active state (never cleared)
 - `CompletedAt` — set when → Completed (cleared if moving out of terminal)
 - `ResolvedAt` — set when → any Terminal state (cleared if moving out of terminal)
@@ -213,8 +217,8 @@ Entities implementing `IHasStateTimestamps` (Issue, WorkPackage, WorkPackageTask
 
 Entities implementing `IHasBlockedState` (WorkPackage, WorkPackageTask) additionally have `PreviousActiveState` managed via `StateTransitionHelper.ApplyBlockedStateLogic()` — captured on transition to Blocked, cleared on transition from Blocked.
 
-### Issue Audit Log
-Full-field audit via `IssueAuditLog` table (separate from `ActivityLog` which is HTTP request logging). Every field change on create/update produces an audit entry with FieldName, OldValue, NewValue, ChangedBy, ChangedAt. On creation, all fields logged with OldValue = null. Deletion does not create audit entries (covered by ActivityLog middleware).
+### Entity Audit Logs
+Full-field audit via per-entity audit log tables (`IssueAuditLog`, `WorkPackageAuditLog`, `PhaseAuditLog`, `TaskAuditLog`, `FeatureRequestAuditLog`) — separate from `ActivityLog` which is HTTP request logging. Every field change on create/update produces an audit entry with FieldName, OldValue, NewValue, ChangedBy, ChangedAt. On creation, all fields logged with OldValue = null. Deletion does not create audit entries (covered by ActivityLog middleware).
 
 ### Partial Updates (PATCH Semantics)
 `UpdateIssueRequest` has all-nullable fields. `null` means "don't change" — **no field clearing support** (once set, optional fields can only be overwritten, never set back to null).
@@ -223,7 +227,10 @@ Full-field audit via `IssueAuditLog` table (separate from `ActivityLog` which is
 Issues use nested routes under projects: `api/projects/{projectId:long}/issues`. POST for create (201), PATCH for partial update (200). This differs from the Project entity's flat PUT upsert pattern.
 
 ### CompletionState Enum
-Shared enum used for Issue state tracking. Three categories defined in `CompletionStateConstants`: ActiveStates (Designing, Implementing, Testing, InReview), InactiveStates (Blocked, NotStarted), TerminalStates (Completed, Cancelled, Replaced). All state transitions are allowed (no validation).
+Shared enum used for Issue/WP/Task state tracking. Three categories defined in `CompletionStateConstants`: ActiveStates (Designing, Implementing, Testing, InReview), InactiveStates (Blocked, NotStarted), TerminalStates (Completed, Cancelled, Replaced). All state transitions are allowed (no validation).
+
+### FeatureStatus Enum
+Purpose-built lifecycle for Feature Requests with 8 states. Three categories defined in `FeatureStatusConstants`: ActiveStates (UnderReview, Approved, Scheduled, InProgress), InactiveStates (Proposed, Deferred), TerminalStates (Completed, Rejected). All state transitions are allowed (no validation). Timestamps follow same pattern as CompletionState via `ApplyFeatureStatusTimestamps()`.
 
 ### Per-Project Sequential Numbering
 `IssueNumber` assigned via `SELECT MAX(issue_number) + 1` in a serializable transaction. Gaps are allowed (deletion doesn't reuse numbers). Number is immutable after creation.
@@ -246,18 +253,18 @@ Integration tests use **Testcontainers** (real PostgreSQL 17 in Docker) + **Resp
 
 ### Shared Infrastructure (API)
 Domain logic shared across services is centralized in:
-- **`StateTransitionHelper`** (static) — `ApplyStateTimestamps()`, `ApplyBlockedStateLogic()`, `MapFileReferences()`. Operates on `IHasStateTimestamps` / `IHasBlockedState` interfaces.
+- **`StateTransitionHelper`** (static) — `ApplyStateTimestamps()`, `ApplyFeatureStatusTimestamps()`, `ApplyBlockedStateLogic()`, `MapFileReferences()`. Operates on `IHasStateTimestamps` / `IHasBlockedState` interfaces.
 - **`StateCascadeService`** (DI-registered) — `PropagateStateUpwardAsync()`, `AutoUnblockDependentWpsAsync()`, `AutoUnblockDependentTasksAsync()`, `HasCircularWpDependencyAsync()`, `HasCircularTaskDependencyAsync()`. Owns all cross-entity state transitions.
 - **`ResponseMapper`** (static) — `MapTask()`, `MapPhase()`, `MapFileReferences()`, `MapAcceptanceCriterion()`, dependency mapping. Shared by `WorkPackageService`, `WorkPackageTaskService`, `PhaseService`.
-- **`HttpContextExtensions`** — `GetCallerIdentity()` extension method used by all 4 controllers.
+- **`HttpContextExtensions`** — `GetCallerIdentity()` extension method used by all 5 controllers.
 - **Marker interfaces** in `PinkRooster.Data.Entities` — `IHasUpdatedAt`, `IHasStateTimestamps`, `IHasBlockedState`.
 
 ### Shared Infrastructure (MCP)
 - **`McpInputParser`** (internal static in `Helpers/`) — `MapFileReferences()`, `MapAcceptanceCriteria()`, `MapCreateTasks()`, `MapUpsertTasks()`, `MapScaffoldPhases()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
-- **MCP-specific enums** (in `Inputs/`) — `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue). Provide schema-level validation for constrained string parameters.
+- **MCP-specific enums** (in `Inputs/`) — `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue/FeatureRequest). Provide schema-level validation for constrained string parameters.
 - **MCP input types** (in `Inputs/`) — `FileReferenceInput`, `AcceptanceCriterionInput`, `PhaseTaskInput`, `ScaffoldPhaseInput`/`ScaffoldTaskInput`, `BatchTaskStateInput`. Map to shared DTOs via `McpInputParser`.
-- **MCP tool annotations** — All 16 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
-- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`.
+- **MCP tool annotations** — All 18 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
+- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `FeatureRequestTools`.
 
 ### State Change Cascade Notifications
 When automatic state transitions occur (auto-block, auto-unblock, upward propagation), the API response includes a `StateChanges` list so MCP tools can report them to AI agents. The cascade flows:
@@ -295,6 +302,18 @@ Write operations return a structured JSON response:
 ```
 Fields `id`, `nextStep`, and `stateChanges` are omitted when null. Use `OperationResult.Success(id, message)` for entity operations and `OperationResult.SuccessMessage(message)` for informational messages without an entity ID.
 
+### Feature Request Entity
+Feature requests track ideas and enhancements with a purpose-built lifecycle (FeatureStatus enum). Key patterns:
+- Per-project sequential `FeatureRequestNumber` via serializable transaction (same as Issue/WP)
+- `FeatureStatus` enum with 8 states: Proposed → UnderReview → Approved → Scheduled → InProgress → Completed/Rejected/Deferred
+- State-driven timestamps via `ApplyFeatureStatusTimestamps()` (same rules as CompletionState)
+- Full-field audit via `FeatureRequestAuditLog`
+- Optional bidirectional link to WorkPackages via `LinkedFeatureRequestId` FK (SetNull on delete)
+- LinkedWorkPackages enriched at read-time (query on WP.LinkedFeatureRequestId)
+- Included in `get_project_status` (counts + item lists) and `get_next_actions` (active FRs without linked WPs)
+- API routes: `api/projects/{projectId}/feature-requests` (POST/PATCH/DELETE/GET, same pattern as Issues)
+- 3 MCP tools: `create_or_update_feature_request`, `get_feature_request_details`, `get_feature_requests`
+
 ### Design Documents
 Detailed design specs live in `claudedocs/`. Current docs:
 - `claudedocs/design_project_entity.md` — Project entity full vertical slice (entity, API, MCP tools, dashboard)
@@ -302,5 +321,6 @@ Detailed design specs live in `claudedocs/`. Current docs:
 - `claudedocs/workflow_issue_entity.md` — Issue entity implementation workflow (6 phases)
 - `claudedocs/design_work_packages.md` — Work Package entity full vertical slice design
 - `claudedocs/workflow_work_packages.md` — Work Package implementation workflow
+- `claudedocs/PROPOSAL_feature_request_tracking.md` — Feature request tracking proposal (3 paths analyzed, Path B implemented)
 - `claudedocs/PROJECT_INDEX.md` — Comprehensive project documentation (architecture, entities, API endpoints, MCP tools, file tree)
 - `claudedocs/SOLID_ANALYSIS.md` — SOLID principles analysis (14 findings, all resolved)

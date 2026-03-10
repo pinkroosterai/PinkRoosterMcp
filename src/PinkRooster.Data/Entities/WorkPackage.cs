@@ -9,9 +9,11 @@ public sealed class WorkPackage : IHasBlockedState, IHasUpdatedAt
     public long ProjectId { get; set; }
     public Project Project { get; set; } = null!;
 
-    // ── Optional Issue Link ──
+    // ── Optional Links ──
     public long? LinkedIssueId { get; set; }
     public Issue? LinkedIssue { get; set; }
+    public long? LinkedFeatureRequestId { get; set; }
+    public FeatureRequest? LinkedFeatureRequest { get; set; }
 
     // ── Definition ──
     public required string Name { get; set; }

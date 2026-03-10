@@ -37,6 +37,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
             .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
             .Include(w => w.LinkedIssue)
+            .Include(w => w.LinkedFeatureRequest)
             .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
 
         return wp is null ? null : ToResponse(wp);
@@ -84,6 +85,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 EstimationRationale = request.EstimationRationale,
                 State = request.State,
                 LinkedIssueId = request.LinkedIssueId,
+                LinkedFeatureRequestId = request.LinkedFeatureRequestId,
                 Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
@@ -150,6 +152,9 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         if (request.LinkedIssueId is not null)
             AuditAndSetNullableLong(auditEntries, wp.Id, changedBy, now, "LinkedIssueId", wp.LinkedIssueId, request.LinkedIssueId, v => wp.LinkedIssueId = v);
 
+        if (request.LinkedFeatureRequestId is not null)
+            AuditAndSetNullableLong(auditEntries, wp.Id, changedBy, now, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId, request.LinkedFeatureRequestId, v => wp.LinkedFeatureRequestId = v);
+
         if (request.Attachments is not null)
         {
             var oldJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
@@ -203,6 +208,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
             .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
             .Include(w => w.LinkedIssue)
+            .Include(w => w.LinkedFeatureRequest)
             .FirstAsync(w => w.Id == wp.Id, ct);
 
         var response = ToResponse(fullWp);
@@ -426,6 +432,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 EstimationRationale = request.EstimationRationale,
                 State = request.State,
                 LinkedIssueId = request.LinkedIssueId,
+                LinkedFeatureRequestId = request.LinkedFeatureRequestId,
                 Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
@@ -795,6 +802,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         Add("EstimationRationale", wp.EstimationRationale);
         Add("State", wp.State.ToString());
         Add("LinkedIssueId", wp.LinkedIssueId?.ToString());
+        Add("LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
 
         if (wp.Attachments.Count > 0)
             Add("Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
@@ -886,6 +894,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         State = w.State.ToString(),
         PreviousActiveState = w.PreviousActiveState?.ToString(),
         LinkedIssueId = w.LinkedIssueId is not null ? $"proj-{w.ProjectId}-issue-{w.LinkedIssueId}" : null,
+        LinkedFeatureRequestId = w.LinkedFeatureRequestId is not null ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequestId}" : null,
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,
@@ -912,6 +921,9 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         LinkedIssueId = w.LinkedIssue is not null
             ? $"proj-{w.ProjectId}-issue-{w.LinkedIssue.IssueNumber}"
             : (w.LinkedIssueId is not null ? w.LinkedIssueId.ToString() : null),
+        LinkedFeatureRequestId = w.LinkedFeatureRequest is not null
+            ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequest.FeatureRequestNumber}"
+            : (w.LinkedFeatureRequestId is not null ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequestId}" : null),
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,

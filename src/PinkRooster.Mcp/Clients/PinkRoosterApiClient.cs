@@ -59,6 +59,54 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return (project, response.StatusCode == HttpStatusCode.Created);
     }
 
+    // ── Feature Request endpoints ──
+
+    public async Task<List<FeatureRequestResponse>> GetFeatureRequestsByProjectAsync(
+        long projectId, string? stateFilter = null, CancellationToken ct = default)
+    {
+        var url = $"/api/projects/{projectId}/feature-requests";
+        if (!string.IsNullOrWhiteSpace(stateFilter))
+            url += $"?state={Uri.EscapeDataString(stateFilter)}";
+
+        return await httpClient.GetFromJsonAsync<List<FeatureRequestResponse>>(url, ct) ?? [];
+    }
+
+    public async Task<FeatureRequestResponse?> GetFeatureRequestAsync(
+        long projectId, int frNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync(
+            $"/api/projects/{projectId}/feature-requests/{frNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+    }
+
+    public async Task<FeatureRequestResponse> CreateFeatureRequestAsync(
+        long projectId, CreateFeatureRequestRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/projects/{projectId}/feature-requests", request, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct)
+            ?? throw new InvalidOperationException("Failed to deserialize feature request response.");
+    }
+
+    public async Task<FeatureRequestResponse?> UpdateFeatureRequestAsync(
+        long projectId, int frNumber, UpdateFeatureRequestRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync(
+            $"/api/projects/{projectId}/feature-requests/{frNumber}", request, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+    }
+
     // ── Issue endpoints ──
 
     public async Task<List<IssueResponse>> GetIssuesByProjectAsync(

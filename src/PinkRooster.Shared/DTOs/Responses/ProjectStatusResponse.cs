@@ -6,6 +6,7 @@ public sealed class ProjectStatusResponse
     public required string Name { get; init; }
     public required string Status { get; init; }
     public required EntityStatusSummary Issues { get; init; }
+    public required EntityStatusSummary FeatureRequests { get; init; }
     public required WorkPackageStatusSummary WorkPackages { get; init; }
 }
 

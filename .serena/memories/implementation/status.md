@@ -8,8 +8,9 @@
 - State Change Cascade Notifications (auto-block, auto-unblock, upward propagation)
 - Compact project status (get_project_status, ~10x token reduction over old overview)
 - Priority-ordered next actions (get_next_actions)
+- Feature Requests: full vertical slice (entity, audit, service, controller, 3 MCP tools, WP linking, project status/next-actions integration)
 - SOLID refactoring: 14/14 findings resolved across 6 passes
-- 97 integration tests passing (project, status, next-actions, issue, WP, phase, task, auth)
+- 119 integration tests passing (project, status, next-actions, issue, feature-request, WP, phase, task, scaffold, auth)
 
 ## Dashboard
 - Vite + React 19 + Shadcn/ui (new-york) + Tailwind CSS v4 + TanStack Query/Table

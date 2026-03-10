@@ -75,6 +75,15 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         var issueInactive = issueStates.Where(i => CompletionStateConstants.InactiveStates.Contains(i.State)).ToList();
         var issueTerminal = issueStates.Count(i => CompletionStateConstants.TerminalStates.Contains(i.State));
 
+        var frStates = await db.FeatureRequests
+            .Where(fr => fr.ProjectId == projectId)
+            .Select(fr => new { fr.Id, fr.Status, fr.FeatureRequestNumber, fr.Name, fr.ProjectId })
+            .ToListAsync(ct);
+
+        var frActive = frStates.Where(fr => FeatureStatusConstants.ActiveStates.Contains(fr.Status)).ToList();
+        var frInactive = frStates.Where(fr => FeatureStatusConstants.InactiveStates.Contains(fr.Status)).ToList();
+        var frTerminal = frStates.Count(fr => FeatureStatusConstants.TerminalStates.Contains(fr.Status));
+
         var wpData = await db.WorkPackages
             .Where(w => w.ProjectId == projectId)
             .Select(w => new { w.Id, w.WorkPackageNumber, w.Name, w.State, w.ProjectId })
@@ -106,6 +115,24 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 {
                     Id = $"proj-{i.ProjectId}-issue-{i.IssueNumber}",
                     Name = i.Name
+                }).ToList()
+            },
+            FeatureRequests = new EntityStatusSummary
+            {
+                Total = frStates.Count,
+                Active = frActive.Count,
+                Inactive = frInactive.Count,
+                Terminal = frTerminal,
+                PercentComplete = frStates.Count > 0 ? frTerminal * 100 / frStates.Count : 0,
+                ActiveItems = frActive.Select(fr => new StatusItem
+                {
+                    Id = $"proj-{fr.ProjectId}-fr-{fr.FeatureRequestNumber}",
+                    Name = fr.Name
+                }).ToList(),
+                InactiveItems = frInactive.Select(fr => new StatusItem
+                {
+                    Id = $"proj-{fr.ProjectId}-fr-{fr.FeatureRequestNumber}",
+                    Name = fr.Name
                 }).ToList()
             },
             WorkPackages = new WorkPackageStatusSummary
@@ -236,8 +263,36 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
             }));
         }
 
-        // Sort: Priority ordinal → entity type (Task=0, WP=1, Issue=2) → SortOrder not available cross-entity, use name
-        var typeOrder = new Dictionary<string, int> { ["Task"] = 0, ["WorkPackage"] = 1, ["Issue"] = 2 };
+        // Query 4: Actionable feature requests — active (UnderReview, Approved), not terminal/deferred
+        if (entityType is null or "featurerequest")
+        {
+            var frs = await db.FeatureRequests
+                .Where(fr => fr.ProjectId == projectId)
+                .Where(fr => FeatureStatusConstants.ActiveStates.Contains(fr.Status)
+                    && fr.Status != FeatureStatus.InProgress) // InProgress = WPs handle it
+                .Select(fr => new
+                {
+                    fr.ProjectId,
+                    fr.FeatureRequestNumber,
+                    fr.Name,
+                    fr.Status,
+                    fr.Priority
+                })
+                .ToListAsync(ct);
+
+            items.AddRange(frs.Select(fr => new NextActionItem
+            {
+                Type = "FeatureRequest",
+                Id = $"proj-{fr.ProjectId}-fr-{fr.FeatureRequestNumber}",
+                Name = fr.Name,
+                Priority = fr.Priority.ToString(),
+                State = fr.Status.ToString(),
+                ParentId = $"proj-{fr.ProjectId}"
+            }));
+        }
+
+        // Sort: Priority ordinal → entity type (Task=0, WP=1, Issue=2, FR=3) → name
+        var typeOrder = new Dictionary<string, int> { ["Task"] = 0, ["WorkPackage"] = 1, ["Issue"] = 2, ["FeatureRequest"] = 3 };
 
         return items
             .OrderBy(i => Enum.TryParse<Priority>(i.Priority, out var p) ? (int)p : 99)

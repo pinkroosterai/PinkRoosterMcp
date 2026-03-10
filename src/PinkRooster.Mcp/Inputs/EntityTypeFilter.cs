@@ -4,5 +4,6 @@ public enum EntityTypeFilter
 {
     Task,
     Wp,
-    Issue
+    Issue,
+    FeatureRequest
 }

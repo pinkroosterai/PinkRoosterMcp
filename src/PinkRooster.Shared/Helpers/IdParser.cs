@@ -83,6 +83,26 @@ public static class IdParser
             && int.TryParse(phasePart, out phaseNumber) && phaseNumber > 0;
     }
 
+    public static bool TryParseFeatureRequestId(string humanId, out long projectId, out int frNumber)
+    {
+        projectId = 0;
+        frNumber = 0;
+
+        const string frMarker = "-fr-";
+        if (!humanId.StartsWith("proj-"))
+            return false;
+
+        var frIndex = humanId.IndexOf(frMarker, StringComparison.Ordinal);
+        if (frIndex < 0)
+            return false;
+
+        var projectPart = humanId.AsSpan(5, frIndex - 5);
+        var frPart = humanId.AsSpan(frIndex + frMarker.Length);
+
+        return long.TryParse(projectPart, out projectId) && projectId > 0
+            && int.TryParse(frPart, out frNumber) && frNumber > 0;
+    }
+
     public static bool TryParseTaskId(string humanId, out long projectId, out int wpNumber, out int taskNumber)
     {
         projectId = 0;

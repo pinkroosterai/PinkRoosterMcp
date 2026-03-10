@@ -87,6 +87,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             State = wp.State,
             PreviousActiveState = wp.PreviousActiveState,
             LinkedIssueId = wp.LinkedIssueId,
+            LinkedFeatureRequestId = wp.LinkedFeatureRequestId,
             StartedAt = wp.StartedAt,
             CompletedAt = wp.CompletedAt,
             ResolvedAt = wp.ResolvedAt,
@@ -122,6 +123,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
         [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
+        [Description("Linked feature request ID (e.g. 'proj-1-fr-1').")] string? linkedFeatureRequestId = null,
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
@@ -130,10 +132,10 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
         if (workPackageId is not null)
             return await UpdateExistingWorkPackage(projId, workPackageId, name, description, type,
-                priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueId, attachments, ct);
+                priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
 
         return await CreateNewWorkPackage(projId, name, description, type, priority, plan,
-            estimatedComplexity, estimationRationale, state, linkedIssueId, attachments, ct);
+            estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
     }
 
     // ── 4. manage_work_package_dependency ──
@@ -216,6 +218,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing). Default: NotStarted.")] CompletionState? state = null,
         [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
+        [Description("Linked feature request ID (e.g. 'proj-1-fr-1').")] string? linkedFeatureRequestId = null,
         [Description("Existing WP IDs that block this WP (e.g. ['proj-1-wp-1']).")] List<string>? blockedByWorkPackageIds = null,
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
@@ -252,6 +255,18 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                     return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
 
                 request.LinkedIssueId = issue.Id;
+            }
+
+            if (linkedFeatureRequestId is not null)
+            {
+                if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
+                    return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
+
+                var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
+                if (fr is null)
+                    return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
+
+                request.LinkedFeatureRequestId = fr.Id;
             }
 
             if (blockedByWorkPackageIds is { Count: > 0 })
@@ -301,7 +316,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     private async Task<string> CreateNewWorkPackage(
         long projId, string? name, string? description, WorkPackageType? type, Priority? priority,
         string? plan, int? estimatedComplexity, string? estimationRationale, CompletionState? state,
-        string? linkedIssueId, List<FileReferenceInput>? attachments, CancellationToken ct)
+        string? linkedIssueId, string? linkedFeatureRequestId, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return OperationResult.Error("'name' is required when creating a work package.");
@@ -333,6 +348,18 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             request.LinkedIssueId = issue.Id;
         }
 
+        if (linkedFeatureRequestId is not null)
+        {
+            if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
+                return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
+
+            var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
+            if (fr is null)
+                return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
+
+            request.LinkedFeatureRequestId = fr.Id;
+        }
+
         var created = await apiClient.CreateWorkPackageAsync(projId, request, ct);
         return OperationResult.Success(created.WorkPackageId, $"Work package '{name}' created.");
     }
@@ -340,7 +367,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     private async Task<string> UpdateExistingWorkPackage(
         long projId, string workPackageId, string? name, string? description, WorkPackageType? type,
         Priority? priority, string? plan, int? estimatedComplexity, string? estimationRationale,
-        CompletionState? state, string? linkedIssueId, List<FileReferenceInput>? attachments, CancellationToken ct)
+        CompletionState? state, string? linkedIssueId, string? linkedFeatureRequestId, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var parsedProjId, out var wpNumber))
             return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
@@ -371,6 +398,18 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                 return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
 
             request.LinkedIssueId = issue.Id;
+        }
+
+        if (linkedFeatureRequestId is not null)
+        {
+            if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
+                return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
+
+            var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
+            if (fr is null)
+                return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
+
+            request.LinkedFeatureRequestId = fr.Id;
         }
 
         var updated = await apiClient.UpdateWorkPackageAsync(projId, wpNumber, request, ct);

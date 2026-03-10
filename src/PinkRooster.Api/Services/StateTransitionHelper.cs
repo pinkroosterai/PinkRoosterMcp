@@ -42,6 +42,34 @@ public static class StateTransitionHelper
     }
 
     /// <summary>
+    /// Applies state-driven timestamps based on FeatureStatus transitions.
+    /// Same rules as CompletionState but using FeatureStatusConstants.
+    /// </summary>
+    public static void ApplyFeatureStatusTimestamps(IHasStateTimestamps entity, FeatureStatus oldStatus, FeatureStatus newStatus)
+    {
+        if (oldStatus == newStatus)
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+
+        // StartedAt: set once when entering an active state from inactive
+        if (entity.StartedAt is null && FeatureStatusConstants.ActiveStates.Contains(newStatus))
+            entity.StartedAt = now;
+
+        // CompletedAt: set when entering Completed, cleared when leaving terminal
+        if (newStatus == FeatureStatus.Completed)
+            entity.CompletedAt = now;
+        else if (FeatureStatusConstants.TerminalStates.Contains(oldStatus) && !FeatureStatusConstants.TerminalStates.Contains(newStatus))
+            entity.CompletedAt = null;
+
+        // ResolvedAt: set when entering any terminal state, cleared when leaving terminal
+        if (FeatureStatusConstants.TerminalStates.Contains(newStatus))
+            entity.ResolvedAt = now;
+        else if (FeatureStatusConstants.TerminalStates.Contains(oldStatus))
+            entity.ResolvedAt = null;
+    }
+
+    /// <summary>
     /// Manages PreviousActiveState for entities that support auto-block/unblock.
     /// - Transitioning TO Blocked from an active state: captures PreviousActiveState
     /// - Transitioning FROM Blocked: clears PreviousActiveState

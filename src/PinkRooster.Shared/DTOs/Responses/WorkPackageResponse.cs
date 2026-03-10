@@ -18,6 +18,7 @@ public sealed class WorkPackageResponse
     public required string State { get; init; }
     public string? PreviousActiveState { get; init; }
     public string? LinkedIssueId { get; init; }
+    public string? LinkedFeatureRequestId { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }

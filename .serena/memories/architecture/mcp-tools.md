@@ -3,9 +3,9 @@
 ## Setup
 - MCP SDK v1.0.0, Streamable HTTP (protocol 2025-03-26) + legacy SSE
 - Registered in `.mcp.json` as `pinkrooster` at `http://localhost:5200`
-- `PinkRoosterApiClient`: all 16 endpoints use `EnsureSuccessAsync` with body-aware error extraction
+- `PinkRoosterApiClient`: all 20 endpoints use `EnsureSuccessAsync` with body-aware error extraction
 
-## 16 MCP Tools
+## 18 MCP Tools
 | Tool | Type | Description |
 |------|------|-------------|
 | get_project_status | Read | Compact status: issue/WP counts by state, active/inactive/blocked lists |
@@ -23,11 +23,14 @@
 | manage_work_package_dependency | Write | Add/remove WP dependency with auto-block/unblock cascades (idempotent) |
 | manage_task_dependency | Write | Add/remove task dependency with auto-block/unblock cascades (idempotent) |
 | scaffold_work_package | Write | One-call WP creation with phases, tasks, dependencies |
+| create_or_update_feature_request | Write | Create (omit featureRequestId) or update (provide featureRequestId) |
+| get_feature_request_details | Read | Full feature request data by composite ID |
+| get_feature_requests | Read | List feature requests, filterable by state category |
 
 ## MCP Tool Annotations
 All tools use MCP SDK annotations:
-- `Title` — human-readable display name on all 16 tools
-- `ReadOnly = true` — on all 6 read tools
+- `Title` — human-readable display name on all 18 tools
+- `ReadOnly = true` — on all 8 read tools
 - `Destructive = false` — on all 10 write tools (none delete data)
 - `Idempotent = true` — on create_or_update_project, batch_update_task_states, manage_*_dependency
 - `OpenWorld = false` — on all 16 tools (closed domain)
@@ -36,7 +39,7 @@ All tools use MCP SDK annotations:
 Constrained string parameters replaced with enum types for schema-level validation:
 - `DependencyAction` — Add, Remove (used by manage_*_dependency tools)
 - `StateFilterCategory` — Active, Inactive, Terminal (used by list tools)
-- `EntityTypeFilter` — Task, Wp, Issue (used by get_next_actions)
+- `EntityTypeFilter` — Task, Wp, Issue, FeatureRequest (used by get_next_actions)
 
 ## MCP Response Pattern
 - Write ops return `OperationResult` JSON with responseType, message, id, nextStep, stateChanges
@@ -54,4 +57,4 @@ MCP tool parameters use MCP-specific input types (never shared DTOs directly):
 
 ## Shared Infrastructure
 - `McpInputParser` (Helpers/): NullIfEmpty, IsTerminalState, mapping methods (MCP inputs → shared DTOs)
-- Tool classes split by entity: ProjectTools, IssueTools, WorkPackageTools, PhaseTools, TaskTools
+- Tool classes split by entity: ProjectTools, IssueTools, WorkPackageTools, PhaseTools, TaskTools, FeatureRequestTools

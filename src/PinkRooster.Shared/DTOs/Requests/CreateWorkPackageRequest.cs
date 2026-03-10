@@ -13,5 +13,6 @@ public sealed class CreateWorkPackageRequest
     public string? EstimationRationale { get; set; }
     public CompletionState State { get; set; } = CompletionState.NotStarted;
     public long? LinkedIssueId { get; set; }
+    public long? LinkedFeatureRequestId { get; set; }
     public List<FileReferenceDto>? Attachments { get; set; }
 }
