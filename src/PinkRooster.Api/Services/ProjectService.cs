@@ -132,6 +132,121 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         };
     }
 
+    public async Task<List<NextActionItem>?> GetNextActionsAsync(
+        long projectId, int limit = 10, string? entityType = null, CancellationToken ct = default)
+    {
+        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, ct);
+        if (project is null) return null;
+
+        var items = new List<NextActionItem>();
+
+        // Query 1: Actionable tasks — active states + NotStarted (if WP is active), never Blocked
+        if (entityType is null or "task")
+        {
+            var tasks = await db.WorkPackageTasks
+                .Include(t => t.WorkPackage)
+                .Where(t => t.WorkPackage.ProjectId == projectId)
+                .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State))
+                .Where(t => t.State != CompletionState.Blocked)
+                .Where(t => CompletionStateConstants.ActiveStates.Contains(t.State)
+                    || (t.State == CompletionState.NotStarted
+                        && CompletionStateConstants.ActiveStates.Contains(t.WorkPackage.State)))
+                .Select(t => new
+                {
+                    t.WorkPackage.ProjectId,
+                    t.WorkPackage.WorkPackageNumber,
+                    t.TaskNumber,
+                    t.Name,
+                    t.State,
+                    t.SortOrder,
+                    t.WorkPackage.Priority
+                })
+                .ToListAsync(ct);
+
+            items.AddRange(tasks.Select(t => new NextActionItem
+            {
+                Type = "Task",
+                Id = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}-task-{t.TaskNumber}",
+                Name = t.Name,
+                Priority = t.Priority.ToString(),
+                State = t.State.ToString(),
+                ParentId = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}"
+            }));
+        }
+
+        // Query 2: Actionable WPs — active/NotStarted, not Blocked, zero phases (leaf WPs only)
+        if (entityType is null or "wp")
+        {
+            var wps = await db.WorkPackages
+                .Where(w => w.ProjectId == projectId)
+                .Where(w => !CompletionStateConstants.TerminalStates.Contains(w.State))
+                .Where(w => w.State != CompletionState.Blocked)
+                .Where(w => !db.WorkPackagePhases.Any(p => p.WorkPackage.Id == w.Id))
+                .Select(w => new
+                {
+                    w.ProjectId,
+                    w.WorkPackageNumber,
+                    w.Name,
+                    w.State,
+                    w.Priority
+                })
+                .ToListAsync(ct);
+
+            items.AddRange(wps.Select(w => new NextActionItem
+            {
+                Type = "WorkPackage",
+                Id = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}",
+                Name = w.Name,
+                Priority = w.Priority.ToString(),
+                State = w.State.ToString(),
+                ParentId = $"proj-{w.ProjectId}"
+            }));
+        }
+
+        // Query 3: Actionable issues — active/NotStarted, not Blocked, no linked WPs
+        if (entityType is null or "issue")
+        {
+            var linkedIssueIds = db.WorkPackages
+                .Where(w => w.ProjectId == projectId && w.LinkedIssueId != null)
+                .Select(w => w.LinkedIssueId!.Value);
+
+            var issues = await db.Issues
+                .Where(i => i.ProjectId == projectId)
+                .Where(i => !CompletionStateConstants.TerminalStates.Contains(i.State))
+                .Where(i => i.State != CompletionState.Blocked)
+                .Where(i => !linkedIssueIds.Contains(i.Id))
+                .Select(i => new
+                {
+                    i.ProjectId,
+                    i.IssueNumber,
+                    i.Name,
+                    i.State,
+                    i.Priority
+                })
+                .ToListAsync(ct);
+
+            items.AddRange(issues.Select(i => new NextActionItem
+            {
+                Type = "Issue",
+                Id = $"proj-{i.ProjectId}-issue-{i.IssueNumber}",
+                Name = i.Name,
+                Priority = i.Priority.ToString(),
+                State = i.State.ToString(),
+                ParentId = $"proj-{i.ProjectId}"
+            }));
+        }
+
+        // Sort: Priority ordinal → entity type (Task=0, WP=1, Issue=2) → SortOrder not available cross-entity, use name
+        var typeOrder = new Dictionary<string, int> { ["Task"] = 0, ["WorkPackage"] = 1, ["Issue"] = 2 };
+
+        return items
+            .OrderBy(i => Enum.TryParse<Priority>(i.Priority, out var p) ? (int)p : 99)
+            .ThenBy(i => typeOrder.GetValueOrDefault(i.Type, 99))
+            .ThenBy(i => i.Name)
+            .Take(limit)
+            .ToList();
+    }
+
     private static ProjectResponse ToResponse(Project p) => new()
     {
         ProjectId = $"proj-{p.Id}",

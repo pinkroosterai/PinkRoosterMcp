@@ -44,6 +44,36 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
         }
     }
 
+    [McpServerTool(Name = "get_next_actions", ReadOnly = true)]
+    [Description(
+        "Returns a priority-ordered list of actionable work items (tasks, work packages, issues) " +
+        "that need attention. Items are sorted by priority then entity type (tasks first). " +
+        "Use after get_project_status to decide what to work on next.")]
+    public async Task<string> GetNextActions(
+        [Description("Project ID (e.g. 'proj-1').")] string projectId,
+        [Description("Maximum number of items to return. Default 10.")] int limit = 10,
+        [Description("Optional filter: 'task', 'wp', or 'issue'. Omit for all types.")] string? entityType = null,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParseProjectId(projectId, out var projId))
+            return OperationResult.Error(
+                $"Invalid project ID '{projectId}'. Expected format: 'proj-{{number}}'.");
+
+        try
+        {
+            var items = await apiClient.GetNextActionsAsync(projId, limit, entityType, ct);
+
+            if (items is null)
+                return OperationResult.Error($"Project {projectId} not found.");
+
+            return JsonSerializer.Serialize(items, JsonDefaults.Indented);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to fetch next actions: {ex.Message}");
+        }
+    }
+
     [McpServerTool(Name = "create_or_update_project")]
     [Description("Creates or updates a project, matched by path. Returns the project id.")]
     public async Task<string> CreateOrUpdateProject(

@@ -101,6 +101,7 @@ State categories (`CompletionStateConstants`): Active (Designing, Implementing, 
 |--------|-------|-------------|
 | GET | `/api/projects?path=...` | List all or find by path |
 | GET | `/api/projects/{projectId}/status` | Compact project status (issue/WP counts + item lists) |
+| GET | `/api/projects/{projectId}/next-actions?limit=&entityType=` | Priority-ordered actionable items |
 | PUT | `/api/projects` | Upsert project |
 | DELETE | `/api/projects/{id}` | Delete project |
 
@@ -153,13 +154,14 @@ State categories (`CompletionStateConstants`): Active (Designing, Implementing, 
 
 ---
 
-## MCP Tools (15 total)
+## MCP Tools (16 total)
 
 Registered as `pinkrooster` in `.mcp.json` at `http://localhost:5200`.
 
 | Tool | R/W | Description |
 |------|-----|-------------|
 | `get_project_status` | R | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
+| `get_next_actions` | R | Priority-ordered actionable items (tasks, WPs, issues) with limit and entity type filter |
 | `create_or_update_project` | W | Upsert project by path |
 | `add_or_update_issue` | W | Create (omit issueId) or update (provide issueId) |
 | `get_issue_details` | R | Full issue data |
@@ -204,6 +206,7 @@ src/PinkRooster.Shared/
 │   └── Responses/                — 14 response DTOs
 │       ├── ProjectResponse.cs
 │       ├── ProjectStatusResponse.cs  — compact status (EntityStatusSummary, WorkPackageStatusSummary, StatusItem)
+│       ├── NextActionItem.cs        — priority-ordered actionable item (Type, Id, Name, Priority, State, ParentId)
 │       ├── IssueResponse.cs
 │       ├── IssueSummaryResponse.cs
 │       ├── IssueAuditLogResponse.cs
@@ -300,7 +303,7 @@ src/PinkRooster.Mcp/
 ├── Clients/
 │   └── PinkRoosterApiClient.cs   — typed HTTP client for all API calls
 ├── Tools/
-│   ├── ProjectTools.cs           — 2 tools
+│   ├── ProjectTools.cs           — 3 tools
 │   ├── IssueTools.cs             — 3 tools
 │   ├── WorkPackageTools.cs       — 7 tools
 │   └── ActivityLogTools.cs       — 1 tool
@@ -323,6 +326,7 @@ tests/PinkRooster.Api.Tests/
 ├── AuthMiddlewareTests.cs
 ├── ProjectEndpointTests.cs       — 12 tests
 ├── ProjectStatusTests.cs         — 7 tests (status endpoint: counts, categorization, blocked separation)
+├── NextActionsTests.cs           — 11 tests (next actions: filtering, sorting, limit, exclusions)
 ├── IssueEndpointTests.cs         — 12 tests
 ├── WorkPackageEndpointTests.cs   — 22 tests (inc. cascade tests)
 ├── PhaseEndpointTests.cs         — 9 tests
@@ -330,7 +334,7 @@ tests/PinkRooster.Api.Tests/
 └── TaskEndpointTests.cs          — 16 tests
 ```
 
-**Total: 86 integration tests** covering CRUD, dependencies, cascades, timestamps, status summaries, and audit logs.
+**Total: 97 integration tests** covering CRUD, dependencies, cascades, timestamps, status summaries, next actions, and audit logs.
 
 ### Dashboard (37 files)
 ```
@@ -456,12 +460,13 @@ src/dashboard/
 | Infrastructure (Phases 1-6) | Complete | — |
 | Project entity (full slice) | Complete | 12 |
 | Compact project status | Complete | 7 |
+| Priority-ordered next actions | Complete | 11 |
 | Issue entity (full slice) | Complete | 12 |
 | Work Packages (full slice) | Complete | 22 WP + 9 phase + 16 task |
 | State change cascades | Complete | 4 (within WP/task tests) |
 | Dashboard | Complete | — |
 | Docker orchestration | Complete | — |
-| **Total integration tests** | — | **86** |
+| **Total integration tests** | — | **97** |
 
 ### Known Minor Issues (from Phase 1-6 reflection)
 1. Hardcoded API key in dashboard client — should use env var

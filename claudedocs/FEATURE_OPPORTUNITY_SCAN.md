@@ -170,7 +170,7 @@ Scope out: Cross-project search, full-text indexing, fuzzy matching (simple ILIK
 
 ---
 
-### #5 — Priority-Ordered Next Actions
+### #5 — Priority-Ordered Next Actions ✅ IMPLEMENTED
 
 **Category:** J. Natural Feature Extensions
 **Benefits:** AI agents managing projects need to decide what to work on next. Currently, they must fetch all active items, check dependencies, and reason about priority — expensive in both tokens and reasoning effort. A "what's next?" tool does this computation server-side.

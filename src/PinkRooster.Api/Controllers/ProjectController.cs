@@ -38,6 +38,14 @@ public sealed class ProjectController(IProjectService projectService) : Controll
         return status is null ? NotFound() : Ok(status);
     }
 
+    [HttpGet("{projectId:long}/next-actions")]
+    public async Task<ActionResult<List<NextActionItem>>> GetNextActions(
+        long projectId, [FromQuery] int limit = 10, [FromQuery] string? entityType = null, CancellationToken ct = default)
+    {
+        var items = await projectService.GetNextActionsAsync(projectId, limit, entityType, ct);
+        return items is null ? NotFound() : Ok(items);
+    }
+
     [HttpDelete("{id:long}")]
     public async Task<ActionResult> Delete(long id, CancellationToken ct)
     {

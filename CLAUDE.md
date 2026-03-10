@@ -100,6 +100,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | Tool | Type | Description |
 |------|------|-------------|
 | `get_project_status` | Read | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
+| `get_next_actions` | Read | Priority-ordered actionable items (tasks, WPs, issues) with optional limit and entity type filter |
 | `create_or_update_project` | Write | Upsert project by path |
 | `add_or_update_issue` | Write | Create (omit issueId) or update (provide issueId) an issue |
 | `get_issue_details` | Read | Full issue data by composite ID (no audit trail) |

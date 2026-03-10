@@ -41,6 +41,22 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<ProjectStatusResponse>(ct);
     }
 
+    public async Task<List<NextActionItem>?> GetNextActionsAsync(
+        long projectId, int limit = 10, string? entityType = null, CancellationToken ct = default)
+    {
+        var url = $"/api/projects/{projectId}/next-actions?limit={limit}";
+        if (!string.IsNullOrWhiteSpace(entityType))
+            url += $"&entityType={Uri.EscapeDataString(entityType)}";
+
+        var response = await httpClient.GetAsync(url, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<List<NextActionItem>>(ct);
+    }
+
     public async Task<(ProjectResponse Project, bool IsNew)> CreateOrUpdateProjectAsync(
         CreateOrUpdateProjectRequest request, CancellationToken ct = default)
     {
