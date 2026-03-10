@@ -54,3 +54,6 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Serena
+.serena/
