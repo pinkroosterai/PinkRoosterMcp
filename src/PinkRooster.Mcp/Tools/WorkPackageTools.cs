@@ -32,18 +32,18 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             return OperationResult.SuccessMessage($"No work packages found for project '{projectId}'" +
                 (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
 
-        var items = workPackages.Select(wp => new WorkPackageOverviewItem
+        var items = workPackages.Select(wp => new
         {
-            WorkPackageId = wp.WorkPackageId,
-            Name = wp.Name,
-            Type = wp.Type,
-            Priority = wp.Priority,
-            State = wp.State,
+            wp.WorkPackageId,
+            wp.Name,
+            wp.Type,
+            wp.Priority,
+            wp.State,
             PhaseCount = wp.Phases.Count,
             TaskCount = wp.Phases.Sum(p => p.Tasks.Count),
             CompletedTaskCount = wp.Phases.Sum(p => p.Tasks.Count(t => McpInputParser.IsTerminalState(t.State))),
-            CreatedAt = wp.CreatedAt,
-            ResolvedAt = wp.ResolvedAt
+            wp.CreatedAt,
+            wp.ResolvedAt
         }).ToList();
 
         return JsonSerializer.Serialize(items, JsonDefaults.Indented);

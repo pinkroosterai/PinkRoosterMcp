@@ -99,7 +99,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 **Available MCP tools** (registered as `pinkrooster` in `.mcp.json`):
 | Tool | Type | Description |
 |------|------|-------------|
-| `get_project_overview` | Read | Returns project info + active/inactive/terminal issue & WP summaries |
+| `get_project_status` | Read | Compact project status: issue/WP counts by state, active/inactive/blocked item lists |
 | `create_or_update_project` | Write | Upsert project by path |
 | `add_or_update_issue` | Write | Create (omit issueId) or update (provide issueId) an issue |
 | `get_issue_details` | Read | Full issue data by composite ID (no audit trail) |
@@ -117,7 +117,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 
 **Testing flow for MCP tools (E2E):**
 
-1. **Project setup**: `get_project_overview` with `projectPath` — confirms project exists, returns `projectId`
+1. **Project setup**: `get_project_status` with `projectPath` — confirms project exists, returns `projectId` + compact status summary
 2. **Issue CRUD**:
    - `add_or_update_issue` with `projectId` + required fields (name, description, issueType, severity) — creates issue, response has `id` field with `proj-{N}-issue-{N}`
    - `get_issue_details` with returned ID — verify all fields including auto-set timestamps
@@ -184,7 +184,7 @@ EF Core packages are pinned to 9.0.13 and Npgsql to 9.0.4 across both Data and A
 ## Design Decisions
 
 ### MCP ↔ API Response Boundary
-The API returns its own DTOs (defined in Shared). The MCP layer **maps** API responses to MCP-specific response classes before returning to agents. MCP response types (`OperationResult`, `ResponseType`, tool-specific responses like `ProjectOverviewResponse`) live **exclusively in `PinkRooster.Mcp/Responses/`** — never in Shared or API. Rationale: MCP responses are tailored for AI agent consumption (fewer fields, contextual hints), while API responses serve the dashboard with full data.
+The API returns its own DTOs (defined in Shared). The MCP layer **maps** API responses to MCP-specific response classes before returning to agents. MCP response types (`OperationResult`, `ResponseType`, tool-specific detail responses) live **exclusively in `PinkRooster.Mcp/Responses/`** — never in Shared or API. Exception: `ProjectStatusResponse` lives in Shared because the API response is already agent-optimized (compact counts + item lists). Rationale: MCP responses are tailored for AI agent consumption (fewer fields, contextual hints), while API responses serve the dashboard with full data.
 
 ### MCP Tool Error Handling
 MCP tools must **never throw exceptions**. Every code path — including API errors, validation failures, circular dependency rejection, not-found cases, and unexpected exceptions — must return an `OperationResult` string with a clear, actionable message the AI agent can act on. Wrap all API client calls in try-catch. `PinkRoosterApiClient` uses `EnsureSuccessAsync()` which extracts the error body from non-success HTTP responses via `ReadErrorMessageAsync` — all 16 endpoints use this uniformly. The agent should always understand **why** an operation failed and what it can do next.

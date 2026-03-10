@@ -29,6 +29,18 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
     }
 
+    public async Task<ProjectStatusResponse?> GetProjectStatusAsync(
+        long projectId, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/api/projects/{projectId}/status", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<ProjectStatusResponse>(ct);
+    }
+
     public async Task<(ProjectResponse Project, bool IsNew)> CreateOrUpdateProjectAsync(
         CreateOrUpdateProjectRequest request, CancellationToken ct = default)
     {
@@ -62,14 +74,6 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
 
         await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<IssueResponse>(ct);
-    }
-
-    public async Task<IssueSummaryResponse> GetIssueSummaryAsync(
-        long projectId, CancellationToken ct = default)
-    {
-        return await httpClient.GetFromJsonAsync<IssueSummaryResponse>(
-            $"/api/projects/{projectId}/issues/summary", ct)
-            ?? throw new InvalidOperationException("Failed to deserialize issue summary response.");
     }
 
     public async Task<IssueResponse> CreateIssueAsync(
@@ -118,14 +122,6 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
 
         await EnsureSuccessAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
-    }
-
-    public async Task<WorkPackageSummaryResponse> GetWorkPackageSummaryAsync(
-        long projectId, CancellationToken ct = default)
-    {
-        return await httpClient.GetFromJsonAsync<WorkPackageSummaryResponse>(
-            $"/api/projects/{projectId}/work-packages/summary", ct)
-            ?? throw new InvalidOperationException("Failed to deserialize work package summary response.");
     }
 
     public async Task<WorkPackageResponse> CreateWorkPackageAsync(

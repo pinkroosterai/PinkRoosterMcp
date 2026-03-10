@@ -31,6 +31,13 @@ public sealed class ProjectController(IProjectService projectService) : Controll
         return isNew ? Created($"{ApiRoutes.Projects.Route}?path={project.ProjectPath}", project) : Ok(project);
     }
 
+    [HttpGet("{projectId:long}/status")]
+    public async Task<ActionResult<ProjectStatusResponse>> GetStatus(long projectId, CancellationToken ct)
+    {
+        var status = await projectService.GetStatusAsync(projectId, ct);
+        return status is null ? NotFound() : Ok(status);
+    }
+
     [HttpDelete("{id:long}")]
     public async Task<ActionResult> Delete(long id, CancellationToken ct)
     {

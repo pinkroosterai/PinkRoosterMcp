@@ -109,16 +109,16 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             return OperationResult.SuccessMessage($"No issues found for project '{projectId}'" +
                 (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
 
-        var items = issues.Select(i => new IssueOverviewItem
+        var items = issues.Select(i => new
         {
-            IssueId = i.IssueId,
-            Name = i.Name,
-            State = i.State,
-            Priority = i.Priority,
-            Severity = i.Severity,
-            IssueType = i.IssueType,
+            i.IssueId,
+            i.Name,
+            i.State,
+            i.Priority,
+            i.Severity,
+            i.IssueType,
             LinkedWorkPackageCount = i.LinkedWorkPackages.Count,
-            CreatedAt = i.CreatedAt
+            i.CreatedAt
         }).ToList();
 
         return JsonSerializer.Serialize(items, JsonDefaults.Indented);

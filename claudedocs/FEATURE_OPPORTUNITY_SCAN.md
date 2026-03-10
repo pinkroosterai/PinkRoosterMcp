@@ -74,7 +74,7 @@ Scope out: Cross-WP dependencies (those still require `manage_work_package_depen
 
 ---
 
-### #2 — Compact Project Status Summary
+### #2 — Compact Project Status Summary ✅ IMPLEMENTED
 
 **Category:** E. Reporting, Analytics & Insights
 **Benefits:** AI agents resuming a project session need to quickly understand where things stand. The current `get_project_overview` returns every active issue and work package as full objects — extremely token-expensive for the "what's the status?" question that opens most agent sessions.
@@ -430,9 +430,9 @@ Scope out: Auto-generating context (the agent decides what to save), sharing con
 
 ### Top 3 Highest-Value Features
 
-1. **One-call work package scaffolding** (#1) — Let agents create a complete implementation plan (WP + phases + tasks + dependencies) in a single tool call instead of 4–10, dramatically reducing context window consumption and latency for the most common agent workflow.
+1. **One-call work package scaffolding** (#1) ✅ — Let agents create a complete implementation plan (WP + phases + tasks + dependencies) in a single tool call instead of 4–10, dramatically reducing context window consumption and latency for the most common agent workflow.
 
-2. **Compact project status summary** (#2) — Give agents a 500-token project health check instead of the current 3,000–5,000-token full overview, enabling efficient session starts and mid-session check-ins without blowing the context budget.
+2. **Compact project status summary** (#2) ✅ — Give agents a 500-token project health check instead of the current 3,000–5,000-token full overview, enabling efficient session starts and mid-session check-ins without blowing the context budget.
 
 3. **Acceptance criteria verification** (#3) — Complete the quality gate workflow that the data model already supports but no tool activates, letting agents record pass/fail results and auto-complete phases when all criteria are met.
 

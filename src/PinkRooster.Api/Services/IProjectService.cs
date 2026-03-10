@@ -10,4 +10,5 @@ public interface IProjectService
     Task<(ProjectResponse Project, bool IsNew)> CreateOrUpdateAsync(
         CreateOrUpdateProjectRequest request, CancellationToken ct = default);
     Task<bool> DeleteAsync(long id, CancellationToken ct = default);
+    Task<ProjectStatusResponse?> GetStatusAsync(long projectId, CancellationToken ct = default);
 }
