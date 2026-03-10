@@ -13,10 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityLogs } from "@/hooks/use-activity-logs";
+import { humanizePath } from "@/lib/humanize-path";
+import { methodColors, statusCodeColor } from "@/lib/state-colors";
 import type { ActivityLog } from "@/types";
 
 const columns: ColumnDef<ActivityLog>[] = [
@@ -38,33 +39,37 @@ const columns: ColumnDef<ActivityLog>[] = [
     header: "Method",
     cell: ({ row }) => {
       const method = row.getValue("httpMethod") as string;
-      const variant =
-        method === "GET"
-          ? "secondary"
-          : method === "POST"
-            ? "default"
-            : method === "DELETE"
-              ? "destructive"
-              : "outline";
-      return <Badge variant={variant}>{method}</Badge>;
+      const colors = methodColors[method] ?? "";
+      return (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${colors}`}>
+          {method}
+        </span>
+      );
     },
   },
   {
     accessorKey: "path",
     header: "Path",
+    cell: ({ row }) => {
+      const path = row.getValue("path") as string;
+      const human = humanizePath(path);
+      const isHumanized = human !== path.replace(/^\/api\//, "");
+      return (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{human}</span>
+          {isHumanized && (
+            <span className="text-xs text-muted-foreground font-mono">{path}</span>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "statusCode",
     header: "Status",
     cell: ({ row }) => {
       const code = row.getValue("statusCode") as number;
-      const color =
-        code < 300
-          ? "text-green-600"
-          : code < 400
-            ? "text-yellow-600"
-            : "text-red-600";
-      return <span className={`font-mono font-medium ${color}`}>{code}</span>;
+      return <span className={`font-mono font-medium ${statusCodeColor(code)}`}>{code}</span>;
     },
   },
   {
@@ -105,7 +110,7 @@ export function ActivityLogPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Activity Log</h1>
 
-      <div className="rounded-md border">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -136,7 +141,7 @@ export function ActivityLogPage() {
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="hover:bg-accent/50">
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(

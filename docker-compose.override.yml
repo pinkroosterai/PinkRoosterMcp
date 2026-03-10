@@ -25,4 +25,5 @@ services:
     volumes:
       - ./src/dashboard/src:/app/src
     environment:
+      API_URL: http://api:8080
       API_KEY: ${API_KEY}

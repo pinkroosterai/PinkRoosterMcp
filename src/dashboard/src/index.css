@@ -2,6 +2,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Light mode (default Shadcn neutral base) ── */
 @theme {
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(222.2 84% 4.9%);
@@ -9,8 +10,8 @@
   --color-card-foreground: hsl(222.2 84% 4.9%);
   --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(222.2 84% 4.9%);
-  --color-primary: hsl(222.2 47.4% 11.2%);
-  --color-primary-foreground: hsl(210 40% 98%);
+  --color-primary: hsl(350 80% 50%);
+  --color-primary-foreground: hsl(0 0% 100%);
   --color-secondary: hsl(210 40% 96.1%);
   --color-secondary-foreground: hsl(222.2 47.4% 11.2%);
   --color-muted: hsl(210 40% 96.1%);
@@ -18,19 +19,42 @@
   --color-accent: hsl(210 40% 96.1%);
   --color-accent-foreground: hsl(222.2 47.4% 11.2%);
   --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(210 40% 98%);
+  --color-destructive-foreground: hsl(0 0% 100%);
   --color-border: hsl(214.3 31.8% 91.4%);
   --color-input: hsl(214.3 31.8% 91.4%);
-  --color-ring: hsl(222.2 84% 4.9%);
+  --color-ring: hsl(350 80% 50%);
   --color-sidebar-background: hsl(0 0% 98%);
   --color-sidebar-foreground: hsl(240 5.3% 26.1%);
-  --color-sidebar-primary: hsl(240 5.9% 10%);
-  --color-sidebar-primary-foreground: hsl(0 0% 98%);
+  --color-sidebar-primary: hsl(350 80% 50%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
   --color-sidebar-accent: hsl(240 4.8% 95.9%);
   --color-sidebar-accent-foreground: hsl(240 5.9% 10%);
   --color-sidebar-border: hsl(220 13% 91%);
-  --color-sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --color-sidebar-ring: hsl(350 80% 50%);
   --radius: 0.5rem;
+}
+
+/* ── Dark mode — pink rooster themed ── */
+.dark {
+  --color-background: hsl(224 30% 7%);
+  --color-foreground: hsl(210 20% 95%);
+  --color-card: hsl(224 25% 10%);
+  --color-card-foreground: hsl(210 20% 95%);
+  --color-popover: hsl(224 25% 10%);
+  --color-popover-foreground: hsl(210 20% 95%);
+  --color-primary: hsl(350 80% 55%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(224 20% 14%);
+  --color-secondary-foreground: hsl(210 20% 90%);
+  --color-muted: hsl(224 20% 14%);
+  --color-muted-foreground: hsl(215 15% 55%);
+  --color-accent: hsl(224 18% 16%);
+  --color-accent-foreground: hsl(210 20% 90%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(224 15% 18%);
+  --color-input: hsl(224 15% 18%);
+  --color-ring: hsl(350 80% 55%);
 }
 
 @layer base {
@@ -43,26 +67,27 @@
   }
 }
 
+/* ── Sidebar tokens (both modes) ── */
 :root {
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-primary: hsl(350 80% 50%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(240 4.8% 95.9%);
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar-ring: hsl(350 80% 50%);
 }
 
 .dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar: hsl(224 28% 8%);
+  --sidebar-foreground: hsl(210 15% 80%);
+  --sidebar-primary: hsl(350 80% 55%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar-accent: hsl(224 20% 14%);
+  --sidebar-accent-foreground: hsl(210 15% 90%);
+  --sidebar-border: hsl(224 15% 16%);
+  --sidebar-ring: hsl(350 80% 55%);
 }
 
 @theme inline {
@@ -74,4 +99,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ── Smooth theme transition ── */
+*,
+*::before,
+*::after {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.05s ease;
 }

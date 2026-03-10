@@ -81,7 +81,7 @@ export function ProjectListPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Projects</h1>
 
-      <div className="rounded-md border">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -97,7 +97,7 @@ export function ProjectListPage() {
             {projects.map((project) => (
               <TableRow
                 key={project.id}
-                className="cursor-pointer"
+                className="cursor-pointer hover:bg-accent/50"
                 onClick={() => handleSelect(project)}
               >
                 <TableCell>
@@ -108,11 +108,9 @@ export function ProjectListPage() {
                   {project.projectPath}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={project.status === "Active" ? "default" : "secondary"}
-                  >
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${project.status === "Active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300"}`}>
                     {project.status}
-                  </Badge>
+                  </span>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground">
                   {new Date(project.createdAt).toLocaleDateString()}

@@ -26,6 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { stateColorClass } from "@/lib/state-colors";
 import type { Issue, WorkPackage, FeatureRequest } from "@/types";
 
 const stateFilters = [
@@ -40,29 +42,6 @@ const severityVariant: Record<string, "destructive" | "default" | "secondary" | 
   Major: "default",
   Minor: "secondary",
   Trivial: "outline",
-};
-
-const stateColors: Record<string, string> = {
-  NotStarted: "bg-gray-100 text-gray-700",
-  Designing: "bg-blue-100 text-blue-700",
-  Implementing: "bg-indigo-100 text-indigo-700",
-  Testing: "bg-yellow-100 text-yellow-700",
-  InReview: "bg-purple-100 text-purple-700",
-  Completed: "bg-green-100 text-green-700",
-  Cancelled: "bg-red-100 text-red-700",
-  Blocked: "bg-orange-100 text-orange-700",
-  Replaced: "bg-gray-200 text-gray-600",
-};
-
-const featureStatusColors: Record<string, string> = {
-  Proposed: "bg-gray-100 text-gray-700",
-  UnderReview: "bg-blue-100 text-blue-700",
-  Approved: "bg-indigo-100 text-indigo-700",
-  Scheduled: "bg-purple-100 text-purple-700",
-  InProgress: "bg-yellow-100 text-yellow-700",
-  Completed: "bg-green-100 text-green-700",
-  Rejected: "bg-red-100 text-red-700",
-  Deferred: "bg-orange-100 text-orange-700",
 };
 
 const frStateFilters = [
@@ -265,7 +244,7 @@ export function ProjectDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -283,7 +262,7 @@ export function ProjectDetailPage() {
                   {issues.map((issue) => (
                     <TableRow
                       key={issue.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-accent/50"
                       onClick={() => navigate(`/projects/${projectId}/issues/${issue.issueNumber}`)}
                     >
                       <TableCell>
@@ -304,9 +283,7 @@ export function ProjectDetailPage() {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">{issue.priority}</TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[issue.state] ?? ""}`}
-                        >
+                        <span className={stateColorClass(issue.state)}>
                           {issue.state}
                         </span>
                       </TableCell>
@@ -387,7 +364,7 @@ export function ProjectDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -405,7 +382,7 @@ export function ProjectDetailPage() {
                   {featureRequests.map((fr) => (
                     <TableRow
                       key={fr.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-accent/50"
                       onClick={() => navigate(`/projects/${projectId}/feature-requests/${fr.featureRequestNumber}`)}
                     >
                       <TableCell>
@@ -421,9 +398,7 @@ export function ProjectDetailPage() {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">{fr.priority}</TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${featureStatusColors[fr.status] ?? ""}`}
-                        >
+                        <span className={stateColorClass(fr.status, "feature")}>
                           {fr.status}
                         </span>
                       </TableCell>
@@ -536,7 +511,7 @@ export function ProjectDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -556,7 +531,7 @@ export function ProjectDetailPage() {
                     return (
                       <TableRow
                         key={wp.id}
-                        className="cursor-pointer"
+                        className="cursor-pointer hover:bg-accent/50"
                         onClick={() => navigate(`/projects/${projectId}/work-packages/${wp.workPackageNumber}`)}
                       >
                         <TableCell>
@@ -574,14 +549,21 @@ export function ProjectDetailPage() {
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">{wp.priority}</TableCell>
                         <TableCell>
-                          <span
-                            className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[wp.state] ?? ""}`}
-                          >
+                          <span className={stateColorClass(wp.state)}>
                             {wp.state}
                           </span>
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {progress.completed}/{progress.total} tasks
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress
+                              value={progress.total > 0 ? (progress.completed / progress.total) * 100 : 0}
+                              className="h-1.5 w-16"
+                              indicatorClassName="bg-emerald-500"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {progress.completed}/{progress.total}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
                           {new Date(wp.createdAt).toLocaleDateString()}

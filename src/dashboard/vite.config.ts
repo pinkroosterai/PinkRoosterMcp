@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:5100",
+        target: process.env.API_URL ?? "http://localhost:5100",
         changeOrigin: true,
         headers: {
           "X-Api-Key": process.env.API_KEY ?? "changeme_dev_only",

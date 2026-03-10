@@ -6,6 +6,7 @@ import type { TaskDep, Phase as PhaseType, WpTask } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { stateColorClass } from "@/lib/state-colors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,18 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const stateColors: Record<string, string> = {
-  NotStarted: "bg-gray-100 text-gray-700",
-  Designing: "bg-blue-100 text-blue-700",
-  Implementing: "bg-indigo-100 text-indigo-700",
-  Testing: "bg-yellow-100 text-yellow-700",
-  InReview: "bg-purple-100 text-purple-700",
-  Completed: "bg-green-100 text-green-700",
-  Cancelled: "bg-red-100 text-red-700",
-  Blocked: "bg-orange-100 text-orange-700",
-  Replaced: "bg-gray-200 text-gray-600",
-};
 
 const typeVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   Feature: "default",
@@ -158,7 +147,7 @@ export function WorkPackageDetailPage() {
               <Badge variant={typeVariant[wp.type] ?? "outline"}>{wp.type}</Badge>
               <Badge variant={priorityVariant[wp.priority] ?? "outline"}>{wp.priority}</Badge>
               <span
-                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[wp.state] ?? ""}`}
+                className={stateColorClass(wp.state)}
               >
                 {wp.state}
               </span>
@@ -239,7 +228,7 @@ export function WorkPackageDetailPage() {
                     <div key={idx} className="flex items-center gap-2 text-sm">
                       <span className="font-medium">{dep.name}</span>
                       <span
-                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${stateColors[dep.state] ?? ""}`}
+                        className={stateColorClass(dep.state)}
                       >
                         {dep.state}
                       </span>
@@ -259,7 +248,7 @@ export function WorkPackageDetailPage() {
                     <div key={idx} className="flex items-center gap-2 text-sm">
                       <span className="font-medium">{dep.name}</span>
                       <span
-                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${stateColors[dep.state] ?? ""}`}
+                        className={stateColorClass(dep.state)}
                       >
                         {dep.state}
                       </span>
@@ -347,7 +336,7 @@ export function WorkPackageDetailPage() {
             <CardTitle className="text-base">Attachments</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -401,7 +390,7 @@ export function WorkPackageDetailPage() {
                       <CardTitle className="text-base">{phase.name}</CardTitle>
                       <Badge variant="outline">Phase {phase.phaseNumber}</Badge>
                       <span
-                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${stateColors[phase.state] ?? ""}`}
+                        className={stateColorClass(phase.state)}
                       >
                         {phase.state}
                       </span>
@@ -480,7 +469,7 @@ export function WorkPackageDetailPage() {
                                   )}
                                   <span className="text-sm font-medium">{task.name}</span>
                                   <span
-                                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${stateColors[task.state] ?? ""}`}
+                                    className={stateColorClass(task.state)}
                                   >
                                     {task.state}
                                   </span>
@@ -546,7 +535,7 @@ export function WorkPackageDetailPage() {
                                         <div className="text-xs font-medium text-muted-foreground mb-1">
                                           Attachments
                                         </div>
-                                        <div className="rounded-md border">
+                                        <div className="rounded-lg border">
                                           <Table>
                                             <TableHeader>
                                               <TableRow>
@@ -587,7 +576,7 @@ export function WorkPackageDetailPage() {
                                             >
                                               <span className="font-medium">{dep.name}</span>
                                               <span
-                                                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${stateColors[dep.state] ?? ""}`}
+                                                className={stateColorClass(dep.state)}
                                               >
                                                 {dep.state}
                                               </span>

@@ -23,24 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { stateColorClass } from "@/lib/state-colors";
 
 const severityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
   Critical: "destructive",
   Major: "default",
   Minor: "secondary",
   Trivial: "outline",
-};
-
-const stateColors: Record<string, string> = {
-  NotStarted: "bg-gray-100 text-gray-700",
-  Designing: "bg-blue-100 text-blue-700",
-  Implementing: "bg-indigo-100 text-indigo-700",
-  Testing: "bg-yellow-100 text-yellow-700",
-  InReview: "bg-purple-100 text-purple-700",
-  Completed: "bg-green-100 text-green-700",
-  Cancelled: "bg-red-100 text-red-700",
-  Blocked: "bg-orange-100 text-orange-700",
-  Replaced: "bg-gray-200 text-gray-600",
 };
 
 function formatDate(value: string | null): string {
@@ -58,6 +47,7 @@ export function IssueDetailPage() {
   const { data: auditLog, isLoading: auditLoading } = useIssueAuditLog(projectId, issueNumber);
   const deleteIssue = useDeleteIssue();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [auditExpanded, setAuditExpanded] = useState(false);
 
   const handleDelete = () => {
     deleteIssue.mutate(
@@ -101,9 +91,7 @@ export function IssueDetailPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{issue.name}</h1>
               <Badge variant="outline">{issue.issueId}</Badge>
-              <span
-                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[issue.state] ?? ""}`}
-              >
+              <span className={stateColorClass(issue.state)}>
                 {issue.state}
               </span>
             </div>
@@ -220,7 +208,7 @@ export function IssueDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -237,7 +225,7 @@ export function IssueDetailPage() {
                     return (
                       <TableRow
                         key={wp.workPackageId}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer hover:bg-accent/50"
                         onClick={() => navigate(`/projects/${projectId}/work-packages/${wpNum}`)}
                       >
                         <TableCell className="font-mono text-sm">{wp.workPackageId}</TableCell>
@@ -245,7 +233,7 @@ export function IssueDetailPage() {
                         <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
                         <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[wp.state] ?? ""}`}>
+                          <span className={stateColorClass(wp.state)}>
                             {wp.state}
                           </span>
                         </TableCell>
@@ -267,7 +255,7 @@ export function IssueDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -324,47 +312,57 @@ export function IssueDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Audit Log</CardTitle>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setAuditExpanded(!auditExpanded)}
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            Audit Log
+            <span className="text-xs text-muted-foreground font-normal">
+              ({auditLog?.length ?? 0} entries) {auditExpanded ? "\u25B2" : "\u25BC"}
+            </span>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {auditLoading ? (
-            <div className="text-muted-foreground text-sm">Loading audit log...</div>
-          ) : !auditLog?.length ? (
-            <div className="text-muted-foreground text-sm">No audit entries.</div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>Field</TableHead>
-                    <TableHead>Old Value</TableHead>
-                    <TableHead>New Value</TableHead>
-                    <TableHead>Changed By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {auditLog.map((entry, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(entry.changedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{entry.fieldName}</TableCell>
-                      <TableCell className="text-xs max-w-[200px] truncate">
-                        {entry.oldValue ?? "\u2014"}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-[200px] truncate">
-                        {entry.newValue ?? "\u2014"}
-                      </TableCell>
-                      <TableCell className="text-xs">{entry.changedBy}</TableCell>
+        {auditExpanded && (
+          <CardContent>
+            {auditLoading ? (
+              <div className="text-muted-foreground text-sm">Loading audit log...</div>
+            ) : !auditLog?.length ? (
+              <div className="text-muted-foreground text-sm">No audit entries.</div>
+            ) : (
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>Field</TableHead>
+                      <TableHead>Old Value</TableHead>
+                      <TableHead>New Value</TableHead>
+                      <TableHead>Changed By</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLog.map((entry, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(entry.changedAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{entry.fieldName}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {entry.oldValue ?? "\u2014"}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {entry.newValue ?? "\u2014"}
+                        </TableCell>
+                        <TableCell className="text-xs">{entry.changedBy}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

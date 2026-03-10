@@ -2,11 +2,14 @@ import { Link, useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useActivityLogs } from "@/hooks/use-activity-logs";
 import { useHealth } from "@/hooks/use-health";
 import { useProjectContext } from "@/hooks/use-project-context";
 import { useProjectStatus, useNextActions } from "@/hooks/use-projects";
+import { stateColorClass, priorityAccent } from "@/lib/state-colors";
 import { ScrollText, Activity, Clock, FolderOpen, Bug, Layers, Lightbulb, ArrowRight } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 const priorityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
   Critical: "destructive",
@@ -36,6 +39,36 @@ function getDetailPath(projectId: number, type: string, id: string): string {
     return `/projects/${projectId}/feature-requests/${frNum}`;
   }
   return `/projects/${projectId}`;
+}
+
+function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
+  const data = [
+    { value: percent },
+    { value: 100 - percent },
+  ];
+  return (
+    <div style={{ width: size, height: size }} className="relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            innerRadius={size * 0.32}
+            outerRadius={size * 0.46}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            stroke="none"
+          >
+            <Cell fill="hsl(350, 80%, 55%)" />
+            <Cell fill="hsl(224, 15%, 18%)" className="dark:opacity-100 opacity-20" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+        {percent}%
+      </span>
+    </div>
+  );
 }
 
 export function DashboardPage() {
@@ -69,8 +102,9 @@ export function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">{selectedProject.name}</h1>
 
+      {/* Metric cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="border-l-4 border-l-primary/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Total Requests
@@ -87,13 +121,13 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`border-l-4 ${healthLoading ? "border-l-muted" : isHealthy ? "border-l-emerald-500" : "border-l-red-500"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Status</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${healthLoading ? "text-muted-foreground" : isHealthy ? "text-green-600" : "text-red-600"}`}>
+            <div className={`text-2xl font-bold ${healthLoading ? "text-muted-foreground" : isHealthy ? "text-emerald-500" : "text-red-500"}`}>
               {healthLoading ? "Checking..." : isHealthy ? "Online" : "Offline"}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -102,7 +136,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-blue-500/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Latest Activity
@@ -122,54 +156,81 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Project Status Summary */}
+      {/* Entity summary cards with progress */}
       {projectStatus && (
         <div className="grid gap-4 md:grid-cols-3">
           <Card
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => navigate(`/projects/${selectedProject.id}`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Issues</CardTitle>
               <Bug className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStatus.issues.active} active</div>
-              <p className="text-xs text-muted-foreground">
-                {projectStatus.issues.terminal} completed &middot; {projectStatus.issues.percentComplete}% done
-              </p>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold">{projectStatus.issues.active} active</div>
+                  <p className="text-xs text-muted-foreground">
+                    {projectStatus.issues.terminal} completed
+                  </p>
+                </div>
+                <MiniDonut percent={projectStatus.issues.percentComplete} />
+              </div>
+              <Progress
+                value={projectStatus.issues.percentComplete}
+                indicatorClassName="bg-emerald-500"
+              />
             </CardContent>
           </Card>
 
           <Card
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => navigate(`/projects/${selectedProject.id}`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Feature Requests</CardTitle>
               <Lightbulb className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStatus.featureRequests.active} active</div>
-              <p className="text-xs text-muted-foreground">
-                {projectStatus.featureRequests.terminal} completed &middot; {projectStatus.featureRequests.percentComplete}% done
-              </p>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold">{projectStatus.featureRequests.active} active</div>
+                  <p className="text-xs text-muted-foreground">
+                    {projectStatus.featureRequests.terminal} completed
+                  </p>
+                </div>
+                <MiniDonut percent={projectStatus.featureRequests.percentComplete} />
+              </div>
+              <Progress
+                value={projectStatus.featureRequests.percentComplete}
+                indicatorClassName="bg-blue-500"
+              />
             </CardContent>
           </Card>
 
           <Card
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => navigate(`/projects/${selectedProject.id}`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Work Packages</CardTitle>
               <Layers className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStatus.workPackages.active.length} active</div>
-              <p className="text-xs text-muted-foreground">
-                {projectStatus.workPackages.blocked.length} blocked &middot; {projectStatus.workPackages.percentComplete}% done
-              </p>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold">{projectStatus.workPackages.active.length} active</div>
+                  <p className="text-xs text-muted-foreground">
+                    {projectStatus.workPackages.blocked.length} blocked
+                  </p>
+                </div>
+                <MiniDonut percent={projectStatus.workPackages.percentComplete} />
+              </div>
+              <Progress
+                value={projectStatus.workPackages.percentComplete}
+                indicatorClassName="bg-purple-500"
+              />
             </CardContent>
           </Card>
         </div>
@@ -185,21 +246,23 @@ export function DashboardPage() {
           {!nextActions?.length ? (
             <p className="text-sm text-muted-foreground">No actionable items.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {nextActions.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+                  className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors border-l-3 ${priorityAccent[item.priority] ?? "border-l-transparent"}`}
                   onClick={() => navigate(getDetailPath(selectedProject.id, item.type, item.id))}
                 >
-                  <Badge variant={priorityVariant[item.priority] ?? "outline"} className="text-xs">
+                  <Badge variant={priorityVariant[item.priority] ?? "outline"} className="text-xs shrink-0">
                     {item.priority}
                   </Badge>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs shrink-0">
                     {typeIcons[item.type] ?? item.type}
                   </Badge>
                   <span className="text-sm font-medium truncate flex-1">{item.name}</span>
-                  <span className="text-xs text-muted-foreground">{item.state}</span>
+                  <span className={stateColorClass(item.state)}>
+                    {item.state}
+                  </span>
                 </div>
               ))}
             </div>

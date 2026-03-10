@@ -5,6 +5,7 @@ import { useFeatureRequest, useDeleteFeatureRequest } from "@/hooks/use-feature-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { stateColorClass } from "@/lib/state-colors";
 import {
   Table,
   TableBody,
@@ -24,17 +25,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const featureStatusColors: Record<string, string> = {
-  Proposed: "bg-gray-100 text-gray-700",
-  UnderReview: "bg-blue-100 text-blue-700",
-  Approved: "bg-indigo-100 text-indigo-700",
-  Scheduled: "bg-purple-100 text-purple-700",
-  InProgress: "bg-yellow-100 text-yellow-700",
-  Completed: "bg-green-100 text-green-700",
-  Rejected: "bg-red-100 text-red-700",
-  Deferred: "bg-orange-100 text-orange-700",
-};
-
 const categoryVariant: Record<string, "default" | "secondary" | "outline"> = {
   Feature: "default",
   Enhancement: "secondary",
@@ -46,18 +36,6 @@ const priorityVariant: Record<string, "destructive" | "default" | "secondary" | 
   High: "default",
   Medium: "secondary",
   Low: "outline",
-};
-
-const stateColors: Record<string, string> = {
-  NotStarted: "bg-gray-100 text-gray-700",
-  Designing: "bg-blue-100 text-blue-700",
-  Implementing: "bg-indigo-100 text-indigo-700",
-  Testing: "bg-yellow-100 text-yellow-700",
-  InReview: "bg-purple-100 text-purple-700",
-  Completed: "bg-green-100 text-green-700",
-  Cancelled: "bg-red-100 text-red-700",
-  Blocked: "bg-orange-100 text-orange-700",
-  Replaced: "bg-gray-200 text-gray-600",
 };
 
 function formatDate(value: string | null): string {
@@ -115,9 +93,7 @@ export function FeatureRequestDetailPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{fr.name}</h1>
               <Badge variant="outline">{fr.featureRequestId}</Badge>
-              <span
-                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${featureStatusColors[fr.status] ?? ""}`}
-              >
+              <span className={stateColorClass(fr.status, "feature")}>
                 {fr.status}
               </span>
             </div>
@@ -209,7 +185,7 @@ export function FeatureRequestDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -234,7 +210,7 @@ export function FeatureRequestDetailPage() {
                         <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
                         <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[wp.state] ?? ""}`}>
+                          <span className={stateColorClass(wp.state)}>
                             {wp.state}
                           </span>
                         </TableCell>
@@ -257,7 +233,7 @@ export function FeatureRequestDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
