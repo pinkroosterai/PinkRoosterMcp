@@ -1,0 +1,28 @@
+# Dev overrides: hot reload for .NET projects via dotnet watch
+# Usage: docker compose up (automatically merges this file)
+services:
+  api:
+    build:
+      target: build
+    entrypoint: ["dotnet", "watch", "run", "--project", "src/PinkRooster.Api/PinkRooster.Api.csproj", "--", "--urls", "http://[::]:8080"]
+    volumes:
+      - ./src/PinkRooster.Api:/src/src/PinkRooster.Api
+      - ./src/PinkRooster.Shared:/src/src/PinkRooster.Shared
+      - ./src/PinkRooster.Data:/src/src/PinkRooster.Data
+
+  mcp:
+    build:
+      target: build
+    entrypoint: ["dotnet", "watch", "run", "--project", "src/PinkRooster.Mcp/PinkRooster.Mcp.csproj", "--", "--urls", "http://[::]:8080"]
+    volumes:
+      - ./src/PinkRooster.Mcp:/src/src/PinkRooster.Mcp
+      - ./src/PinkRooster.Shared:/src/src/PinkRooster.Shared
+
+  dashboard:
+    build:
+      target: build
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+    volumes:
+      - ./src/dashboard/src:/app/src
+    environment:
+      API_KEY: ${API_KEY}

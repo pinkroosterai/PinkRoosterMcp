@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>PinkRooster.Mcp</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PinkRooster.Shared\PinkRooster.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

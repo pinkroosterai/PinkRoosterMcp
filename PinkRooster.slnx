@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PinkRooster.Api/PinkRooster.Api.csproj" />
+    <Project Path="src/PinkRooster.Data/PinkRooster.Data.csproj" />
+    <Project Path="src/PinkRooster.Mcp/PinkRooster.Mcp.csproj" />
+    <Project Path="src/PinkRooster.Shared/PinkRooster.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PinkRooster.Api.Tests/PinkRooster.Api.Tests.csproj" />
+  </Folder>
+</Solution>

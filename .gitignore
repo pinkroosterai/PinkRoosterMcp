@@ -1,0 +1,56 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.DotSettings.user
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+# NuGet
+*.nupkg
+**/packages/*
+*.nuget.props
+*.nuget.targets
+
+# Node / React
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# EF Core
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log

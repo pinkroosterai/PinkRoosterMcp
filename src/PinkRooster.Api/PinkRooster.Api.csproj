@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>PinkRooster.Api</RootNamespace>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.13">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PinkRooster.Data\PinkRooster.Data.csproj" />
+    <ProjectReference Include="..\PinkRooster.Shared\PinkRooster.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

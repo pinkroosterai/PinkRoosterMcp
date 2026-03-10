@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: pinkrooster
+      POSTGRES_USER: pinkrooster
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinkrooster"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "5100:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD}"
+      Auth__ApiKeys__0: ${API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp.Dockerfile
+    ports:
+      - "5200:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ApiServer__BaseUrl: "http://api:8080"
+      ApiServer__ApiKey: ${API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard.Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      API_KEY: ${API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

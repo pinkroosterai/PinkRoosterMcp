@@ -1,0 +1,30 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "resolvedPaths": {
+    "cwd": "/home/najgeetsrev/Development/PinkRoosterMcp/src/dashboard",
+    "tailwindConfig": "",
+    "tailwindCss": "src/index.css",
+    "components": "src/components",
+    "ui": "src/components/ui",
+    "lib": "src/lib",
+    "hooks": "src/hooks",
+    "utils": "src/lib/utils"
+  },
+  "iconLibrary": "lucide"
+}
