@@ -5,7 +5,7 @@
 - Registered in `.mcp.json` as `pinkrooster` at `http://localhost:5200`
 - `PinkRoosterApiClient`: all 16 endpoints use `EnsureSuccessAsync` with body-aware error extraction
 
-## 17 MCP Tools
+## 16 MCP Tools
 | Tool | Type | Description |
 |------|------|-------------|
 | get_project_status | Read | Compact status: issue/WP counts by state, active/inactive/blocked lists |
@@ -23,15 +23,14 @@
 | manage_work_package_dependency | Write | Add/remove WP dependency with auto-block/unblock cascades (idempotent) |
 | manage_task_dependency | Write | Add/remove task dependency with auto-block/unblock cascades (idempotent) |
 | scaffold_work_package | Write | One-call WP creation with phases, tasks, dependencies |
-| get_activity_logs | Read | Paginated HTTP request logs |
 
 ## MCP Tool Annotations
 All tools use MCP SDK annotations:
-- `Title` — human-readable display name on all 17 tools
-- `ReadOnly = true` — on all 7 read tools
+- `Title` — human-readable display name on all 16 tools
+- `ReadOnly = true` — on all 6 read tools
 - `Destructive = false` — on all 10 write tools (none delete data)
 - `Idempotent = true` — on create_or_update_project, batch_update_task_states, manage_*_dependency
-- `OpenWorld = false` — on all 17 tools (closed domain)
+- `OpenWorld = false` — on all 16 tools (closed domain)
 
 ## MCP-Specific Enums (Inputs/)
 Constrained string parameters replaced with enum types for schema-level validation:
@@ -55,4 +54,4 @@ MCP tool parameters use MCP-specific input types (never shared DTOs directly):
 
 ## Shared Infrastructure
 - `McpInputParser` (Helpers/): NullIfEmpty, IsTerminalState, mapping methods (MCP inputs → shared DTOs)
-- Tool classes split by entity: ProjectTools, IssueTools, WorkPackageTools, PhaseTools, TaskTools, ActivityLogTools
+- Tool classes split by entity: ProjectTools, IssueTools, WorkPackageTools, PhaseTools, TaskTools

@@ -8,14 +8,6 @@ namespace PinkRooster.Mcp.Clients;
 
 public sealed class PinkRoosterApiClient(HttpClient httpClient)
 {
-    public async Task<PaginatedResponse<ActivityLogResponse>> GetActivityLogsAsync(
-        int page = 1, int pageSize = 25, CancellationToken ct = default)
-    {
-        var response = await httpClient.GetFromJsonAsync<PaginatedResponse<ActivityLogResponse>>(
-            $"/api/activity-logs?page={page}&pageSize={pageSize}", ct);
-        return response ?? throw new InvalidOperationException("Failed to deserialize activity logs response.");
-    }
-
     public async Task<ProjectResponse?> GetProjectByPathAsync(
         string projectPath, CancellationToken ct = default)
     {

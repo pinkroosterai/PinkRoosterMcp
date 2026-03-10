@@ -114,7 +114,6 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `manage_work_package_dependency` | Write | Add/remove WP dependency (returns auto-block state changes) |
 | `manage_task_dependency` | Write | Add/remove task dependency (returns auto-block state changes) |
 | `scaffold_work_package` | Write | One-call WP creation with phases, tasks, dependencies, and WP blockers |
-| `get_activity_logs` | Read | Paginated HTTP request logs |
 
 **Testing flow for MCP tools (E2E):**
 
@@ -257,8 +256,8 @@ Domain logic shared across services is centralized in:
 - **`McpInputParser`** (internal static in `Helpers/`) — `MapFileReferences()`, `MapAcceptanceCriteria()`, `MapCreateTasks()`, `MapUpsertTasks()`, `MapScaffoldPhases()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
 - **MCP-specific enums** (in `Inputs/`) — `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue). Provide schema-level validation for constrained string parameters.
 - **MCP input types** (in `Inputs/`) — `FileReferenceInput`, `AcceptanceCriterionInput`, `PhaseTaskInput`, `ScaffoldPhaseInput`/`ScaffoldTaskInput`, `BatchTaskStateInput`. Map to shared DTOs via `McpInputParser`.
-- **MCP tool annotations** — All 17 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
-- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `ActivityLogTools`.
+- **MCP tool annotations** — All 16 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
+- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`.
 
 ### State Change Cascade Notifications
 When automatic state transitions occur (auto-block, auto-unblock, upward propagation), the API response includes a `StateChanges` list so MCP tools can report them to AI agents. The cascade flows:
