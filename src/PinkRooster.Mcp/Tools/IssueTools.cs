@@ -5,6 +5,7 @@ using PinkRooster.Mcp.Clients;
 using PinkRooster.Mcp.Helpers;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
+using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 using PinkRooster.Shared.Helpers;
 
@@ -81,6 +82,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             RootCause = issue.RootCause,
             Resolution = issue.Resolution,
             Attachments = issue.Attachments,
+            LinkedWorkPackages = McpInputParser.NullIfEmpty(issue.LinkedWorkPackages),
             StartedAt = issue.StartedAt,
             CompletedAt = issue.CompletedAt,
             ResolvedAt = issue.ResolvedAt,
@@ -115,6 +117,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             Priority = i.Priority,
             Severity = i.Severity,
             IssueType = i.IssueType,
+            LinkedWorkPackageCount = i.LinkedWorkPackages.Count,
             CreatedAt = i.CreatedAt
         }).ToList();
 

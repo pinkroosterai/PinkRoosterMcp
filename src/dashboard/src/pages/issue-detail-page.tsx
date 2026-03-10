@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield } from "lucide-react";
+import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package } from "lucide-react";
 import { useIssue, useIssueAuditLog, useDeleteIssue } from "@/hooks/use-issues";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -208,6 +208,53 @@ export function IssueDetailPage() {
                 <p className="text-sm whitespace-pre-wrap">{issue.resolution}</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {issue.linkedWorkPackages.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="size-4" /> Related Work Packages
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>State</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {issue.linkedWorkPackages.map((wp) => {
+                    const wpNum = wp.workPackageId.split("-wp-")[1];
+                    return (
+                      <TableRow
+                        key={wp.workPackageId}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/projects/${projectId}/work-packages/${wpNum}`)}
+                      >
+                        <TableCell className="font-mono text-sm">{wp.workPackageId}</TableCell>
+                        <TableCell className="text-sm">{wp.name}</TableCell>
+                        <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
+                        <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${stateColors[wp.state] ?? ""}`}>
+                            {wp.state}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

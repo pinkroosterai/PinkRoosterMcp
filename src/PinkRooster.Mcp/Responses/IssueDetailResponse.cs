@@ -1,4 +1,5 @@
 using PinkRooster.Shared.DTOs.Requests;
+using PinkRooster.Shared.DTOs.Responses;
 
 namespace PinkRooster.Mcp.Responses;
 
@@ -23,6 +24,7 @@ public sealed class IssueDetailResponse
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }
+    public List<LinkedWorkPackageItem>? LinkedWorkPackages { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }

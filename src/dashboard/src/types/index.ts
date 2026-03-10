@@ -29,6 +29,14 @@ export interface Project {
   updatedAt: string;
 }
 
+export interface LinkedWorkPackageItem {
+  workPackageId: string;
+  name: string;
+  state: string;
+  type: string;
+  priority: string;
+}
+
 export interface Issue {
   issueId: string;
   id: number;
@@ -51,6 +59,7 @@ export interface Issue {
   completedAt: string | null;
   resolvedAt: string | null;
   attachments: FileReference[];
+  linkedWorkPackages: LinkedWorkPackageItem[];
   createdAt: string;
   updatedAt: string;
 }

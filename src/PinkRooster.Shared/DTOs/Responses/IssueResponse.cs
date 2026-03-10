@@ -25,6 +25,7 @@ public sealed class IssueResponse
     public DateTimeOffset? CompletedAt { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }
     public required List<FileReferenceDto> Attachments { get; init; }
+    public List<LinkedWorkPackageItem> LinkedWorkPackages { get; set; } = [];
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }

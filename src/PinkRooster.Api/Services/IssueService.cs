@@ -16,10 +16,13 @@ public sealed class IssueService(AppDbContext db) : IIssueService
         var query = db.Issues.Where(i => i.ProjectId == projectId);
         query = ApplyStateFilter(query, stateFilter);
 
-        return await query
+        var responses = await query
             .OrderByDescending(i => i.CreatedAt)
             .Select(i => ToResponse(i))
             .ToListAsync(ct);
+
+        await EnrichWithLinkedWorkPackagesAsync(responses, projectId, ct);
+        return responses;
     }
 
     public async Task<IssueResponse?> GetByNumberAsync(
@@ -28,7 +31,12 @@ public sealed class IssueService(AppDbContext db) : IIssueService
         var issue = await db.Issues
             .FirstOrDefaultAsync(i => i.ProjectId == projectId && i.IssueNumber == issueNumber, ct);
 
-        return issue is null ? null : ToResponse(issue);
+        if (issue is null)
+            return null;
+
+        var response = ToResponse(issue);
+        await EnrichWithLinkedWorkPackagesAsync([response], projectId, ct);
+        return response;
     }
 
     public async Task<IssueSummaryResponse> GetSummaryAsync(long projectId, CancellationToken ct = default)
@@ -230,6 +238,47 @@ public sealed class IssueService(AppDbContext db) : IIssueService
     }
 
     // ── Private helpers ──
+
+    private async Task EnrichWithLinkedWorkPackagesAsync(
+        List<IssueResponse> responses, long projectId, CancellationToken ct)
+    {
+        if (responses.Count == 0)
+            return;
+
+        var issueIds = responses.Select(r => r.Id).ToHashSet();
+
+        var linkedWps = await db.WorkPackages
+            .Where(wp => wp.ProjectId == projectId && wp.LinkedIssueId != null && issueIds.Contains(wp.LinkedIssueId.Value))
+            .Select(wp => new
+            {
+                wp.LinkedIssueId,
+                wp.ProjectId,
+                wp.WorkPackageNumber,
+                wp.Name,
+                State = wp.State.ToString(),
+                Type = wp.Type.ToString(),
+                Priority = wp.Priority.ToString()
+            })
+            .ToListAsync(ct);
+
+        if (linkedWps.Count == 0)
+            return;
+
+        var lookup = linkedWps.ToLookup(wp => wp.LinkedIssueId!.Value);
+
+        foreach (var response in responses)
+        {
+            var wps = lookup[response.Id];
+            response.LinkedWorkPackages = wps.Select(wp => new LinkedWorkPackageItem
+            {
+                WorkPackageId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
+                Name = wp.Name,
+                State = wp.State,
+                Type = wp.Type,
+                Priority = wp.Priority
+            }).ToList();
+        }
+    }
 
     private static IQueryable<Issue> ApplyStateFilter(IQueryable<Issue> query, string? stateFilter)
     {
