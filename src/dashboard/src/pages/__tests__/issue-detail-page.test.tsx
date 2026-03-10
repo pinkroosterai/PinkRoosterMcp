@@ -1,0 +1,149 @@
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { server } from "@/test/mocks/server";
+import { renderWithProviders } from "@/test/render";
+import { IssueDetailPage } from "../issue-detail-page";
+import { Route, Routes } from "react-router";
+
+function renderPage(projectId = 1, issueNumber = 1) {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/projects/:id/issues/:issueNumber" element={<IssueDetailPage />} />
+    </Routes>,
+    { route: `/projects/${projectId}/issues/${issueNumber}` },
+  );
+}
+
+describe("IssueDetailPage", () => {
+  it("renders issue name and badge", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Bug")).toBeInTheDocument();
+    });
+    expect(screen.getByText("proj-1-issue-1")).toBeInTheDocument();
+    // State appears in both header and audit log, so use getAllByText
+    expect(screen.getAllByText("Implementing").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders definition card with type, severity, priority", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Definition")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Major")).toBeInTheDocument();
+    // Priority "High" may appear in both definition and audit log
+    expect(screen.getAllByText("High").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders reproduction section", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Reproduction")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Open app/)).toBeInTheDocument();
+    expect(screen.getByText("Should work")).toBeInTheDocument();
+    expect(screen.getByText("Does not work")).toBeInTheDocument();
+  });
+
+  it("renders audit log (collapsed by default, expandable)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Audit Log/)).toBeInTheDocument();
+    });
+    // Audit log is collapsed by default — "Field" header not visible
+    expect(screen.queryByText("Field")).not.toBeInTheDocument();
+
+    // Click to expand
+    await user.click(screen.getByText(/Audit Log/));
+    await waitFor(() => {
+      expect(screen.getByText("Field")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Changed By")).toBeInTheDocument();
+  });
+
+  it("renders timeline card", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Timeline")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(screen.getByText("Started")).toBeInTheDocument();
+  });
+
+  it("shows not-found state for missing issue", async () => {
+    server.use(
+      http.get("/api/projects/:id/issues/:n", () =>
+        HttpResponse.json(null, { status: 404 }),
+      ),
+    );
+    renderPage(1, 999);
+
+    await waitFor(() => {
+      expect(screen.getByText("Issue not found.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows delete confirmation dialog", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Bug")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Delete issue?")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/permanently delete/i)).toBeInTheDocument();
+  });
+
+  it("hides reproduction section when no reproduction data", async () => {
+    server.use(
+      http.get("/api/projects/:id/issues/:n", () =>
+        HttpResponse.json({
+          issueId: "proj-1-issue-1",
+          id: 1,
+          issueNumber: 1,
+          projectId: "proj-1",
+          name: "Minimal Issue",
+          description: "No repro",
+          issueType: "Bug",
+          severity: "Minor",
+          priority: "Low",
+          stepsToReproduce: null,
+          expectedBehavior: null,
+          actualBehavior: null,
+          affectedComponent: null,
+          stackTrace: null,
+          rootCause: null,
+          resolution: null,
+          state: "NotStarted",
+          startedAt: null,
+          completedAt: null,
+          resolvedAt: null,
+          attachments: [],
+          linkedWorkPackages: [],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Minimal Issue")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Reproduction")).not.toBeInTheDocument();
+    expect(screen.queryByText("Resolution")).not.toBeInTheDocument();
+  });
+});
