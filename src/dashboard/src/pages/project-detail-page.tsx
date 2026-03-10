@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Trash2, Bug, AlertCircle, Layers } from "lucide-react";
+import { ArrowLeft, Trash2, Bug, Layers } from "lucide-react";
 import { useProjects } from "@/hooks/use-projects";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";

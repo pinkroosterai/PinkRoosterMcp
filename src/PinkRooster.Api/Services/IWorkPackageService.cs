@@ -13,4 +13,5 @@ public interface IWorkPackageService
     Task<bool> DeleteAsync(long projectId, int wpNumber, CancellationToken ct = default);
     Task<DependencyResponse> AddDependencyAsync(long projectId, int wpNumber, ManageDependencyRequest request, List<StateChangeDto>? stateChanges = null, CancellationToken ct = default);
     Task<bool> RemoveDependencyAsync(long projectId, int wpNumber, long dependsOnWpId, List<StateChangeDto>? stateChanges = null, CancellationToken ct = default);
+    Task<ScaffoldWorkPackageResponse> ScaffoldAsync(long projectId, ScaffoldWorkPackageRequest request, string changedBy, List<StateChangeDto>? stateChanges = null, CancellationToken ct = default);
 }

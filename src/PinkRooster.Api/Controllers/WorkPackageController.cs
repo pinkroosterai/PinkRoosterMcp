@@ -60,6 +60,22 @@ public sealed class WorkPackageController(IWorkPackageService workPackageService
         return deleted ? NoContent() : NotFound();
     }
 
+    [HttpPost("scaffold")]
+    public async Task<ActionResult<ScaffoldWorkPackageResponse>> Scaffold(
+        long projectId, ScaffoldWorkPackageRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var changedBy = HttpContext.GetCallerIdentity();
+            var result = await workPackageService.ScaffoldAsync(projectId, request, changedBy, ct: ct);
+            return Created($"api/projects/{projectId}/work-packages", result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{wpNumber:int}/dependencies")]
     public async Task<ActionResult<DependencyResponse>> AddDependency(
         long projectId, int wpNumber, ManageDependencyRequest request, CancellationToken ct)

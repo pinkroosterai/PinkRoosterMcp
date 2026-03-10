@@ -151,6 +151,16 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
     }
 
+    public async Task<ScaffoldWorkPackageResponse> ScaffoldWorkPackageAsync(
+        long projectId, ScaffoldWorkPackageRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/projects/{projectId}/work-packages/scaffold", request, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct)
+            ?? throw new InvalidOperationException("Failed to deserialize scaffold response.");
+    }
+
     public async Task<DependencyResponse> AddWorkPackageDependencyAsync(
         long projectId, int wpNumber, ManageDependencyRequest request, CancellationToken ct = default)
     {

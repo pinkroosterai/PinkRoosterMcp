@@ -179,6 +179,121 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         }
     }
 
+    // ── 5. scaffold_work_package ──
+
+    [McpServerTool(Name = "scaffold_work_package")]
+    [Description(
+        "Creates a complete work package with phases, tasks, acceptance criteria, and task dependencies in a single call. " +
+        "Tasks require name + description; all other fields are optional. " +
+        "Task dependencies use 0-based indices within the same phase's task array via dependsOnTaskIndices. " +
+        "Returns a compact ID map of all created entities.")]
+    public async Task<string> ScaffoldWorkPackage(
+        [Description("Project ID in 'proj-{number}' format.")] string projectId,
+        [Description("Work package name/title.")] string name,
+        [Description("Detailed description of the work package.")] string description,
+        [Description("Phases with optional tasks, acceptance criteria, and task dependencies.")] List<ScaffoldPhaseRequest> phases,
+        [Description("Type: Feature, BugFix, Refactor, Spike, Chore (default: Feature)")] string? type = null,
+        [Description("Priority: Critical, High, Medium, Low (default: Medium)")] string? priority = null,
+        [Description("Implementation plan (markdown).")] string? plan = null,
+        [Description("Estimated complexity (integer).")] string? estimatedComplexity = null,
+        [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
+        [Description("State: NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced")] string? state = null,
+        [Description("Linked issue ID in 'proj-{number}-issue-{number}' format.")] string? linkedIssueId = null,
+        [Description("Existing WP IDs that block this WP, as JSON array: [\"proj-1-wp-2\"]")] string? blockedByWorkPackageIds = null,
+        [Description("File attachments as JSON array: [{\"fileName\":\"...\",\"relativePath\":\"...\",\"description\":\"...\"}]")] string? attachments = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (!IdParser.TryParseProjectId(projectId, out var projId))
+                return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
+
+            if (phases.Count == 0)
+                return OperationResult.Error("'phases' must contain at least one phase.");
+
+            var request = new ScaffoldWorkPackageRequest
+            {
+                Name = name,
+                Description = description,
+                Type = McpInputParser.ParseEnumOrDefault(type, WorkPackageType.Feature),
+                Priority = McpInputParser.ParseEnumOrDefault(priority, Priority.Medium),
+                Plan = plan,
+                EstimatedComplexity = McpInputParser.ParseInt(estimatedComplexity),
+                EstimationRationale = estimationRationale,
+                State = McpInputParser.ParseEnumOrDefault(state, CompletionState.NotStarted),
+                Attachments = McpInputParser.ParseFileReferences(attachments),
+                Phases = phases
+            };
+
+            // Resolve linked issue ID
+            if (linkedIssueId is not null)
+            {
+                if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
+                    return OperationResult.Error($"Invalid linked issue ID format: '{linkedIssueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
+
+                var issue = await apiClient.GetIssueAsync(issueProjId, issueNumber, ct);
+                if (issue is null)
+                    return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
+
+                request.LinkedIssueId = issue.Id;
+            }
+
+            // Resolve blockedBy WP IDs
+            if (!string.IsNullOrWhiteSpace(blockedByWorkPackageIds))
+            {
+                List<string>? blockerIdStrings;
+                try
+                {
+                    blockerIdStrings = JsonSerializer.Deserialize<List<string>>(blockedByWorkPackageIds, JsonDefaults.Indented);
+                }
+                catch
+                {
+                    return OperationResult.Error("'blockedByWorkPackageIds' must be a valid JSON array of WP ID strings.");
+                }
+
+                if (blockerIdStrings is { Count: > 0 })
+                {
+                    request.BlockedByWpIds = [];
+                    foreach (var wpIdStr in blockerIdStrings)
+                    {
+                        if (!IdParser.TryParseWorkPackageId(wpIdStr, out var bProjId, out var bWpNumber))
+                            return OperationResult.Error($"Invalid blocker WP ID format: '{wpIdStr}'. Expected 'proj-{{number}}-wp-{{number}}'.");
+
+                        var blockerWp = await apiClient.GetWorkPackageAsync(bProjId, bWpNumber, ct);
+                        if (blockerWp is null)
+                            return OperationResult.Warning($"Blocker work package '{wpIdStr}' not found.");
+
+                        request.BlockedByWpIds.Add(blockerWp.Id);
+                    }
+                }
+            }
+
+            var result = await apiClient.ScaffoldWorkPackageAsync(projId, request, ct);
+
+            var totalTasks = result.Phases.Sum(p => p.TaskIds.Count);
+            var response = new ScaffoldOperationResult
+            {
+                ResponseType = ResponseType.Success,
+                Message = $"Work package '{result.WorkPackageId}' scaffolded: {result.Phases.Count} phases, {totalTasks} tasks, {result.TotalDependencies} dependencies.",
+                Id = result.WorkPackageId,
+                Phases = result.Phases,
+                TotalTasks = totalTasks,
+                TotalDependencies = result.TotalDependencies,
+                StateChanges = result.StateChanges
+            };
+
+            return JsonSerializer.Serialize(response, JsonDefaults.Indented);
+        }
+        catch (HttpRequestException ex)
+        {
+            return OperationResult.Error($"Scaffold failed: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Unexpected error during scaffold: {ex.Message}");
+        }
+    }
+
     // ── Private helpers: Work Package create/update ──
 
     private async Task<string> CreateNewWorkPackage(

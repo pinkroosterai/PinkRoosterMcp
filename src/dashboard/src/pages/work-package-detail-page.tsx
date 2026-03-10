@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock } from "lucide-react";
 import { useWorkPackage, useDeleteWorkPackage } from "@/hooks/use-work-packages";
+import type { TaskDep } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,7 +134,7 @@ export function WorkPackageDetailPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{wp.name}</h1>
-              <Badge variant="outline">{wp.wpId}</Badge>
+              <Badge variant="outline">{wp.workPackageId}</Badge>
               <Badge variant={typeVariant[wp.type] ?? "outline"}>{wp.type}</Badge>
               <Badge variant={priorityVariant[wp.priority] ?? "outline"}>{wp.priority}</Badge>
               <span
@@ -467,7 +468,7 @@ export function WorkPackageDetailPage() {
                                               key={fIdx}
                                               className="text-sm font-mono text-muted-foreground"
                                             >
-                                              {file}
+                                              {file.relativePath}
                                             </li>
                                           ))}
                                         </ul>
@@ -506,13 +507,13 @@ export function WorkPackageDetailPage() {
                                         </div>
                                       </div>
                                     )}
-                                    {task.dependencies && task.dependencies.length > 0 && (
+                                    {task.blockedBy && task.blockedBy.length > 0 && (
                                       <div>
                                         <div className="text-xs font-medium text-muted-foreground mb-1">
-                                          Dependencies
+                                          Blocked By
                                         </div>
                                         <div className="space-y-1">
-                                          {task.dependencies.map((dep, dIdx) => (
+                                          {task.blockedBy.map((dep: TaskDep, dIdx: number) => (
                                             <div
                                               key={dIdx}
                                               className="flex items-center gap-2 text-sm"
@@ -557,7 +558,7 @@ export function WorkPackageDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete work package?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{wp.name}</strong> ({wp.wpId}).
+              This will permanently delete <strong>{wp.name}</strong> ({wp.workPackageId}).
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

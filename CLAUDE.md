@@ -112,6 +112,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `batch_update_task_states` | Write | Update state of multiple tasks in one call (consolidated cascades) |
 | `manage_work_package_dependency` | Write | Add/remove WP dependency (returns auto-block state changes) |
 | `manage_task_dependency` | Write | Add/remove task dependency (returns auto-block state changes) |
+| `scaffold_work_package` | Write | One-call WP creation with phases, tasks, dependencies, and WP blockers |
 | `get_activity_logs` | Read | Paginated HTTP request logs |
 
 **Testing flow for MCP tools (E2E):**

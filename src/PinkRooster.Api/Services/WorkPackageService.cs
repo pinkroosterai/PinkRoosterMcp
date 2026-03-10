@@ -367,6 +367,388 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         return true;
     }
 
+    public async Task<ScaffoldWorkPackageResponse> ScaffoldAsync(
+        long projectId, ScaffoldWorkPackageRequest request, string changedBy, List<StateChangeDto>? stateChanges = null, CancellationToken ct = default)
+    {
+        stateChanges ??= [];
+
+        // 0. Validate task dependency graphs upfront (before touching the change tracker)
+        //    This prevents orphaned entities if RequestLoggingMiddleware calls SaveChangesAsync
+        //    on the same scoped DbContext after we return a 400.
+        foreach (var phaseReq in request.Phases)
+        {
+            if (phaseReq.Tasks is not { Count: > 0 }) continue;
+
+            for (var ti = 0; ti < phaseReq.Tasks.Count; ti++)
+            {
+                var deps = phaseReq.Tasks[ti].DependsOnTaskIndices;
+                if (deps is null) continue;
+
+                foreach (var depIndex in deps)
+                {
+                    if (depIndex < 0 || depIndex >= phaseReq.Tasks.Count)
+                        throw new InvalidOperationException(
+                            $"Task '{phaseReq.Tasks[ti].Name}' in phase '{phaseReq.Name}' has out-of-bounds dependency index {depIndex}. " +
+                            $"Valid range: 0-{phaseReq.Tasks.Count - 1}.");
+
+                    if (depIndex == ti)
+                        throw new InvalidOperationException(
+                            $"Task '{phaseReq.Tasks[ti].Name}' in phase '{phaseReq.Name}' cannot depend on itself (index {depIndex}).");
+                }
+            }
+
+            ValidateNoCycles(phaseReq, phaseReq.Tasks.Count);
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async (cancellation) =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellation);
+
+            // 1. Create Work Package
+            var nextWpNumber = await db.WorkPackages
+                .Where(w => w.ProjectId == projectId)
+                .MaxAsync(w => (int?)w.WorkPackageNumber, cancellation) ?? 0;
+            nextWpNumber++;
+
+            var wp = new WorkPackage
+            {
+                WorkPackageNumber = nextWpNumber,
+                ProjectId = projectId,
+                Name = request.Name,
+                Description = request.Description,
+                Type = request.Type,
+                Priority = request.Priority,
+                Plan = request.Plan,
+                EstimatedComplexity = request.EstimatedComplexity,
+                EstimationRationale = request.EstimationRationale,
+                State = request.State,
+                LinkedIssueId = request.LinkedIssueId,
+                Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
+            };
+
+            StateTransitionHelper.ApplyBlockedStateLogic(wp, CompletionState.NotStarted, request.State);
+            StateTransitionHelper.ApplyStateTimestamps(wp, CompletionState.NotStarted, request.State);
+
+            db.WorkPackages.Add(wp);
+            db.WorkPackageAuditLogs.AddRange(BuildCreateAuditEntries(wp, changedBy));
+
+            // 2. Create Phases, Tasks, AcceptanceCriteria
+            var nextPhaseNumber = 1;
+            var nextPhaseSortOrder = 1;
+            var nextTaskNumber = 1;
+            var totalDependencies = 0;
+
+            // Track created tasks per phase for dependency resolution: phaseIndex → list of task entities
+            var phaseTaskMap = new List<List<WorkPackageTask>>();
+            var phaseEntities = new List<WorkPackagePhase>();
+
+            foreach (var phaseReq in request.Phases)
+            {
+                var phaseSortOrder = phaseReq.SortOrder ?? nextPhaseSortOrder++;
+                if (phaseReq.SortOrder is not null)
+                    nextPhaseSortOrder = Math.Max(nextPhaseSortOrder, phaseSortOrder + 1);
+
+                var phase = new WorkPackagePhase
+                {
+                    PhaseNumber = nextPhaseNumber++,
+                    WorkPackage = wp,
+                    Name = phaseReq.Name,
+                    Description = phaseReq.Description,
+                    SortOrder = phaseSortOrder,
+                    State = CompletionState.NotStarted
+                };
+
+                db.WorkPackagePhases.Add(phase);
+                db.PhaseAuditLogs.AddRange(BuildPhaseCreateAuditEntries(phase, changedBy));
+                phaseEntities.Add(phase);
+
+                // Acceptance Criteria
+                if (phaseReq.AcceptanceCriteria is { Count: > 0 })
+                {
+                    foreach (var acDto in phaseReq.AcceptanceCriteria)
+                    {
+                        db.AcceptanceCriteria.Add(new AcceptanceCriterion
+                        {
+                            Phase = phase,
+                            Name = acDto.Name,
+                            Description = acDto.Description,
+                            VerificationMethod = acDto.VerificationMethod,
+                            VerificationResult = acDto.VerificationResult,
+                            VerifiedAt = acDto.VerifiedAt
+                        });
+                    }
+                }
+
+                // Tasks
+                var phaseTasks = new List<WorkPackageTask>();
+                var nextTaskSortOrder = 1;
+
+                if (phaseReq.Tasks is { Count: > 0 })
+                {
+                    foreach (var taskReq in phaseReq.Tasks)
+                    {
+                        var taskSortOrder = taskReq.SortOrder ?? nextTaskSortOrder++;
+                        if (taskReq.SortOrder is not null)
+                            nextTaskSortOrder = Math.Max(nextTaskSortOrder, taskSortOrder + 1);
+
+                        var task = new WorkPackageTask
+                        {
+                            TaskNumber = nextTaskNumber++,
+                            Phase = phase,
+                            WorkPackage = wp,
+                            Name = taskReq.Name,
+                            Description = taskReq.Description,
+                            SortOrder = taskSortOrder,
+                            ImplementationNotes = taskReq.ImplementationNotes,
+                            State = taskReq.State,
+                            TargetFiles = StateTransitionHelper.MapFileReferences(taskReq.TargetFiles),
+                            Attachments = StateTransitionHelper.MapFileReferences(taskReq.Attachments)
+                        };
+
+                        StateTransitionHelper.ApplyStateTimestamps(task, CompletionState.NotStarted, taskReq.State);
+                        StateTransitionHelper.ApplyBlockedStateLogic(task, CompletionState.NotStarted, taskReq.State);
+
+                        db.WorkPackageTasks.Add(task);
+                        db.TaskAuditLogs.AddRange(BuildTaskCreateAuditEntries(task, changedBy));
+                        phaseTasks.Add(task);
+                    }
+                }
+
+                phaseTaskMap.Add(phaseTasks);
+            }
+
+            // 3. Create Task Dependencies (same-phase only, already validated upfront)
+            for (var pi = 0; pi < request.Phases.Count; pi++)
+            {
+                var phaseReq = request.Phases[pi];
+                if (phaseReq.Tasks is null) continue;
+
+                for (var ti = 0; ti < phaseReq.Tasks.Count; ti++)
+                {
+                    var taskReq = phaseReq.Tasks[ti];
+                    if (taskReq.DependsOnTaskIndices is not { Count: > 0 }) continue;
+
+                    var dependentTask = phaseTaskMap[pi][ti];
+
+                    foreach (var depIndex in taskReq.DependsOnTaskIndices)
+                    {
+                        var dependsOnTask = phaseTaskMap[pi][depIndex];
+
+                        db.WorkPackageTaskDependencies.Add(new WorkPackageTaskDependency
+                        {
+                            DependentTask = dependentTask,
+                            DependsOnTask = dependsOnTask,
+                            Reason = $"Scaffold dependency: {dependsOnTask.Name} → {dependentTask.Name}"
+                        });
+
+                        // Auto-block if blocker is non-terminal and dependent is active
+                        if (!CompletionStateConstants.TerminalStates.Contains(dependsOnTask.State)
+                            && dependentTask.State != CompletionState.Blocked
+                            && !CompletionStateConstants.TerminalStates.Contains(dependentTask.State)
+                            && !CompletionStateConstants.InactiveStates.Contains(dependentTask.State))
+                        {
+                            var oldState = dependentTask.State;
+                            dependentTask.PreviousActiveState = oldState;
+                            dependentTask.State = CompletionState.Blocked;
+                            StateTransitionHelper.ApplyStateTimestamps(dependentTask, oldState, CompletionState.Blocked);
+                        }
+
+                        totalDependencies++;
+                    }
+                }
+            }
+
+            // 4. WP-level Dependencies (blockedBy existing WPs)
+            if (request.BlockedByWpIds is { Count: > 0 })
+            {
+                // SaveChanges first so WP gets an Id for dependency FK
+                await db.SaveChangesAsync(cancellation);
+
+                foreach (var blockerWpId in request.BlockedByWpIds)
+                {
+                    var blockerWp = await db.WorkPackages
+                        .FirstOrDefaultAsync(w => w.Id == blockerWpId, cancellation)
+                        ?? throw new InvalidOperationException(
+                            $"Blocker work package with internal ID {blockerWpId} not found.");
+
+                    if (blockerWp.Id == wp.Id)
+                        throw new InvalidOperationException("A work package cannot depend on itself.");
+
+                    if (await cascadeService.HasCircularWpDependencyAsync(wp.Id, blockerWp.Id, cancellation))
+                        throw new InvalidOperationException(
+                            $"Adding dependency on 'proj-{blockerWp.ProjectId}-wp-{blockerWp.WorkPackageNumber}' would create a circular dependency.");
+
+                    db.WorkPackageDependencies.Add(new WorkPackageDependency
+                    {
+                        DependentWorkPackageId = wp.Id,
+                        DependsOnWorkPackageId = blockerWp.Id,
+                        Reason = "Scaffold dependency"
+                    });
+
+                    // Auto-block the new WP if blocker is non-terminal
+                    if (!CompletionStateConstants.TerminalStates.Contains(blockerWp.State)
+                        && wp.State != CompletionState.Blocked
+                        && !CompletionStateConstants.TerminalStates.Contains(wp.State)
+                        && !CompletionStateConstants.InactiveStates.Contains(wp.State))
+                    {
+                        var oldState = wp.State;
+                        wp.PreviousActiveState = oldState;
+                        wp.State = CompletionState.Blocked;
+                        StateTransitionHelper.ApplyStateTimestamps(wp, oldState, CompletionState.Blocked);
+
+                        stateChanges.Add(new StateChangeDto
+                        {
+                            EntityType = "WorkPackage",
+                            EntityId = $"proj-{projectId}-wp-{nextWpNumber}",
+                            OldState = oldState.ToString(),
+                            NewState = CompletionState.Blocked.ToString(),
+                            Reason = $"Auto-blocked: dependency on 'proj-{blockerWp.ProjectId}-wp-{blockerWp.WorkPackageNumber}' added"
+                        });
+                    }
+
+                    totalDependencies++;
+                }
+            }
+
+            await db.SaveChangesAsync(cancellation);
+            await transaction.CommitAsync(cancellation);
+
+            // 5. Build compact response
+            var totalTasks = phaseTaskMap.Sum(pt => pt.Count);
+            var phaseResults = new List<ScaffoldPhaseResult>();
+
+            for (var i = 0; i < phaseEntities.Count; i++)
+            {
+                var phase = phaseEntities[i];
+                phaseResults.Add(new ScaffoldPhaseResult
+                {
+                    PhaseId = $"proj-{projectId}-wp-{nextWpNumber}-phase-{phase.PhaseNumber}",
+                    TaskIds = phaseTaskMap[i].Select(t =>
+                        $"proj-{projectId}-wp-{nextWpNumber}-task-{t.TaskNumber}").ToList()
+                });
+            }
+
+            return new ScaffoldWorkPackageResponse
+            {
+                WorkPackageId = $"proj-{projectId}-wp-{nextWpNumber}",
+                Phases = phaseResults,
+                TotalTasks = totalTasks,
+                TotalDependencies = totalDependencies,
+                StateChanges = stateChanges.Count > 0 ? stateChanges : null
+            };
+        }, ct);
+    }
+
+    private static void ValidateNoCycles(ScaffoldPhaseRequest phaseReq, int taskCount)
+    {
+        if (phaseReq.Tasks is null) return;
+
+        // Build adjacency: depIndex → taskIndex (dependsOn → dependent)
+        var inDegree = new int[taskCount];
+        var adj = new List<int>[taskCount];
+        for (var i = 0; i < taskCount; i++) adj[i] = [];
+
+        for (var ti = 0; ti < phaseReq.Tasks.Count; ti++)
+        {
+            var deps = phaseReq.Tasks[ti].DependsOnTaskIndices;
+            if (deps is null) continue;
+
+            foreach (var depIdx in deps)
+            {
+                if (depIdx < 0 || depIdx >= taskCount) continue; // already validated above
+                adj[depIdx].Add(ti);
+                inDegree[ti]++;
+            }
+        }
+
+        // Kahn's algorithm
+        var queue = new Queue<int>();
+        for (var i = 0; i < taskCount; i++)
+            if (inDegree[i] == 0) queue.Enqueue(i);
+
+        var visited = 0;
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            visited++;
+            foreach (var next in adj[node])
+            {
+                inDegree[next]--;
+                if (inDegree[next] == 0) queue.Enqueue(next);
+            }
+        }
+
+        if (visited < taskCount)
+            throw new InvalidOperationException(
+                $"Circular task dependency detected in phase '{phaseReq.Name}'. " +
+                $"Review the dependsOnTaskIndices to remove the cycle.");
+    }
+
+    // Reused by ScaffoldAsync — same audit pattern as PhaseService
+    private static List<PhaseAuditLog> BuildPhaseCreateAuditEntries(WorkPackagePhase phase, string changedBy)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var entries = new List<PhaseAuditLog>();
+
+        void Add(string field, string? value)
+        {
+            if (value is null) return;
+            entries.Add(new PhaseAuditLog
+            {
+                Phase = phase,
+                FieldName = field,
+                OldValue = null,
+                NewValue = value,
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+        }
+
+        Add("Name", phase.Name);
+        Add("Description", phase.Description);
+        Add("SortOrder", phase.SortOrder.ToString());
+        Add("State", phase.State.ToString());
+
+        return entries;
+    }
+
+    private static List<TaskAuditLog> BuildTaskCreateAuditEntries(WorkPackageTask task, string changedBy)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var entries = new List<TaskAuditLog>();
+
+        void Add(string field, string? value)
+        {
+            if (value is null) return;
+            entries.Add(new TaskAuditLog
+            {
+                Task = task,
+                FieldName = field,
+                OldValue = null,
+                NewValue = value,
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+        }
+
+        Add("Name", task.Name);
+        Add("Description", task.Description);
+        Add("SortOrder", task.SortOrder.ToString());
+        Add("ImplementationNotes", task.ImplementationNotes);
+        Add("State", task.State.ToString());
+
+        if (task.TargetFiles.Count > 0)
+            Add("TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+
+        if (task.Attachments.Count > 0)
+            Add("Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+
+        return entries;
+    }
+
     // ── Private helpers ──
 
     private static IQueryable<WorkPackage> ApplyStateFilter(IQueryable<WorkPackage> query, string? stateFilter)
