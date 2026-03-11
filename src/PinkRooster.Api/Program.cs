@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Api.Middleware;
 using PinkRooster.Api.Services;
@@ -47,12 +48,33 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Dev-only: auto-migrate and enable Swagger
-if (app.Environment.IsDevelopment())
-{
+// Auto-migrate: enabled in Development, or via AUTO_MIGRATE=true env var
+var autoMigrate = app.Environment.IsDevelopment()
+    || string.Equals(app.Configuration["AUTO_MIGRATE"], "true", StringComparison.OrdinalIgnoreCase);
+if (autoMigrate)
     await DbInitializer.InitializeAsync(app.Services);
+
+// Swagger: enabled in Development, or via ENABLE_SWAGGER=true env var
+var enableSwagger = app.Environment.IsDevelopment()
+    || string.Equals(app.Configuration["ENABLE_SWAGGER"], "true", StringComparison.OrdinalIgnoreCase);
+if (enableSwagger)
+{
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+// Global exception handler for non-Development (suppresses stack traces)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(errorApp =>
+    {
+        errorApp.Run(async context =>
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("""{"error":"An internal error occurred."}""");
+        });
+    });
 }
 
 // Middleware pipeline

@@ -22,7 +22,9 @@ services:
     ports:
       - "5100:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
+      AUTO_MIGRATE: "true"
+      ENABLE_SWAGGER: "true"
       ConnectionStrings__DefaultConnection: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD}"
       Auth__ApiKeys__0: ${API_KEY}
     depends_on:
@@ -42,7 +44,7 @@ services:
     ports:
       - "5200:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       ApiServer__BaseUrl: "http://api:8080"
       ApiServer__ApiKey: ${API_KEY}
       Auth__ApiKeys__0: ${MCP_API_KEY:-}
