@@ -95,7 +95,7 @@ Call `mcp__pinkrooster__create_or_update_feature_request` with:
 - `category`: mapped category
 - `priority`: mapped priority
 - `businessValue`: derived from the "why" in the description
-- `userStory`: format as "As a [role], I want [capability], so that [benefit]"
+- `userStories`: array of structured user stories extracted from the description, each with `role`, `goal`, `benefit` (e.g., `[{ "role": "developer", "goal": "export data as CSV", "benefit": "offline analysis in spreadsheets" }]`). Derive multiple stories if the description implies distinct user roles or capabilities.
 - `requester`: "Claude Code" (or user name if known)
 
 ## Step 5: Report and Offer Scaffolding

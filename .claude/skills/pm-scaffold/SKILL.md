@@ -26,7 +26,8 @@ Parse `$ARGUMENTS` to determine the source:
 **If entity ID** (format `proj-N-issue-N` or `proj-N-fr-N`):
 - Issue: Call `mcp__pinkrooster__get_issue_details` to load requirements
 - FR: Call `mcp__pinkrooster__get_feature_request_details` to load requirements
-- Extract: name, description, priority, state/status, and any detailed fields
+- Extract: name, description, priority, state/status, userStories (array of role/goal/benefit), businessValue, acceptanceSummary, and any other detailed fields
+- Use user stories to inform task design — each story may map to one or more tasks across phases
 
 **If free-text description**:
 - Use `$ARGUMENTS` directly as the feature description

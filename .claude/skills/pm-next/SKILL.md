@@ -62,8 +62,9 @@ Based on the selected item's entity type:
 
 **If Feature Request** (ID format: `proj-N-fr-N`):
 1. Call `mcp__pinkrooster__get_feature_request_details` with the FR ID
-2. Extract: `name`, `description`, `userStory`, `businessValue`, `acceptanceSummary`
-3. Check for linked work packages — if none, suggest: "This FR has no work package. Run `/pm-scaffold {frId}` to create one."
+2. Extract: `name`, `description`, `userStories` (array of role/goal/benefit), `businessValue`, `acceptanceSummary`
+3. Display user stories as context: "As a [role], I want [goal], so that [benefit]" for each story
+4. Check for linked work packages — if none, suggest: "This FR has no work package. Run `/pm-scaffold {frId}` to create one."
 
 ## Step 5: Read Target Code
 
