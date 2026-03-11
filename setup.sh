@@ -4,6 +4,9 @@ set -euo pipefail
 # ─── PinkRooster Setup Script ────────────────────────────────────────────────
 # Idempotent script for configuring, building, deploying, and registering
 # PinkRooster. Safe to re-run for config changes or restarts.
+#
+# Usage: ./setup.sh [--config-only]
+#   --config-only   Update .env without rebuilding Docker or re-registering MCP
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,20 +21,38 @@ BOLD='\033[1m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-ok()   { printf "${GREEN}  %s${RESET}\n" "$1"; }
-fail() { printf "${RED}  %s${RESET}\n" "$1"; }
-info() { printf "${CYAN}  %s${RESET}\n" "$1"; }
-warn() { printf "${YELLOW}  %s${RESET}\n" "$1"; }
-header() { printf "\n${BOLD}${CYAN}── %s ──${RESET}\n\n" "$1"; }
+ok()     { printf "${GREEN}  %s${RESET}\n" "$1"; }
+fail()   { printf "${RED}  %s${RESET}\n" "$1"; }
+info()   { printf "${CYAN}  %s${RESET}\n" "$1"; }
+warn()   { printf "${YELLOW}  %s${RESET}\n" "$1"; }
+step()   { printf "\n${BOLD}${CYAN}── [%s/4] %s ──${RESET}\n\n" "$1" "$2"; }
+
+# ─── Flags ───────────────────────────────────────────────────────────────────
+CONFIG_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --config-only) CONFIG_ONLY=true ;;
+    -h|--help)
+      printf "Usage: ./setup.sh [--config-only]\n"
+      printf "  --config-only   Update .env without rebuilding Docker or re-registering MCP\n"
+      exit 0
+      ;;
+    *)
+      printf "Unknown option: %s\n" "$arg"
+      printf "Usage: ./setup.sh [--config-only]\n"
+      exit 1
+      ;;
+  esac
+done
 
 # ─── Secret generation ───────────────────────────────────────────────────────
 generate_secret() {
-  openssl rand -base64 32 2>/dev/null | tr -d '/+=' | head -c 32
+  openssl rand -base64 48 2>/dev/null | tr -d '/+=' | head -c 32
 }
 
 # ─── Step 1: Environment file ────────────────────────────────────────────────
 configure_env() {
-  header "Environment Configuration"
+  step 1 "Environment Configuration"
 
   # Load existing values if .env exists
   local existing_pg_password="" existing_api_key="" existing_mcp_key=""
@@ -39,7 +60,6 @@ configure_env() {
 
   if [[ -f .env ]]; then
     info "Found existing .env — loading current values as defaults"
-    # Source safely: only read known variables
     existing_pg_password=$(grep -E '^POSTGRES_PASSWORD=' .env 2>/dev/null | cut -d= -f2- || true)
     existing_api_key=$(grep -E '^API_KEY=' .env 2>/dev/null | cut -d= -f2- || true)
     existing_mcp_key=$(grep -E '^MCP_API_KEY=' .env 2>/dev/null | cut -d= -f2- || true)
@@ -105,42 +125,144 @@ configure_env() {
     MCP_API_KEY="${mcp_key:-$default_mcp_key}"
   fi
 
-  # Write .env
-  cat > .env <<EOF
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-API_KEY=${API_KEY}
+  # Backup existing .env before overwriting
+  if [[ -f .env ]]; then
+    cp .env .env.bak
+  fi
+
+  # Write .env (quoted values to handle special characters)
+  cat > .env <<'ENVEOF'
+POSTGRES_PASSWORD=
+API_KEY=
 
 # MCP server authentication (optional — leave empty for open access)
-MCP_API_KEY=${MCP_API_KEY}
+MCP_API_KEY=
 
 # Dashboard authentication (optional — leave empty for open access)
-DASHBOARD_USER=${DASHBOARD_USER}
-DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
-EOF
+DASHBOARD_USER=
+DASHBOARD_PASSWORD=
+ENVEOF
 
-  ok "Environment file written to .env"
+  # Write actual values safely (handles special chars in passwords)
+  sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${POSTGRES_PASSWORD//|/\\|}|" .env
+  sed -i "s|^API_KEY=.*|API_KEY=${API_KEY//|/\\|}|" .env
+  sed -i "s|^MCP_API_KEY=.*|MCP_API_KEY=${MCP_API_KEY//|/\\|}|" .env
+  sed -i "s|^DASHBOARD_USER=.*|DASHBOARD_USER=${DASHBOARD_USER//|/\\|}|" .env
+  sed -i "s|^DASHBOARD_PASSWORD=.*|DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD//|/\\|}|" .env
+  chmod 600 .env
+
+  ok "Environment file written to .env (mode 600)"
+  if [[ -f .env.bak ]]; then
+    info "Previous config backed up to .env.bak"
+  fi
+
+  # Show what changed
+  printf "\n"
+  printf "  ${BOLD}Configuration summary:${RESET}\n"
+  if [[ -n "$existing_pg_password" && "$existing_pg_password" == "$POSTGRES_PASSWORD" ]]; then
+    printf "  %-18s ${DIM}unchanged${RESET}\n" "POSTGRES_PASSWORD"
+  elif [[ -n "$existing_pg_password" ]]; then
+    printf "  %-18s ${YELLOW}changed${RESET}\n" "POSTGRES_PASSWORD"
+  else
+    printf "  %-18s ${GREEN}generated${RESET}\n" "POSTGRES_PASSWORD"
+  fi
+
+  if [[ -n "$existing_api_key" && "$existing_api_key" == "$API_KEY" ]]; then
+    printf "  %-18s ${DIM}unchanged${RESET}\n" "API_KEY"
+  elif [[ -n "$existing_api_key" ]]; then
+    printf "  %-18s ${YELLOW}changed${RESET}\n" "API_KEY"
+  else
+    printf "  %-18s ${GREEN}generated${RESET}\n" "API_KEY"
+  fi
+
+  if [[ -n "$DASHBOARD_USER" ]]; then
+    if [[ -n "$existing_dash_user" ]]; then
+      printf "  %-18s ${GREEN}enabled${RESET} (user: %s)\n" "Dashboard auth" "$DASHBOARD_USER"
+    else
+      printf "  %-18s ${GREEN}newly enabled${RESET} (user: %s)\n" "Dashboard auth" "$DASHBOARD_USER"
+    fi
+  elif [[ -n "$existing_dash_user" ]]; then
+    printf "  %-18s ${YELLOW}disabled${RESET} (was: %s)\n" "Dashboard auth" "$existing_dash_user"
+  else
+    printf "  %-18s ${DIM}off${RESET}\n" "Dashboard auth"
+  fi
+
+  if [[ -n "$MCP_API_KEY" ]]; then
+    if [[ -n "$existing_mcp_key" ]]; then
+      printf "  %-18s ${GREEN}enabled${RESET}\n" "MCP auth"
+    else
+      printf "  %-18s ${GREEN}newly enabled${RESET}\n" "MCP auth"
+    fi
+  elif [[ -n "$existing_mcp_key" ]]; then
+    printf "  %-18s ${YELLOW}disabled${RESET}\n" "MCP auth"
+  else
+    printf "  %-18s ${DIM}off${RESET}\n" "MCP auth"
+  fi
 }
 
-# ─── Step 2: Docker build & deploy ───────────────────────────────────────────
-deploy_docker() {
-  header "Docker Build & Deploy"
+# ─── Step 2: Preflight checks ────────────────────────────────────────────────
+preflight_checks() {
+  step 2 "Preflight Checks"
 
-  # Check Docker is available
+  local failed=false
+
+  # Docker CLI
   if ! command -v docker &>/dev/null; then
     fail "Docker is not installed or not in PATH"
-    exit 1
+    failed=true
+  else
+    ok "Docker CLI found"
   fi
 
+  # Docker Compose
   if ! docker compose version &>/dev/null; then
     fail "Docker Compose is not available (need docker compose v2+)"
+    failed=true
+  else
+    ok "Docker Compose $(docker compose version --short 2>/dev/null || echo "v2+") found"
+  fi
+
+  # Docker daemon
+  if ! docker info &>/dev/null 2>&1; then
+    fail "Docker daemon is not running"
+    info "Start Docker Desktop or run 'sudo systemctl start docker'"
+    failed=true
+  else
+    ok "Docker daemon is running"
+  fi
+
+  if [[ "$failed" == true ]]; then
+    printf "\n"
+    fail "Preflight checks failed — fix the above issues and re-run ./setup.sh"
     exit 1
   fi
 
+  # Port checks (non-fatal warnings)
+  local ports=("5432:PostgreSQL" "5100:API" "5200:MCP" "3000:Dashboard")
+  for entry in "${ports[@]}"; do
+    local port="${entry%%:*}"
+    local name="${entry##*:}"
+    # Check if something non-Docker is using the port
+    if ss -tlnp 2>/dev/null | grep -q ":${port} " && \
+       ! docker compose ps --format '{{.Ports}}' 2>/dev/null | grep -q "${port}"; then
+      warn "Port $port ($name) is in use by another process — Docker may fail to bind"
+    fi
+  done
+}
+
+# ─── Step 3: Docker build & deploy ───────────────────────────────────────────
+deploy_docker() {
+  step 3 "Docker Build & Deploy"
+
   info "Building and starting services..."
-  if docker compose up -d --build 2>&1 | tail -5; then
+  printf "\n"
+
+  if docker compose up -d --build; then
+    printf "\n"
     ok "Docker stack started"
   else
-    fail "Docker compose failed"
+    printf "\n"
+    fail "Docker compose failed — run 'docker compose logs' to investigate"
     exit 1
   fi
 
@@ -164,6 +286,7 @@ wait_for_health() {
     if [[ "$pg_ok" == false ]]; then
       if docker compose exec -T postgres pg_isready -U pinkrooster -q 2>/dev/null; then
         pg_ok=true
+        printf "\033[2K"
         ok "PostgreSQL is ready"
       fi
     fi
@@ -172,6 +295,7 @@ wait_for_health() {
     if [[ "$api_ok" == false && "$pg_ok" == true ]]; then
       if curl -sf http://localhost:5100/health >/dev/null 2>&1; then
         api_ok=true
+        printf "\033[2K"
         ok "API is ready (http://localhost:5100)"
       fi
     fi
@@ -180,6 +304,7 @@ wait_for_health() {
     if [[ "$mcp_ok" == false && "$api_ok" == true ]]; then
       if curl -sf http://localhost:5200/health >/dev/null 2>&1; then
         mcp_ok=true
+        printf "\033[2K"
         ok "MCP server is ready (http://localhost:5200)"
       fi
     fi
@@ -188,6 +313,7 @@ wait_for_health() {
     if [[ "$dash_ok" == false && "$api_ok" == true ]]; then
       if curl -sf http://localhost:3000 >/dev/null 2>&1; then
         dash_ok=true
+        printf "\033[2K"
         ok "Dashboard is ready (http://localhost:3000)"
       fi
     fi
@@ -201,68 +327,106 @@ wait_for_health() {
 
     sleep "$interval"
     elapsed=$((elapsed + interval))
-    printf "  ${DIM}... waiting (%ds/%ds)${RESET}\r" "$elapsed" "$timeout"
+    printf "\033[2K  ${DIM}... waiting (%ds/%ds)${RESET}\r" "$elapsed" "$timeout"
   done
 
-  # Timeout — report what failed
-  printf "\n\n"
+  # Timeout — report what failed, showing dependency chain
+  printf "\033[2K\n"
   warn "Health check timeout after ${timeout}s. Status:"
-  if [[ "$pg_ok" == true ]]; then ok "PostgreSQL: healthy"; else fail "PostgreSQL: not ready"; fi
-  if [[ "$api_ok" == true ]]; then ok "API: healthy"; else fail "API: not ready"; fi
-  if [[ "$mcp_ok" == true ]]; then ok "MCP: healthy"; else fail "MCP: not ready"; fi
-  if [[ "$dash_ok" == true ]]; then ok "Dashboard: healthy"; else fail "Dashboard: not ready"; fi
+  if [[ "$pg_ok" == true ]]; then ok "PostgreSQL: healthy"; else fail "PostgreSQL: not ready (blocker — all services depend on this)"; fi
+  if [[ "$api_ok" == true ]]; then
+    ok "API: healthy"
+  elif [[ "$pg_ok" == false ]]; then
+    fail "API: not checked (waiting on PostgreSQL)"
+  else
+    fail "API: not ready (blocker — MCP + Dashboard depend on this)"
+  fi
+  if [[ "$mcp_ok" == true ]]; then
+    ok "MCP: healthy"
+  elif [[ "$api_ok" == false ]]; then
+    fail "MCP: not checked (waiting on API)"
+  else
+    fail "MCP: not ready"
+  fi
+  if [[ "$dash_ok" == true ]]; then
+    ok "Dashboard: healthy"
+  elif [[ "$api_ok" == false ]]; then
+    fail "Dashboard: not checked (waiting on API)"
+  else
+    fail "Dashboard: not ready"
+  fi
   printf "\n"
   warn "Run 'docker compose logs' to investigate"
   HEALTH_FAILED=true
 }
 
-# ─── Step 3: MCP registration & skills ───────────────────────────────────────
-register_mcp() {
-  header "Claude Code Integration"
-
-  local claude_dir="$HOME/.claude"
-
-  # Check claude CLI is available
-  if ! command -v claude &>/dev/null; then
-    fail "Claude Code CLI not found — cannot register MCP server"
-    warn "Install Claude Code, then re-run ./setup.sh"
-    return 1
-  fi
-
-  # Register MCP server (user-scoped, available to all projects)
-  if [[ -n "$MCP_API_KEY" ]]; then
-    claude mcp add --transport http --scope user \
-      --header "X-Api-Key: $MCP_API_KEY" \
-      pinkrooster http://localhost:5200
-  else
-    claude mcp add --transport http --scope user \
-      pinkrooster http://localhost:5200
-  fi
-  ok "MCP server registered (user-scoped)"
-
-  # Copy skills
-  printf "\n"
+# ─── Step 4a: Install skills ──────────────────────────────────────────────────
+install_skills() {
   local skills_src="$SCRIPT_DIR/.claude/skills"
-  local skills_dst="$claude_dir/skills"
+  local skills_dst="$HOME/.claude/skills"
+  SKILLS_COPIED=0
 
   if [[ -d "$skills_src" ]]; then
     mkdir -p "$skills_dst"
-    local copied=0
+    local skill_names=()
     for skill_dir in "$skills_src"/pm-*/; do
       if [[ -d "$skill_dir" ]]; then
         cp -r "$skill_dir" "$skills_dst/"
-        copied=$((copied + 1))
+        skill_names+=("$(basename "$skill_dir")")
+        SKILLS_COPIED=$((SKILLS_COPIED + 1))
       fi
     done
-    ok "Copied $copied PM skills to $skills_dst"
+    ok "Copied $SKILLS_COPIED PM skills to $skills_dst"
+    for name in "${skill_names[@]}"; do
+      printf "  ${DIM}  /%s${RESET}\n" "$name"
+    done
   else
     warn "Skills directory not found at $skills_src"
   fi
 }
 
-# ─── Step 4: Status summary ──────────────────────────────────────────────────
+# ─── Step 4b: MCP registration ───────────────────────────────────────────────
+register_mcp() {
+  # Check claude CLI is available
+  if ! command -v claude &>/dev/null; then
+    warn "Claude Code CLI not found — skipping MCP registration"
+    info "Install Claude Code, then re-run ./setup.sh"
+    MCP_REGISTERED=false
+    return 0
+  fi
+
+  # Remove existing registration first (idempotent re-registration)
+  if claude mcp get pinkrooster &>/dev/null 2>&1; then
+    claude mcp remove --scope user pinkrooster &>/dev/null 2>&1 || true
+    info "Removed existing MCP registration"
+  fi
+
+  # Register MCP server (user-scoped, available to all projects)
+  if [[ -n "$MCP_API_KEY" ]]; then
+    if claude mcp add --transport http --scope user \
+      --header "X-Api-Key: $MCP_API_KEY" \
+      pinkrooster http://localhost:5200 2>/dev/null; then
+      ok "MCP server registered (user-scoped, with API key)"
+      MCP_REGISTERED=true
+    else
+      fail "Failed to register MCP server"
+      MCP_REGISTERED=false
+    fi
+  else
+    if claude mcp add --transport http --scope user \
+      pinkrooster http://localhost:5200 2>/dev/null; then
+      ok "MCP server registered (user-scoped, open access)"
+      MCP_REGISTERED=true
+    else
+      fail "Failed to register MCP server"
+      MCP_REGISTERED=false
+    fi
+  fi
+}
+
+# ─── Summary ─────────────────────────────────────────────────────────────────
 print_summary() {
-  header "Setup Complete"
+  printf "\n${BOLD}${CYAN}── Setup Complete ──${RESET}\n\n"
 
   printf "  ${BOLD}Service URLs${RESET}\n"
   printf "  %-14s %s\n" "API:" "http://localhost:5100"
@@ -285,28 +449,25 @@ print_summary() {
   printf "\n"
 
   printf "  ${BOLD}Claude Code${RESET}\n"
-  if command -v claude &>/dev/null && claude mcp get pinkrooster &>/dev/null; then
+  if [[ "${MCP_REGISTERED:-false}" == true ]]; then
     ok "MCP server registered (user-scoped)"
   else
     fail "MCP server not registered"
   fi
-
-  local skill_count=0
-  for d in "$HOME/.claude/skills"/pm-*/; do
-    [[ -d "$d" ]] && skill_count=$((skill_count + 1))
-  done
-  if (( skill_count > 0 )); then
-    ok "$skill_count PM skills installed"
+  if (( ${SKILLS_COPIED:-0} > 0 )); then
+    ok "$SKILLS_COPIED PM skills installed"
   else
-    warn "No PM skills found in ~/.claude/skills/"
+    warn "No PM skills installed"
   fi
   printf "\n"
 
+  # Warnings
   if [[ "${HEALTH_FAILED:-false}" == true ]]; then
     warn "Some services failed health checks. Run 'docker compose logs' to debug."
   fi
 
-  printf "  ${DIM}Re-run ./setup.sh anytime to change settings or restart services.${RESET}\n\n"
+  printf "  ${DIM}Re-run ./setup.sh anytime to change settings or restart services.${RESET}\n"
+  printf "  ${DIM}Use ./setup.sh --config-only to update .env without rebuilding.${RESET}\n\n"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -321,10 +482,27 @@ main() {
   printf "  ${DIM}Project Management for AI-Assisted Development${RESET}\n"
 
   HEALTH_FAILED=false
+  MCP_REGISTERED=false
+  SKILLS_COPIED=0
 
   configure_env
+
+  if [[ "$CONFIG_ONLY" == true ]]; then
+    printf "\n"
+    ok "Config-only mode — skipping Docker build and MCP registration."
+    info "Run ./setup.sh (without --config-only) for a full deploy."
+    printf "\n"
+    return 0
+  fi
+
+  preflight_checks
   deploy_docker
+
+  step 4 "Claude Code Integration"
+  install_skills
+  printf "\n"
   register_mcp
+
   print_summary
 }
 
