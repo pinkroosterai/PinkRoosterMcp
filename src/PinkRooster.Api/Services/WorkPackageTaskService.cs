@@ -265,14 +265,7 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
             StateChanges = stateChanges.Count > 0 ? stateChanges : null
         });
 
-        // Re-query with includes for full response
-        var fullTask = await db.WorkPackageTasks
-            .Include(t => t.Phase)
-            .Include(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
-            .Include(t => t.Blocking).ThenInclude(d => d.DependentTask)
-            .FirstAsync(t => t.Id == task.Id, ct);
-
-        var response = ToResponse(fullTask, wp, fullTask.Phase);
+        var response = ToResponse(task, wp, task.Phase);
         response.StateChanges = stateChanges.Count > 0 ? stateChanges : null;
         return response;
     }

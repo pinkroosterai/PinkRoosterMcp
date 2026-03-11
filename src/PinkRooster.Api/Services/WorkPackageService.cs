@@ -137,6 +137,18 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         stateChanges ??= [];
 
         var wp = await db.WorkPackages
+            .Include(w => w.Phases.OrderBy(p => p.SortOrder))
+                .ThenInclude(p => p.Tasks.OrderBy(t => t.SortOrder))
+                    .ThenInclude(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
+            .Include(w => w.Phases)
+                .ThenInclude(p => p.Tasks)
+                    .ThenInclude(t => t.Blocking).ThenInclude(d => d.DependentTask)
+            .Include(w => w.Phases)
+                .ThenInclude(p => p.AcceptanceCriteria)
+            .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
+            .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
+            .Include(w => w.LinkedIssue)
+            .Include(w => w.LinkedFeatureRequest)
             .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
 
         if (wp is null)
@@ -251,23 +263,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             StateChanges = stateChanges.Count > 0 ? stateChanges : null
         });
 
-        // Re-query with full tree for response
-        var fullWp = await db.WorkPackages
-            .Include(w => w.Phases.OrderBy(p => p.SortOrder))
-                .ThenInclude(p => p.Tasks.OrderBy(t => t.SortOrder))
-                    .ThenInclude(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
-            .Include(w => w.Phases)
-                .ThenInclude(p => p.Tasks)
-                    .ThenInclude(t => t.Blocking).ThenInclude(d => d.DependentTask)
-            .Include(w => w.Phases)
-                .ThenInclude(p => p.AcceptanceCriteria)
-            .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
-            .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
-            .Include(w => w.LinkedIssue)
-            .Include(w => w.LinkedFeatureRequest)
-            .FirstAsync(w => w.Id == wp.Id, ct);
-
-        var response = ToResponse(fullWp);
+        var response = ToResponse(wp);
         response.StateChanges = stateChanges.Count > 0 ? stateChanges : null;
         return response;
     }

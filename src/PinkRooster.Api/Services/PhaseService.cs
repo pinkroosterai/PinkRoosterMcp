@@ -164,6 +164,9 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         var phase = await db.WorkPackagePhases
             .Include(p => p.WorkPackage)
             .Include(p => p.Tasks.OrderBy(t => t.SortOrder))
+                .ThenInclude(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
+            .Include(p => p.Tasks)
+                .ThenInclude(t => t.Blocking).ThenInclude(d => d.DependentTask)
             .Include(p => p.AcceptanceCriteria)
             .FirstOrDefaultAsync(p =>
                 p.WorkPackage.ProjectId == projectId &&
@@ -376,17 +379,7 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
             StateChanges = stateChanges.Count > 0 ? stateChanges : null
         });
 
-        // Re-query with full tree for response
-        var fullPhase = await db.WorkPackagePhases
-            .Include(p => p.Tasks.OrderBy(t => t.SortOrder))
-                .ThenInclude(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
-            .Include(p => p.Tasks)
-                .ThenInclude(t => t.Blocking).ThenInclude(d => d.DependentTask)
-            .Include(p => p.AcceptanceCriteria)
-            .Include(p => p.WorkPackage)
-            .FirstAsync(p => p.Id == phase.Id, ct);
-
-        var response = ToResponse(fullPhase);
+        var response = ToResponse(phase);
         response.StateChanges = stateChanges.Count > 0 ? stateChanges : null;
         return response;
     }
