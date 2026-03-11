@@ -20,7 +20,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
             Description = "Test",
             ProjectPath = $"/tmp/next-actions-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return (project!.Id, project.ProjectId);
     }
 
@@ -69,12 +69,12 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
             Name = "Active WP", Description = "d", State = CompletionState.Implementing,
             Priority = Priority.High
         }, ct);
-        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         var phaseResp = await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
             new CreatePhaseRequest { Name = "Phase 1" }, ct);
-        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
@@ -98,12 +98,12 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         {
             Name = "Active WP", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         var phaseResp = await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
             new CreatePhaseRequest { Name = "Phase 1" }, ct);
-        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
@@ -126,12 +126,12 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         {
             Name = "NotStarted WP", Description = "d"
         }, ct);
-        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         var phaseResp = await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
             new CreatePhaseRequest { Name = "Phase 1" }, ct);
-        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
@@ -163,7 +163,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         {
             Name = "Parent WP", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var parentWp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var parentWp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{parentWp!.WorkPackageNumber}/phases",
             new CreatePhaseRequest { Name = "Phase 1" }, ct);
@@ -188,7 +188,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
             Name = "Unlinked Issue", Description = "d", IssueType = IssueType.Bug,
             Severity = IssueSeverity.Major, State = CompletionState.Implementing
         }, ct);
-        var issue1 = await issueResp1.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        var issue1 = await issueResp1.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(IssuePath(projectId), new CreateIssueRequest
         {
@@ -231,11 +231,11 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
             Name = "Low WP", Description = "d", State = CompletionState.Implementing,
             Priority = Priority.Low
         }, ct);
-        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         var phaseResp = await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
             new CreatePhaseRequest { Name = "Phase 1" }, ct);
-        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
             new CreateTaskRequest { Name = "Low Task", Description = "d", State = CompletionState.Implementing }, ct);
@@ -329,14 +329,14 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         {
             Name = "Blocker", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var blocker = await blockerResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var blocker = await blockerResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // Create dependent WP that will be auto-blocked
         var depResp = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
             Name = "Blocked WP", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var dep = await depResp.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var dep = await depResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(
             $"{WpPath(projectId)}/{dep!.WorkPackageNumber}/dependencies",

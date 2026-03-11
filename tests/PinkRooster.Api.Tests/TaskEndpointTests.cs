@@ -19,14 +19,14 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
             Description = "Test",
             ProjectPath = $"/tmp/task-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await projResponse.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await projResponse.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         var wpResponse = await Client.PostAsJsonAsync($"{BasePath}/{project!.Id}/work-packages", new CreateWorkPackageRequest
         {
             Name = "Test WP",
             Description = "Test"
         }, ct);
-        var wp = await wpResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await wpResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         if (createPhase)
         {
@@ -53,7 +53,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
             new CreateTaskRequest { Name = "Task 1", Description = "Do something" }, ct);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
 
         Assert.NotNull(task);
         Assert.Equal(1, task.TaskNumber);
@@ -75,7 +75,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
                 State = Shared.Enums.CompletionState.Implementing
             }, ct);
 
-        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         Assert.Equal("Implementing", task!.State);
         Assert.NotNull(task.StartedAt);
     }
@@ -92,7 +92,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
             new UpdateTaskRequest { Name = "Updated", ImplementationNotes = "Some notes" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         Assert.Equal("Updated", task!.Name);
         Assert.Equal("Some notes", task.ImplementationNotes);
     }
@@ -108,7 +108,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
         var response = await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/1",
             new UpdateTaskRequest { State = Shared.Enums.CompletionState.Completed }, ct);
 
-        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         Assert.Equal("Completed", task!.State);
         Assert.NotNull(task.StartedAt);
         Assert.NotNull(task.CompletedAt);
@@ -150,7 +150,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
 
         var r1 = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T1", Description = "d" }, ct);
-        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T2", Description = "d" }, ct);
 
@@ -174,7 +174,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
 
         var r1 = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T1", Description = "d" }, ct);
-        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
 
         // T2 in active state
         await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
@@ -197,7 +197,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
 
         var r1 = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T1", Description = "d" }, ct);
-        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T2", Description = "d", State = Shared.Enums.CompletionState.Designing }, ct);
@@ -221,10 +221,10 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
 
         var r1 = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T1", Description = "d" }, ct);
-        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var t1 = await r1.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         var r2 = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}?phaseNumber=1",
             new CreateTaskRequest { Name = "T2", Description = "d" }, ct);
-        var t2 = await r2.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var t2 = await r2.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
 
         // T2 depends on T1
         await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}/2/dependencies",
@@ -344,7 +344,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
                 ]
             }, ct);
 
-        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
         Assert.Single(task!.TargetFiles);
         Assert.Equal("Program.cs", task.TargetFiles[0].FileName);
     }
@@ -367,7 +367,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
         // Complete the only task → should cascade: Phase auto-complete + WP auto-complete
         var updateResponse = await Client.PatchAsJsonAsync($"{TaskPath(projectId, wpNumber)}/1",
             new UpdateTaskRequest { State = Shared.Enums.CompletionState.Completed }, ct);
-        var updatedTask = await updateResponse.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        var updatedTask = await updateResponse.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
 
         Assert.NotNull(updatedTask!.StateChanges);
         Assert.Equal(2, updatedTask.StateChanges.Count);
@@ -414,7 +414,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
             }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(JsonOptions, ct);
 
         Assert.NotNull(result);
         Assert.Equal(3, result.UpdatedCount);
@@ -447,7 +447,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
                 ]
             }, ct);
 
-        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(JsonOptions, ct);
 
         // Should cascade: phase auto-complete + WP auto-complete
         Assert.NotNull(result!.StateChanges);
@@ -476,7 +476,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
                 Tasks = [new TaskStateUpdate { TaskNumber = 1, State = Shared.Enums.CompletionState.NotStarted }]
             }, ct);
 
-        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(JsonOptions, ct);
         Assert.Equal(0, result!.UpdatedCount);
         Assert.Single(result.Results);
         Assert.Equal("NotStarted", result.Results[0].OldState);
@@ -547,7 +547,7 @@ public sealed class TaskEndpointTests(PostgresFixture postgres) : IntegrationTes
         // Add dependency: task 2 blocked by task 1
         var addResponse = await Client.PostAsJsonAsync($"{TaskPath(projectId, wpNumber)}/2/dependencies",
             new ManageDependencyRequest { DependsOnId = task1Id }, ct);
-        var dep = await addResponse.Content.ReadFromJsonAsync<TaskDependencyResponse>(ct);
+        var dep = await addResponse.Content.ReadFromJsonAsync<TaskDependencyResponse>(JsonOptions, ct);
 
         Assert.NotNull(dep!.StateChanges);
         Assert.Single(dep.StateChanges);

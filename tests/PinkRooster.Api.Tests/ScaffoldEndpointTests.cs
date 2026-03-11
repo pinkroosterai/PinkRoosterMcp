@@ -20,7 +20,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
             Description = "Test",
             ProjectPath = $"/tmp/scaffold-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return project!.Id;
     }
 
@@ -70,7 +70,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(JsonOptions, ct);
         Assert.NotNull(result);
         Assert.Equal(2, result.Phases.Count);
         Assert.Equal(4, result.TotalTasks);
@@ -107,7 +107,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         ]);
 
         var response = await Client.PostAsJsonAsync(ScaffoldPath(projectId), request, ct);
-        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(JsonOptions, ct);
 
         Assert.NotNull(result);
         Assert.StartsWith("proj-", result.WorkPackageId);
@@ -148,7 +148,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         var response = await Client.PostAsJsonAsync(ScaffoldPath(projectId), request, ct);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(JsonOptions, ct);
         Assert.NotNull(result);
         Assert.Equal(1, result.TotalDependencies);
 
@@ -241,7 +241,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         var blockerResponse = await Client.PostAsJsonAsync(
             $"{BasePath}/{projectId}/work-packages",
             new CreateWorkPackageRequest { Name = "Blocker WP", Description = "Blocks stuff" }, ct);
-        var blockerWp = await blockerResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var blockerWp = await blockerResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // Scaffold a new WP blocked by the existing one
         var request = new ScaffoldWorkPackageRequest
@@ -256,7 +256,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         var response = await Client.PostAsJsonAsync(ScaffoldPath(projectId), request, ct);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(JsonOptions, ct);
         Assert.NotNull(result);
         Assert.Equal(1, result.TotalDependencies);
 
@@ -337,7 +337,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
                 IssueType = IssueType.Bug,
                 Severity = IssueSeverity.Major
             }, ct);
-        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
 
         var request = new ScaffoldWorkPackageRequest
         {

@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Xunit;
 
 namespace PinkRooster.Api.Tests.Fixtures;
@@ -7,6 +9,11 @@ namespace PinkRooster.Api.Tests.Fixtures;
 public abstract class IntegrationTest : IAsyncLifetime
 {
     private readonly PostgresFixture _postgres;
+
+    protected static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     protected ApiFactory Factory { get; private set; } = null!;
     protected HttpClient Client { get; private set; } = null!;
@@ -32,6 +39,11 @@ public abstract class IntegrationTest : IAsyncLifetime
 
     protected async Task<T> GetJson<T>(string url, CancellationToken ct = default) where T : class
     {
-        return (await Client.GetFromJsonAsync<T>(url, ct))!;
+        return (await Client.GetFromJsonAsync<T>(url, JsonOptions, ct))!;
+    }
+
+    protected async Task<T> ReadJson<T>(HttpResponseMessage response, CancellationToken ct = default)
+    {
+        return (await response.Content.ReadFromJsonAsync<T>(JsonOptions, ct))!;
     }
 }

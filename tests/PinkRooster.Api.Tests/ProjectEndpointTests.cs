@@ -37,7 +37,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : Integration
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         Assert.NotNull(project);
         Assert.StartsWith("proj-", project.ProjectId);
@@ -64,7 +64,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : Integration
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         Assert.NotNull(project);
         Assert.Equal("UpdatedName", project.Name);
@@ -102,7 +102,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : Integration
         var ct = TestContext.Current.CancellationToken;
         var request = MakeRequest("delete");
         var putResponse = await Client.PutAsJsonAsync("/api/projects", request, ct);
-        var project = await putResponse.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await putResponse.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         var response = await Client.DeleteAsync($"/api/projects/{project!.Id}", ct);
 
@@ -129,7 +129,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : Integration
         var ct = TestContext.Current.CancellationToken;
         var request = MakeRequest("prefix");
         var response = await Client.PutAsJsonAsync("/api/projects", request, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         Assert.NotNull(project);
         Assert.Matches(@"^proj-\d+$", project.ProjectId);

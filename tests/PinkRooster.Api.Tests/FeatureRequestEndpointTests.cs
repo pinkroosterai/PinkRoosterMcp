@@ -20,7 +20,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
             Description = "Test",
             ProjectPath = $"/tmp/fr-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return project!.Id;
     }
 
@@ -58,7 +58,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.NotNull(fr);
         Assert.Equal(1, fr.FeatureRequestNumber);
@@ -77,7 +77,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         await Client.PostAsJsonAsync(FrPath(projectId), MakeFrRequest("FR-A"), ct);
         var response = await Client.PostAsJsonAsync(FrPath(projectId), MakeFrRequest("FR-B"), ct);
-        var fr2 = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr2 = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal(2, fr2!.FeatureRequestNumber);
     }
@@ -101,7 +101,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         };
 
         var response = await Client.PostAsJsonAsync(FrPath(projectId), request, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("Enhancement", fr!.Category);
         Assert.Equal("Critical", fr.Priority);
@@ -148,7 +148,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1", update, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
         Assert.Equal("Renamed FR", fr!.Name);
         Assert.Equal("High", fr.Priority);
     }
@@ -169,7 +169,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         // Only update name, leave others untouched
         var update = new UpdateFeatureRequestRequest { Name = "Updated" };
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1", update, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("Updated", fr!.Name);
         Assert.Equal("Original desc", fr.Description);
@@ -231,7 +231,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         };
 
         var response = await Client.PostAsJsonAsync(FrPath(projectId), request, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.NotNull(fr!.StartedAt);
         Assert.Equal("UnderReview", fr.Status);
@@ -246,7 +246,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         var update = new UpdateFeatureRequestRequest { Status = FeatureStatus.InProgress };
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1", update, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("InProgress", fr!.Status);
         Assert.NotNull(fr.StartedAt);
@@ -268,7 +268,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         var update = new UpdateFeatureRequestRequest { Status = FeatureStatus.Completed };
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1", update, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("Completed", fr!.Status);
         Assert.NotNull(fr.StartedAt);
@@ -291,7 +291,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         var update = new UpdateFeatureRequestRequest { Status = FeatureStatus.Rejected };
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1", update, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("Rejected", fr!.Status);
         Assert.NotNull(fr.StartedAt);
@@ -319,7 +319,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         // Move back to InProgress
         var response = await Client.PatchAsJsonAsync($"{FrPath(projectId)}/1",
             new UpdateFeatureRequestRequest { Status = FeatureStatus.InProgress }, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal("InProgress", fr!.Status);
         Assert.NotNull(fr.StartedAt);
@@ -378,7 +378,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         // Create feature request
         var frResponse = await Client.PostAsJsonAsync(FrPath(projectId), MakeFrRequest(), ct);
-        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         // Create WP linked to this FR
         var wpResponse = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
@@ -420,7 +420,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         // Create FR
         var frResponse = await Client.PostAsJsonAsync(FrPath(projectId), MakeFrRequest(), ct);
-        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         // Create 2 WPs linked to the same FR
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
@@ -452,7 +452,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
 
         // Create FR then WP linked to it
         var frResponse = await Client.PostAsJsonAsync(FrPath(projectId), MakeFrRequest(), ct);
-        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await frResponse.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
@@ -486,13 +486,13 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
             Description = "Test2",
             ProjectPath = $"/tmp/fr-test2-{Guid.NewGuid():N}"
         }, ct);
-        var proj2 = (await resp2.Content.ReadFromJsonAsync<ProjectResponse>(ct))!.Id;
+        var proj2 = (await resp2.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct))!.Id;
 
         // Create FRs in both projects
         await Client.PostAsJsonAsync(FrPath(proj1), MakeFrRequest("P1-FR1"), ct);
         await Client.PostAsJsonAsync(FrPath(proj1), MakeFrRequest("P1-FR2"), ct);
         var response = await Client.PostAsJsonAsync(FrPath(proj2), MakeFrRequest("P2-FR1"), ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         // Project 2's first FR should be number 1, not 3
         Assert.Equal(1, fr!.FeatureRequestNumber);

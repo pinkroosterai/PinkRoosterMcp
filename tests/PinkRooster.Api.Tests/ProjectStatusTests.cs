@@ -20,7 +20,7 @@ public sealed class ProjectStatusTests(PostgresFixture postgres) : IntegrationTe
             Description = "Test",
             ProjectPath = $"/tmp/status-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return (project!.Id, project.ProjectId);
     }
 
@@ -187,14 +187,14 @@ public sealed class ProjectStatusTests(PostgresFixture postgres) : IntegrationTe
         {
             Name = "Blocker WP", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var blockerWp = await blockerResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var blockerWp = await blockerResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // Create dependent WP (will auto-block)
         var dependentResponse = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
             Name = "Blocked WP", Description = "d", State = CompletionState.Implementing
         }, ct);
-        var dependentWp = await dependentResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var dependentWp = await dependentResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // Add dependency → auto-blocks the dependent
         await Client.PostAsJsonAsync(

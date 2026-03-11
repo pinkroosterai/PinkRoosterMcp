@@ -20,7 +20,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
             Description = "Test",
             ProjectPath = $"/tmp/us-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return project!.Id;
     }
 
@@ -49,7 +49,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         };
 
         var response = await Client.PostAsJsonAsync(FrPath(projectId), request, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.Equal(2, fr!.UserStories.Count);
         Assert.Equal("developer", fr.UserStories[0].Role);
@@ -72,7 +72,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         };
 
         var response = await Client.PostAsJsonAsync(FrPath(projectId), request, ct);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
 
         Assert.NotNull(fr!.UserStories);
         Assert.Empty(fr.UserStories);
@@ -96,7 +96,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
             new ManageUserStoriesRequest { Action = "Add", Role = "tester", Goal = "run tests", Benefit = "quality" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
         Assert.Single(fr!.UserStories);
         Assert.Equal("tester", fr.UserStories[0].Role);
     }
@@ -138,7 +138,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
             new ManageUserStoriesRequest { Action = "Update", Index = 0, Role = "new", Goal = "new goal", Benefit = "new benefit" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
         Assert.Single(fr!.UserStories);
         Assert.Equal("new", fr.UserStories[0].Role);
         Assert.Equal("new goal", fr.UserStories[0].Goal);
@@ -185,7 +185,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
             new ManageUserStoriesRequest { Action = "Remove", Index = 0 }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
         Assert.Single(fr!.UserStories);
         Assert.Equal("second", fr.UserStories[0].Role);
     }

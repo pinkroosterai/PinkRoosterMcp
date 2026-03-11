@@ -20,7 +20,7 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
             Description = "Test",
             ProjectPath = $"/tmp/issue-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return project!.Id;
     }
 
@@ -45,7 +45,7 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
 
         // Create issue
         var issueResponse = await Client.PostAsJsonAsync(IssuePath(projectId), MakeIssueRequest(), ct);
-        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
 
         // Create WP linked to this issue
         var wpResponse = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
@@ -74,7 +74,7 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
 
         // Create issue
         var issueResponse = await Client.PostAsJsonAsync(IssuePath(projectId), MakeIssueRequest(), ct);
-        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
 
         // Create two WPs linked to this issue
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
@@ -101,7 +101,7 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
 
         // Create issue with no linked WPs
         var issueResponse = await Client.PostAsJsonAsync(IssuePath(projectId), MakeIssueRequest(), ct);
-        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        var issue = await issueResponse.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
 
         var detail = await GetJson<IssueResponse>($"{IssuePath(projectId)}/{issue!.IssueNumber}", ct);
 

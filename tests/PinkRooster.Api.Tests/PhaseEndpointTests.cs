@@ -19,7 +19,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             Description = "Test",
             ProjectPath = $"/tmp/phase-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await projResponse.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await projResponse.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
 
         await Client.PostAsJsonAsync($"{BasePath}/{project!.Id}/work-packages", new CreateWorkPackageRequest
         {
@@ -48,7 +48,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
         }, ct);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         Assert.NotNull(phase);
         Assert.Equal(1, phase.PhaseNumber);
@@ -64,7 +64,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
 
         await Client.PostAsJsonAsync(PhasePath(projectId, wpNumber), new CreatePhaseRequest { Name = "P1" }, ct);
         var r2 = await Client.PostAsJsonAsync(PhasePath(projectId, wpNumber), new CreatePhaseRequest { Name = "P2" }, ct);
-        var phase2 = await r2.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase2 = await r2.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         Assert.Equal(2, phase2!.PhaseNumber);
     }
@@ -95,7 +95,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             ]
         }, ct);
 
-        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         Assert.Equal(2, phase!.AcceptanceCriteria.Count);
         Assert.Equal("Tests pass", phase.AcceptanceCriteria[0].Name);
@@ -119,7 +119,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             ]
         }, ct);
 
-        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
 
         Assert.Equal(3, phase!.Tasks.Count);
         Assert.Equal(1, phase.Tasks[0].TaskNumber);
@@ -139,7 +139,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             new UpdatePhaseRequest { Name = "Renamed", Description = "New desc" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
         Assert.Equal("Renamed", phase!.Name);
         Assert.Equal("New desc", phase.Description);
     }
@@ -167,7 +167,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             ]
         }, ct);
 
-        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase = await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
         Assert.Single(phase!.AcceptanceCriteria);
         Assert.Equal("Replaced", phase.AcceptanceCriteria[0].Name);
     }
@@ -221,7 +221,7 @@ public sealed class PhaseEndpointTests(PostgresFixture postgres) : IntegrationTe
             Tasks = [new CreateTaskRequest { Name = "T3", Description = "d" }]
         }, ct);
 
-        var phase2 = await r2.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        var phase2 = await r2.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
         Assert.Single(phase2!.Tasks);
         Assert.Equal(3, phase2.Tasks[0].TaskNumber);
     }

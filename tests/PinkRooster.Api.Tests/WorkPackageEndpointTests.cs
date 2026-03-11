@@ -19,7 +19,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
             Description = "Test",
             ProjectPath = $"/tmp/wp-test-{Guid.NewGuid():N}"
         }, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
         return project!.Id;
     }
 
@@ -55,7 +55,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.NotNull(wp);
         Assert.Equal(1, wp.WorkPackageNumber);
@@ -74,7 +74,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
 
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-A"), ct);
         var response = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-B"), ct);
-        var wp2 = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp2 = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.Equal(2, wp2!.WorkPackageNumber);
     }
@@ -88,7 +88,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         request.State = Shared.Enums.CompletionState.Implementing;
 
         var response = await Client.PostAsJsonAsync(WpPath(projectId), request, ct);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.NotNull(wp!.StartedAt);
         Assert.Equal("Implementing", wp.State);
@@ -111,7 +111,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         };
 
         var response = await Client.PostAsJsonAsync(WpPath(projectId), request, ct);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.Equal("Refactor", wp!.Type);
         Assert.Equal("Critical", wp.Priority);
@@ -156,7 +156,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var response = await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1", update, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         Assert.Equal("Renamed WP", wp!.Name);
         Assert.Equal("High", wp.Priority);
     }
@@ -176,7 +176,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         // Only update name, leave description and priority untouched
         var update = new UpdateWorkPackageRequest { Name = "Updated" };
         var response = await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1", update, ct);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.Equal("Updated", wp!.Name);
         Assert.Equal("Original desc", wp.Description);
@@ -232,7 +232,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
 
         var update = new UpdateWorkPackageRequest { State = Shared.Enums.CompletionState.Implementing };
         var response = await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1", update, ct);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.Equal("Implementing", wp!.State);
         Assert.NotNull(wp.StartedAt);
@@ -250,7 +250,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
 
         var update = new UpdateWorkPackageRequest { State = Shared.Enums.CompletionState.Completed };
         var response = await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1", update, ct);
-        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp = await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.Equal("Completed", wp!.State);
         Assert.NotNull(wp.StartedAt);
@@ -311,7 +311,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-2"), ct);
 
         var depRequest = new ManageDependencyRequest { DependsOnId = wp1!.Id, Reason = "prerequisite" };
@@ -332,7 +332,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // WP-2 starts as active (Designing)
         var req2 = MakeWpRequest("WP-2");
@@ -354,7 +354,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         var req2 = MakeWpRequest("WP-2");
         req2.State = Shared.Enums.CompletionState.Designing;
@@ -377,9 +377,9 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         var r2 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-2"), ct);
-        var wp2 = await r2.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp2 = await r2.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // WP-2 depends on WP-1
         await Client.PostAsJsonAsync($"{WpPath(projectId)}/2/dependencies",
@@ -399,7 +399,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         var response = await Client.PostAsJsonAsync($"{WpPath(projectId)}/1/dependencies",
             new ManageDependencyRequest { DependsOnId = wp1!.Id }, ct);
@@ -414,7 +414,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         var projectId = await CreateProjectAsync(ct);
 
         var r1 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-1"), ct);
-        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp1 = await r1.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-2"), ct);
 
         var depRequest = new ManageDependencyRequest { DependsOnId = wp1!.Id };
@@ -437,7 +437,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         // Create WP1 (blocker) and WP2 (dependent, in Implementing state)
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-Blocker"), ct);
         var r2 = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-Dependent"), ct);
-        var wp2 = await r2.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var wp2 = await r2.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         // Move WP2 to Implementing
         await Client.PatchAsJsonAsync($"{WpPath(projectId)}/2",
@@ -448,14 +448,14 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
             new ManageDependencyRequest { DependsOnId = wp2!.Id - 1 }, ct); // wp1 id is wp2.Id - 1 (sequential)
 
         // We need the wp1 Id - let's get it properly
-        var getWp1 = await Client.GetFromJsonAsync<WorkPackageResponse>($"{WpPath(projectId)}/1", ct);
+        var getWp1 = await Client.GetFromJsonAsync<WorkPackageResponse>($"{WpPath(projectId)}/1", JsonOptions, ct);
 
         depResponse = await Client.DeleteAsync($"{WpPath(projectId)}/2/dependencies/{getWp1!.Id}", ct);
 
         // Re-add with correct ID
         var addResponse = await Client.PostAsJsonAsync($"{WpPath(projectId)}/2/dependencies",
             new ManageDependencyRequest { DependsOnId = getWp1.Id }, ct);
-        var dep = await addResponse.Content.ReadFromJsonAsync<DependencyResponse>(ct);
+        var dep = await addResponse.Content.ReadFromJsonAsync<DependencyResponse>(JsonOptions, ct);
 
         Assert.NotNull(dep!.StateChanges);
         Assert.Single(dep.StateChanges);
@@ -475,7 +475,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-Blocker"), ct);
         await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest("WP-Dependent"), ct);
 
-        var getWp1 = await Client.GetFromJsonAsync<WorkPackageResponse>($"{WpPath(projectId)}/1", ct);
+        var getWp1 = await Client.GetFromJsonAsync<WorkPackageResponse>($"{WpPath(projectId)}/1", JsonOptions, ct);
 
         // Move both to Implementing
         await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1",
@@ -490,7 +490,7 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         // Complete WP1 → should auto-unblock WP2
         var updateResponse = await Client.PatchAsJsonAsync($"{WpPath(projectId)}/1",
             new UpdateWorkPackageRequest { State = Shared.Enums.CompletionState.Completed }, ct);
-        var updatedWp = await updateResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        var updatedWp = await updateResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
 
         Assert.NotNull(updatedWp!.StateChanges);
         Assert.Single(updatedWp.StateChanges);
