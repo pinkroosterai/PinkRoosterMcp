@@ -20,6 +20,8 @@ builder.Services.AddScoped<IPhaseService, PhaseService>();
 builder.Services.AddScoped<IWorkPackageTaskService, WorkPackageTaskService>();
 builder.Services.AddScoped<IStateCascadeService, StateCascadeService>();
 builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
+builder.Services.AddSingleton<ActivityLogChannel>();
+builder.Services.AddHostedService<ActivityLogWriterService>();
 
 // Controllers + Swagger
 builder.Services.AddControllers()

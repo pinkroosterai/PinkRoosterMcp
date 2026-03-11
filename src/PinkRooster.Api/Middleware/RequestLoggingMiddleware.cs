@@ -4,6 +4,7 @@ using PinkRooster.Api.Services;
 using PinkRooster.Shared.Constants;
 using PinkRooster.Shared.DTOs;
 
+
 namespace PinkRooster.Api.Middleware;
 
 public sealed partial class RequestLoggingMiddleware(RequestDelegate next)
@@ -17,7 +18,7 @@ public sealed partial class RequestLoggingMiddleware(RequestDelegate next)
     [GeneratedRegex(@"^/api/projects/(\d+)/", RegexOptions.Compiled)]
     private static partial Regex ProjectIdPattern();
 
-    public async Task InvokeAsync(HttpContext context, IActivityLogService activityLogService, IEventBroadcaster broadcaster)
+    public async Task InvokeAsync(HttpContext context, ActivityLogChannel activityLogChannel, IEventBroadcaster broadcaster)
     {
         var sw = Stopwatch.StartNew();
 
@@ -36,12 +37,15 @@ public sealed partial class RequestLoggingMiddleware(RequestDelegate next)
                     ? identity as string
                     : null;
 
-                await activityLogService.LogRequestAsync(
-                    context.Request.Method,
-                    path,
-                    context.Response.StatusCode,
-                    sw.ElapsedMilliseconds,
-                    callerIdentity);
+                activityLogChannel.TryWrite(new ActivityLogEntry
+                {
+                    HttpMethod = context.Request.Method,
+                    Path = path,
+                    StatusCode = context.Response.StatusCode,
+                    DurationMs = sw.ElapsedMilliseconds,
+                    CallerIdentity = callerIdentity,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
 
                 // Publish activity event for dashboard live updates
                 var match = ProjectIdPattern().Match(path);
