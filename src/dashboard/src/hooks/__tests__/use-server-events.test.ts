@@ -140,14 +140,14 @@ describe("useServerEvents", () => {
     // Advance past debounce window (150ms)
     act(() => { vi.advanceTimersByTime(200); });
 
-    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey);
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: (string | number)[] }).queryKey);
     expect(keys).toEqual(
       expect.arrayContaining([
-        ["issues"],
-        ["issue"],
-        ["issue-summary"],
-        ["project-status"],
-        ["next-actions"],
+        ["issues", 1],
+        ["issue", 1],
+        ["issue-summary", 1],
+        ["project-status", 1],
+        ["next-actions", 1],
       ]),
     );
   });
@@ -180,8 +180,8 @@ describe("useServerEvents", () => {
     act(() => { vi.advanceTimersByTime(200); });
 
     // Should only invalidate each key once despite two events
-    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey);
-    const issueKeyCount = keys.filter((k) => JSON.stringify(k) === '["issues"]').length;
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: (string | number)[] }).queryKey);
+    const issueKeyCount = keys.filter((k) => JSON.stringify(k) === '["issues",1]').length;
     expect(issueKeyCount).toBe(1);
   });
 

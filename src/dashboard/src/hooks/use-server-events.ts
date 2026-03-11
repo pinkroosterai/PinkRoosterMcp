@@ -75,8 +75,12 @@ export function useServerEvents(projectId: number | undefined) {
     es.addEventListener("entity:changed", (e) => {
       try {
         const data: ServerEvent = JSON.parse(e.data);
-        const keys = ENTITY_QUERY_KEYS[data.entityType] ?? [];
-        enqueueKeys([...keys, ...ALWAYS_INVALIDATE]);
+        const entityKeys = ENTITY_QUERY_KEYS[data.entityType] ?? [];
+        const scopedKeys = [
+          ...entityKeys.map((k) => [...k, data.projectId]),
+          ...ALWAYS_INVALIDATE.map((k) => [...k, data.projectId]),
+        ];
+        enqueueKeys(scopedKeys);
 
         if (data.stateChanges?.length) {
           for (const sc of data.stateChanges) {
