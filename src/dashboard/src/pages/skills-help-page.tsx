@@ -8,6 +8,7 @@ import {
   PenLine,
   ListFilter,
   Sparkles,
+  Lightbulb,
   ArrowRight,
   Terminal,
   Zap,
@@ -117,6 +118,16 @@ const skills: SkillInfo[] = [
     usage: "/pm-refine-fr <fr-id>",
     args: "Feature request ID (e.g., proj-1-fr-3). If omitted, lists inactive FRs to choose from",
     stateChanges: [],
+  },
+  {
+    name: "pm-explore",
+    icon: Lightbulb,
+    description:
+      "Analyze the codebase from a product manager's perspective and suggest realistic, user-facing feature enhancements. Cross-references existing items to avoid duplicates and creates selected suggestions as feature requests.",
+    usage: "/pm-explore [--limit N]",
+    args: "Optional: --limit N to cap suggestions (default 5)",
+    stateChanges: [],
+    readOnly: true,
   },
 ];
 

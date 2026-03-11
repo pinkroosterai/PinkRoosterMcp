@@ -8,7 +8,7 @@ describe("SkillsHelpPage", () => {
     expect(screen.getByText("PM Workflow Skills")).toBeInTheDocument();
   });
 
-  it("renders all 7 skill names", () => {
+  it("renders all 8 skill names", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     // Skills whose usage differs from the title have unique title text
@@ -18,6 +18,7 @@ describe("SkillsHelpPage", () => {
       "/pm-implement",
       "/pm-scaffold",
       "/pm-plan",
+      "/pm-explore",
     ];
 
     for (const name of uniqueNames) {
@@ -53,6 +54,9 @@ describe("SkillsHelpPage", () => {
     expect(
       screen.getByText(/Review and prioritize open issues/),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Analyze the codebase from a product manager/),
+    ).toBeInTheDocument();
   });
 
   it("renders usage syntax for each skill", () => {
@@ -78,7 +82,7 @@ describe("SkillsHelpPage", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     const badges = screen.getAllByText("Read-only");
-    expect(badges).toHaveLength(2);
+    expect(badges).toHaveLength(3);
   });
 
   it("shows auto-state propagation for skills that have it", () => {
