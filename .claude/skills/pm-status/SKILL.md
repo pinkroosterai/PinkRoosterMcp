@@ -45,14 +45,18 @@ Present the results in this exact format:
 ### Blocked Items
 (List any blocked issues, WPs, or tasks. If none, show "None — no blockers.")
 - **{entityId}** "{name}" — blocked by {blocker} | state: Blocked
+(If blocked items exist, add: "Deep-dive analysis: `/pm-triage`")
 
 ### Next Actions (top {limit})
 1. [{priority}] {entityId} "{name}" ({state}) — {type}
 2. ...
 
+Start working: `/pm-next` | Implement specific item: `/pm-implement {topEntityId}`
+
 ### Planning Opportunities
 (Feature requests that are Approved/Scheduled but have no linked work package)
-- **{frId}** "{name}" — {status}, no linked WP
+- **{frId}** "{name}" — {status}, no linked WP → `/pm-scaffold {frId}`
+(If none, show "None — all tracked items have work packages.")
 ```
 
 ## Constraints
@@ -60,5 +64,6 @@ Present the results in this exact format:
 - Never modify any entities — this skill is read-only
 - Always show the blocked items section even if empty (say "None")
 - Always show planning opportunities even if empty (say "None")
-- If the project has no data yet, show empty tables and suggest creating issues or feature requests
+- If the project has no data yet, show empty tables and suggest: "Create work items with `/pm-plan <description>`"
 - Format priority tags: [Critical], [High], [Medium], [Low]
+- Always include actionable skill suggestions in each section so the user can act immediately

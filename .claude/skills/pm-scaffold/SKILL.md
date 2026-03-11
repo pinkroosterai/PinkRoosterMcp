@@ -142,9 +142,9 @@ Automatically update the source entity state to reflect that planning/scaffoldin
 - {issueId or frId}: {oldState} → {newState} (if auto-transitioned)
 
 ### Next Steps
-- Start implementation: `/pm-next Task`
-- View details: `/pm-status`
-- Implement specific task: `/pm-implement {first-task-id}`
+- Start implementing: `/pm-implement {wpId}` or `/pm-next`
+- View project status: `/pm-status`
+- Review backlog priorities: `/pm-triage`
 ```
 
 ## Constraints

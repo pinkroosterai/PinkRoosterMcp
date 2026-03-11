@@ -113,16 +113,7 @@ Scaffold a work package with implementation tasks? (y/n)
 ## Step 6: Optional Scaffolding
 
 If the user accepts scaffolding:
-1. Analyze the codebase to understand which layers need changes
-2. Use Grep/Glob to find related existing files
-3. Call `mcp__pinkrooster__scaffold_work_package` with:
-   - `projectId`
-   - `name`: same as entity name
-   - `description`: implementation plan derived from entity
-   - `phases`: following the project's vertical slice pattern
-   - `linkedIssueId` or `linkedFeatureRequestId`: link to the created entity
-   - `priority`: same as entity priority
-4. Report the created WP structure
+- Delegate to `/pm-scaffold {entityId}` — it handles codebase analysis, phase/task design, and linked entity transitions.
 
 If the user declines:
 "Entity created. You can scaffold later with `/pm-scaffold {entityId}`."
@@ -133,3 +124,4 @@ If the user declines:
 - Never create both an issue AND a feature request for the same work
 - Derive as much structured data as possible from the natural language description
 - Report the entity ID prominently so the user can reference it
+- After creation, suggest `/pm-triage` if the project has many open items to help the user prioritize

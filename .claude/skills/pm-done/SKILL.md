@@ -118,6 +118,9 @@ If no cascading changes occurred, show: "No cascading state changes."
 
 ## Suggest Next Steps
 
-- If an auto-unblock occurred: "**{entityId}** was unblocked. Run `/pm-next` to start it."
-- If a WP was auto-completed: "Work package complete. Run `/pm-status` to see project progress."
-- If nothing was unblocked: "Run `/pm-status` to see updated project progress."
+Choose the most relevant suggestion based on what happened:
+
+- If an auto-unblock occurred: "**{entityId}** was unblocked. Start it: `/pm-implement {entityId}`" or "Pick up next priority: `/pm-next`"
+- If a WP was auto-completed: "Work package complete. Pick up next priority: `/pm-next`" or "Check progress: `/pm-status`"
+- If a single task was completed and the WP has remaining non-terminal tasks: "Continue implementing: `/pm-implement {wpId}`"
+- If nothing was unblocked and no remaining tasks: "Run `/pm-status` to see updated project progress."

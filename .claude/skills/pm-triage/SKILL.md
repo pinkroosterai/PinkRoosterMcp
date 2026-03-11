@@ -88,8 +88,15 @@ If the item has an `affectedComponent` (issues), use Grep to check code health i
 
 ### Recommendations
 1. {Actionable recommendation referencing specific entity IDs}
-2. {Suggest specific PM skill: /pm-scaffold, /pm-plan, /pm-done}
+2. {Suggest specific PM skill based on the situation}
 3. ...
+
+**Skill suggestions per situation:**
+- Items with linked WPs ready for work → `/pm-next` or `/pm-implement {wpId}`
+- Items needing work packages → `/pm-scaffold {entityId}`
+- Items that appear done but aren't marked → `/pm-done {entityId}`
+- New work to track → `/pm-plan <description>`
+- Stale items to close → cancel via dashboard (http://localhost:3000)
 ```
 
 ## Constraints
@@ -98,4 +105,4 @@ If the item has an `affectedComponent` (issues), use Grep to check code health i
 - NEVER modify entities — this is strictly read-only analysis
 - Always produce the full report even if some tiers are empty (show "None")
 - Include specific entity IDs in all recommendations so the user can act on them
-- Suggest follow-up PM skills: `/pm-scaffold` for items needing WPs, `/pm-plan` for new work
+- Always suggest the most appropriate PM skill for each recommendation: `/pm-next` for ready items, `/pm-implement` for specific WPs, `/pm-scaffold` for unplanned items, `/pm-done` for completable items, `/pm-plan` for new work

@@ -244,8 +244,9 @@ After all tasks in the queue have been processed:
 - {test results summary}
 
 ### Next Steps
-- Run `/pm-status` to check overall progress
-- Run `/pm-next` to pick up the next priority item
+- **Task mode only**: Mark complete: `/pm-done {taskId}`
+- **Phase/WP mode**: Continue with next priority: `/pm-next`
+- Check overall progress: `/pm-status`
 ```
 
 ## Constraints
