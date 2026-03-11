@@ -35,6 +35,13 @@ public sealed class EventBroadcaster : IEventBroadcaster
             if (_subscribers.TryGetValue(projectId, out var currentSet))
             {
                 currentSet.TryRemove(channel, out _);
+
+                // Clean up empty outer key to prevent unbounded accumulation
+                if (currentSet.IsEmpty)
+                {
+                    _subscribers.TryRemove(new KeyValuePair<long,
+                        ConcurrentDictionary<Channel<ServerEvent>, byte>>(projectId, currentSet));
+                }
             }
 
             channel.Writer.TryComplete();

@@ -32,6 +32,9 @@ export function useRowHighlight<T extends { updatedAt: string }>(
 
     if (changed.size > 0) {
       setChangedKeys(changed);
+      // Clear after animation completes (matches row-highlight 1.5s duration)
+      const timer = setTimeout(() => setChangedKeys(new Set()), 1600);
+      return () => clearTimeout(timer);
     }
   }, [data]);
 
