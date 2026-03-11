@@ -1,5 +1,5 @@
 import type { Plugin } from "vite";
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual, createHmac } from "crypto";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -37,6 +37,12 @@ export function authPlugin(): Plugin {
       return { allowed: false, retryAfter };
     }
     return { allowed: true, retryAfter: 0 };
+  }
+
+  function safeCompare(a: string, b: string): boolean {
+    const hmacA = createHmac("sha256", "compare").update(a).digest();
+    const hmacB = createHmac("sha256", "compare").update(b).digest();
+    return timingSafeEqual(hmacA, hmacB);
   }
 
   function isProtected(): boolean {
@@ -111,8 +117,8 @@ export function authPlugin(): Plugin {
           const { username, password } = body;
 
           if (
-            username === process.env.DASHBOARD_USER &&
-            password === process.env.DASHBOARD_PASSWORD
+            safeCompare(username, process.env.DASHBOARD_USER!) &&
+            safeCompare(password, process.env.DASHBOARD_PASSWORD!)
           ) {
             const token = randomUUID();
             tokens.set(token, { expiresAt: Date.now() + TOKEN_TTL_MS });
