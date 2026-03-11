@@ -5,7 +5,6 @@ description: >-
   analyzes target files, implements code changes, runs tests, and
   updates task states. Auto-transitions linked entities on start
   and completion.
-disable-model-invocation: true
 argument-hint: <task-id | phase-id | wp-id> [--dry-run]
 ---
 

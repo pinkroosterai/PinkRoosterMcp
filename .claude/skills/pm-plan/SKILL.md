@@ -4,7 +4,6 @@ description: >-
   Plan new work by creating an issue or feature request from a natural
   language description. Optionally scaffold a work package with phases
   and tasks.
-disable-model-invocation: true
 argument-hint: <description of work needed>
 ---
 

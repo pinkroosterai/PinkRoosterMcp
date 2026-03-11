@@ -4,7 +4,6 @@ description: >-
   Mark tasks, issues, or feature requests as completed and report
   cascading state changes. Automatically completes linked entities
   when a work package auto-completes.
-disable-model-invocation: true
 argument-hint: <task-id | issue-id | fr-id> | all <wp-id>
 ---
 

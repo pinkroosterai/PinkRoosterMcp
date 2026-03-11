@@ -4,7 +4,6 @@ description: >-
   Review and prioritize open issues and feature requests. Analyzes
   severity, age, and codebase impact to recommend priority adjustments
   and next steps.
-disable-model-invocation: true
 context: fork
 agent: Explore
 ---

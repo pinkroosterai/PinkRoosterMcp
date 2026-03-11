@@ -5,7 +5,6 @@ description: >-
   based on a feature description or linked issue/FR. Analyzes the
   codebase to produce realistic target files and implementation notes.
   Auto-transitions linked entities to planning states.
-disable-model-invocation: true
 argument-hint: <description | issue-id | fr-id>
 ---
 
