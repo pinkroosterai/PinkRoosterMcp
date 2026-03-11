@@ -4,14 +4,26 @@ using PinkRooster.Shared.Constants;
 
 namespace PinkRooster.Mcp.Middleware;
 
-public sealed class McpApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration)
+public sealed class McpApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<McpApiKeyAuthMiddleware> logger)
 {
-    private readonly byte[][] _validKeyBytes = (configuration
-        .GetSection("Auth:ApiKeys")
-        .Get<string[]>() ?? [])
-        .Where(k => !string.IsNullOrWhiteSpace(k))
-        .Select(k => Encoding.UTF8.GetBytes(k))
-        .ToArray();
+    private readonly byte[][] _validKeyBytes = InitializeKeys(configuration, logger);
+
+    private static byte[][] InitializeKeys(IConfiguration configuration, ILogger logger)
+    {
+        var keys = (configuration
+            .GetSection("Auth:ApiKeys")
+            .Get<string[]>() ?? [])
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => Encoding.UTF8.GetBytes(k))
+            .ToArray();
+
+        if (keys.Length == 0)
+            logger.LogInformation("No MCP API keys configured — running in open access mode");
+        else
+            logger.LogInformation("MCP API key authentication enabled with {KeyCount} key(s)", keys.Length);
+
+        return keys;
+    }
 
     public Task InvokeAsync(HttpContext context)
     {

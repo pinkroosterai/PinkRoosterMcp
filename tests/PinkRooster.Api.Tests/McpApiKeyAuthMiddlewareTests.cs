@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using PinkRooster.Mcp.Middleware;
 using PinkRooster.Shared.Constants;
 using Xunit;
@@ -27,7 +28,7 @@ public sealed class McpApiKeyAuthMiddlewareTests
             .AddInMemoryCollection(configData)
             .Build();
 
-        return new McpApiKeyAuthMiddleware(next, configuration);
+        return new McpApiKeyAuthMiddleware(next, configuration, NullLogger<McpApiKeyAuthMiddleware>.Instance);
     }
 
     private static DefaultHttpContext CreateHttpContext(string path, string? apiKey = null)

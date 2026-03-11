@@ -4,13 +4,26 @@ using PinkRooster.Shared.Constants;
 
 namespace PinkRooster.Api.Middleware;
 
-public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration)
+public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<ApiKeyAuthMiddleware> logger)
 {
-    private readonly byte[][] _validKeyBytes = (configuration
-        .GetSection("Auth:ApiKeys")
-        .Get<string[]>() ?? [])
-        .Select(k => Encoding.UTF8.GetBytes(k))
-        .ToArray();
+    private readonly byte[][] _validKeyBytes = InitializeKeys(configuration, logger);
+
+    private static byte[][] InitializeKeys(IConfiguration configuration, ILogger logger)
+    {
+        var keys = (configuration
+            .GetSection("Auth:ApiKeys")
+            .Get<string[]>() ?? [])
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => Encoding.UTF8.GetBytes(k))
+            .ToArray();
+
+        if (keys.Length == 0)
+            logger.LogWarning("No API keys configured — all non-health requests will be rejected with 401");
+        else
+            logger.LogInformation("API key authentication enabled with {KeyCount} key(s)", keys.Length);
+
+        return keys;
+    }
 
     public Task InvokeAsync(HttpContext context)
     {
