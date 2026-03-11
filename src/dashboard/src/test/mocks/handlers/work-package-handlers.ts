@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { createWorkPackage, createWorkPackageSummary } from "../data/work-packages";
+import { createWorkPackage, createWorkPackageSummary, createTask } from "../data/work-packages";
 
 export const workPackageHandlers = [
   http.get("/api/projects/:projectId/work-packages", () => {
@@ -13,6 +13,32 @@ export const workPackageHandlers = [
   http.get("/api/projects/:projectId/work-packages/:wpNumber", ({ params }) => {
     return HttpResponse.json(
       createWorkPackage({ workPackageNumber: Number(params.wpNumber) }),
+    );
+  }),
+
+  http.patch("/api/projects/:projectId/work-packages/:wpNumber", async ({ params, request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json(
+      createWorkPackage({
+        workPackageNumber: Number(params.wpNumber),
+        ...body,
+        stateChanges: body.state === "Completed"
+          ? [{ entityType: "WorkPackage", entityId: `proj-${params.projectId}-wp-${params.wpNumber}`, oldState: "Implementing", newState: "Completed", reason: "State changed" }]
+          : undefined,
+      } as Partial<import("@/types").WorkPackage>),
+    );
+  }),
+
+  http.patch("/api/projects/:projectId/work-packages/:wpNumber/tasks/:taskNumber", async ({ params, request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json(
+      createTask({
+        taskNumber: Number(params.taskNumber),
+        ...body,
+        stateChanges: body.state === "Completed"
+          ? [{ entityType: "Task", entityId: `proj-${params.projectId}-wp-${params.wpNumber}-task-${params.taskNumber}`, oldState: "Implementing", newState: "Completed", reason: "State changed" }]
+          : undefined,
+      } as Partial<import("@/types").WpTask>),
     );
   }),
 

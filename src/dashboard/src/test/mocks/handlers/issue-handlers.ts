@@ -29,6 +29,16 @@ export const issueHandlers = [
     ]);
   }),
 
+  http.patch("/api/projects/:projectId/issues/:issueNumber", async ({ params, request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json(
+      createIssue({
+        issueNumber: Number(params.issueNumber),
+        ...body,
+      } as Partial<import("@/types").Issue>),
+    );
+  }),
+
   http.delete("/api/projects/:projectId/issues/:issueNumber", () => {
     return HttpResponse.json(null, { status: 200 });
   }),
