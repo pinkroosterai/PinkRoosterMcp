@@ -1,6 +1,6 @@
 namespace PinkRooster.Data.Entities;
 
-public sealed class PhaseAuditLog
+public sealed class PhaseAuditLog : IAuditLogEntry
 {
     public long Id { get; set; }
     public long PhaseId { get; set; }

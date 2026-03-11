@@ -1,6 +1,6 @@
 namespace PinkRooster.Data.Entities;
 
-public sealed class FeatureRequestAuditLog
+public sealed class FeatureRequestAuditLog : IAuditLogEntry
 {
     public long Id { get; set; }
     public long FeatureRequestId { get; set; }

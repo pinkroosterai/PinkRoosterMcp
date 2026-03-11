@@ -1,6 +1,6 @@
 namespace PinkRooster.Data.Entities;
 
-public sealed class TaskAuditLog
+public sealed class TaskAuditLog : IAuditLogEntry
 {
     public long Id { get; set; }
     public long TaskId { get; set; }

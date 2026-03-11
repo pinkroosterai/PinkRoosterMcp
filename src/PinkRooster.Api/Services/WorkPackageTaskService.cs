@@ -68,7 +68,17 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
             db.WorkPackageTasks.Add(task);
 
             // Audit all fields on creation
-            var auditEntries = BuildCreateAuditEntries(task, changedBy);
+            var auditEntries = new List<TaskAuditLog>();
+            var createAudit = () => new TaskAuditLog { Task = task, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Name", task.Name);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Description", task.Description);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "SortOrder", task.SortOrder.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "ImplementationNotes", task.ImplementationNotes);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "State", task.State.ToString());
+            if (task.TargetFiles.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+            if (task.Attachments.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
             db.TaskAuditLogs.AddRange(auditEntries);
 
             await db.SaveChangesAsync(cancellation);
@@ -109,25 +119,26 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
         var auditEntries = new List<TaskAuditLog>();
         var now = DateTimeOffset.UtcNow;
+        var audit = () => new TaskAuditLog { TaskId = task.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
 
         // Track state before changes for timestamp logic
         var oldState = task.State;
         var oldPhaseId = task.PhaseId;
 
         if (request.Name is not null)
-            AuditAndSet(auditEntries, task.Id, changedBy, now, "Name", task.Name, request.Name, v => task.Name = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Name", task.Name, request.Name, v => task.Name = v);
 
         if (request.Description is not null)
-            AuditAndSet(auditEntries, task.Id, changedBy, now, "Description", task.Description, request.Description, v => task.Description = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Description", task.Description, request.Description, v => task.Description = v);
 
         if (request.SortOrder is not null)
-            AuditAndSetInt(auditEntries, task.Id, changedBy, now, "SortOrder", task.SortOrder, request.SortOrder.Value, v => task.SortOrder = v);
+            AuditHelper.AuditAndSetValue(auditEntries, audit, "SortOrder", task.SortOrder, request.SortOrder.Value, v => task.SortOrder = v);
 
         if (request.ImplementationNotes is not null)
-            AuditAndSet(auditEntries, task.Id, changedBy, now, "ImplementationNotes", task.ImplementationNotes, request.ImplementationNotes, v => task.ImplementationNotes = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "ImplementationNotes", task.ImplementationNotes, request.ImplementationNotes, v => task.ImplementationNotes = v);
 
         if (request.State is not null)
-            AuditAndSetEnum(auditEntries, task.Id, changedBy, now, "State", task.State, request.State.Value, v => task.State = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", task.State, request.State.Value, v => task.State = v);
 
         if (request.TargetFiles is not null)
         {
@@ -194,6 +205,26 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         if (request.State is not null && oldState != request.State.Value)
         {
             var newState = request.State.Value;
+
+            // Soft warning: moving to active state while non-terminal blockers exist
+            if (CompletionStateConstants.ActiveStates.Contains(newState))
+            {
+                var activeBlockerCount = task.BlockedBy
+                    .Count(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnTask!.State));
+
+                if (activeBlockerCount > 0)
+                {
+                    stateChanges.Add(new StateChangeDto
+                    {
+                        EntityType = "Task",
+                        EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
+                        OldState = oldState.ToString(),
+                        NewState = newState.ToString(),
+                        Reason = $"Warning: task has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
+                    });
+                }
+            }
+
             StateTransitionHelper.ApplyBlockedStateLogic(task, oldState, newState);
             StateTransitionHelper.ApplyStateTimestamps(task, oldState, newState);
         }
@@ -554,91 +585,6 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
     }
 
     // ── Private helpers ──
-
-    private static List<TaskAuditLog> BuildCreateAuditEntries(WorkPackageTask task, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<TaskAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new TaskAuditLog
-            {
-                Task = task,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", task.Name);
-        Add("Description", task.Description);
-        Add("SortOrder", task.SortOrder.ToString());
-        Add("ImplementationNotes", task.ImplementationNotes);
-        Add("State", task.State.ToString());
-
-        if (task.TargetFiles.Count > 0)
-            Add("TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
-
-        if (task.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(task.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
-
-        return entries;
-    }
-
-    private static void AuditAndSet(
-        List<TaskAuditLog> entries, long taskId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new TaskAuditLog
-        {
-            TaskId = taskId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetEnum<TEnum>(
-        List<TaskAuditLog> entries, long taskId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new TaskAuditLog
-        {
-            TaskId = taskId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetInt(
-        List<TaskAuditLog> entries, long taskId, string changedBy, DateTimeOffset now,
-        string field, int oldValue, int newValue, Action<int> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new TaskAuditLog
-        {
-            TaskId = taskId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
 
     private static TaskResponse ToResponse(WorkPackageTask t, WorkPackage wp, WorkPackagePhase phase) =>
         ResponseMapper.MapTask(t, wp.ProjectId, wp.WorkPackageNumber, phase.PhaseNumber);

@@ -130,7 +130,23 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
             db.Issues.Add(issue);
 
             // Audit all fields on creation
-            var auditEntries = BuildCreateAuditEntries(issue, changedBy);
+            var auditEntries = new List<IssueAuditLog>();
+            var createAudit = () => new IssueAuditLog { Issue = issue, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Name", issue.Name);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Description", issue.Description);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "IssueType", issue.IssueType.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Severity", issue.Severity.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Priority", issue.Priority.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "State", issue.State.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "StepsToReproduce", issue.StepsToReproduce);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "ExpectedBehavior", issue.ExpectedBehavior);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "ActualBehavior", issue.ActualBehavior);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "AffectedComponent", issue.AffectedComponent);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "StackTrace", issue.StackTrace);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "RootCause", issue.RootCause);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Resolution", issue.Resolution);
+            if (issue.Attachments.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "Attachments", JsonSerializer.Serialize(issue.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
             db.IssueAuditLogs.AddRange(auditEntries);
 
             await db.SaveChangesAsync(cancellation);
@@ -160,48 +176,49 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
 
         var auditEntries = new List<IssueAuditLog>();
         var now = DateTimeOffset.UtcNow;
+        var audit = () => new IssueAuditLog { IssueId = issue.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
 
         // Track state before changes for timestamp logic
         var oldState = issue.State;
 
         if (request.Name is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "Name", issue.Name, request.Name, v => issue.Name = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Name", issue.Name, request.Name, v => issue.Name = v);
 
         if (request.Description is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "Description", issue.Description, request.Description, v => issue.Description = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Description", issue.Description, request.Description, v => issue.Description = v);
 
         if (request.IssueType is not null)
-            AuditAndSetEnum(auditEntries, issue.Id, changedBy, now, "IssueType", issue.IssueType, request.IssueType.Value, v => issue.IssueType = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "IssueType", issue.IssueType, request.IssueType.Value, v => issue.IssueType = v);
 
         if (request.Severity is not null)
-            AuditAndSetEnum(auditEntries, issue.Id, changedBy, now, "Severity", issue.Severity, request.Severity.Value, v => issue.Severity = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Severity", issue.Severity, request.Severity.Value, v => issue.Severity = v);
 
         if (request.Priority is not null)
-            AuditAndSetEnum(auditEntries, issue.Id, changedBy, now, "Priority", issue.Priority, request.Priority.Value, v => issue.Priority = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Priority", issue.Priority, request.Priority.Value, v => issue.Priority = v);
 
         if (request.StepsToReproduce is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "StepsToReproduce", issue.StepsToReproduce, request.StepsToReproduce, v => issue.StepsToReproduce = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "StepsToReproduce", issue.StepsToReproduce, request.StepsToReproduce, v => issue.StepsToReproduce = v);
 
         if (request.ExpectedBehavior is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "ExpectedBehavior", issue.ExpectedBehavior, request.ExpectedBehavior, v => issue.ExpectedBehavior = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "ExpectedBehavior", issue.ExpectedBehavior, request.ExpectedBehavior, v => issue.ExpectedBehavior = v);
 
         if (request.ActualBehavior is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "ActualBehavior", issue.ActualBehavior, request.ActualBehavior, v => issue.ActualBehavior = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "ActualBehavior", issue.ActualBehavior, request.ActualBehavior, v => issue.ActualBehavior = v);
 
         if (request.AffectedComponent is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "AffectedComponent", issue.AffectedComponent, request.AffectedComponent, v => issue.AffectedComponent = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "AffectedComponent", issue.AffectedComponent, request.AffectedComponent, v => issue.AffectedComponent = v);
 
         if (request.StackTrace is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "StackTrace", issue.StackTrace, request.StackTrace, v => issue.StackTrace = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "StackTrace", issue.StackTrace, request.StackTrace, v => issue.StackTrace = v);
 
         if (request.RootCause is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "RootCause", issue.RootCause, request.RootCause, v => issue.RootCause = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "RootCause", issue.RootCause, request.RootCause, v => issue.RootCause = v);
 
         if (request.Resolution is not null)
-            AuditAndSet(auditEntries, issue.Id, changedBy, now, "Resolution", issue.Resolution, request.Resolution, v => issue.Resolution = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Resolution", issue.Resolution, request.Resolution, v => issue.Resolution = v);
 
         if (request.State is not null)
-            AuditAndSetEnum(auditEntries, issue.Id, changedBy, now, "State", issue.State, request.State.Value, v => issue.State = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", issue.State, request.State.Value, v => issue.State = v);
 
         if (request.Attachments is not null)
         {
@@ -324,79 +341,6 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
         };
 
         return states is null ? query : query.Where(i => states.Contains(i.State));
-    }
-
-    private static List<IssueAuditLog> BuildCreateAuditEntries(Issue issue, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<IssueAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new IssueAuditLog
-            {
-                Issue = issue,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", issue.Name);
-        Add("Description", issue.Description);
-        Add("IssueType", issue.IssueType.ToString());
-        Add("Severity", issue.Severity.ToString());
-        Add("Priority", issue.Priority.ToString());
-        Add("State", issue.State.ToString());
-        Add("StepsToReproduce", issue.StepsToReproduce);
-        Add("ExpectedBehavior", issue.ExpectedBehavior);
-        Add("ActualBehavior", issue.ActualBehavior);
-        Add("AffectedComponent", issue.AffectedComponent);
-        Add("StackTrace", issue.StackTrace);
-        Add("RootCause", issue.RootCause);
-        Add("Resolution", issue.Resolution);
-
-        if (issue.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(issue.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
-
-        return entries;
-    }
-
-    private static void AuditAndSet(
-        List<IssueAuditLog> entries, long issueId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new IssueAuditLog
-        {
-            IssueId = issueId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetEnum<TEnum>(
-        List<IssueAuditLog> entries, long issueId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new IssueAuditLog
-        {
-            IssueId = issueId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
     }
 
     private static IssueResponse ToResponse(Issue i) => new()

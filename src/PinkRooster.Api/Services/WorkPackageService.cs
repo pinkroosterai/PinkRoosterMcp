@@ -99,7 +99,20 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             db.WorkPackages.Add(wp);
 
             // Audit all fields on creation
-            var auditEntries = BuildCreateAuditEntries(wp, changedBy);
+            var auditEntries = new List<WorkPackageAuditLog>();
+            var createAudit = () => new WorkPackageAuditLog { WorkPackage = wp, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Name", wp.Name);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Description", wp.Description);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Type", wp.Type.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Priority", wp.Priority.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Plan", wp.Plan);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "EstimatedComplexity", wp.EstimatedComplexity?.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "EstimationRationale", wp.EstimationRationale);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "State", wp.State.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedIssueId", wp.LinkedIssueId?.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
+            if (wp.Attachments.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
             db.WorkPackageAuditLogs.AddRange(auditEntries);
 
             await db.SaveChangesAsync(cancellation);
@@ -131,39 +144,40 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         var auditEntries = new List<WorkPackageAuditLog>();
         var now = DateTimeOffset.UtcNow;
+        var audit = () => new WorkPackageAuditLog { WorkPackageId = wp.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
 
         // Track state before changes for timestamp logic
         var oldState = wp.State;
 
         if (request.Name is not null)
-            AuditAndSet(auditEntries, wp.Id, changedBy, now, "Name", wp.Name, request.Name, v => wp.Name = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Name", wp.Name, request.Name, v => wp.Name = v);
 
         if (request.Description is not null)
-            AuditAndSet(auditEntries, wp.Id, changedBy, now, "Description", wp.Description, request.Description, v => wp.Description = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Description", wp.Description, request.Description, v => wp.Description = v);
 
         if (request.Type is not null)
-            AuditAndSetEnum(auditEntries, wp.Id, changedBy, now, "Type", wp.Type, request.Type.Value, v => wp.Type = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Type", wp.Type, request.Type.Value, v => wp.Type = v);
 
         if (request.Priority is not null)
-            AuditAndSetEnum(auditEntries, wp.Id, changedBy, now, "Priority", wp.Priority, request.Priority.Value, v => wp.Priority = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Priority", wp.Priority, request.Priority.Value, v => wp.Priority = v);
 
         if (request.Plan is not null)
-            AuditAndSet(auditEntries, wp.Id, changedBy, now, "Plan", wp.Plan, request.Plan, v => wp.Plan = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Plan", wp.Plan, request.Plan, v => wp.Plan = v);
 
         if (request.EstimatedComplexity is not null)
-            AuditAndSetNullableInt(auditEntries, wp.Id, changedBy, now, "EstimatedComplexity", wp.EstimatedComplexity, request.EstimatedComplexity, v => wp.EstimatedComplexity = v);
+            AuditHelper.AuditAndSetNullable(auditEntries, audit, "EstimatedComplexity", wp.EstimatedComplexity, request.EstimatedComplexity, v => wp.EstimatedComplexity = v);
 
         if (request.EstimationRationale is not null)
-            AuditAndSet(auditEntries, wp.Id, changedBy, now, "EstimationRationale", wp.EstimationRationale, request.EstimationRationale, v => wp.EstimationRationale = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "EstimationRationale", wp.EstimationRationale, request.EstimationRationale, v => wp.EstimationRationale = v);
 
         if (request.State is not null)
-            AuditAndSetEnum(auditEntries, wp.Id, changedBy, now, "State", wp.State, request.State.Value, v => wp.State = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", wp.State, request.State.Value, v => wp.State = v);
 
         if (request.LinkedIssueId is not null)
-            AuditAndSetNullableLong(auditEntries, wp.Id, changedBy, now, "LinkedIssueId", wp.LinkedIssueId, request.LinkedIssueId, v => wp.LinkedIssueId = v);
+            AuditHelper.AuditAndSetNullable(auditEntries, audit, "LinkedIssueId", wp.LinkedIssueId, request.LinkedIssueId, v => wp.LinkedIssueId = v);
 
         if (request.LinkedFeatureRequestId is not null)
-            AuditAndSetNullableLong(auditEntries, wp.Id, changedBy, now, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId, request.LinkedFeatureRequestId, v => wp.LinkedFeatureRequestId = v);
+            AuditHelper.AuditAndSetNullable(auditEntries, audit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId, request.LinkedFeatureRequestId, v => wp.LinkedFeatureRequestId = v);
 
         if (request.Attachments is not null)
         {
@@ -189,6 +203,28 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         if (request.State is not null && oldState != request.State.Value)
         {
             var newState = request.State.Value;
+
+            // Soft warning: moving to active state while non-terminal blockers exist
+            if (CompletionStateConstants.ActiveStates.Contains(newState))
+            {
+                var activeBlockerCount = await db.WorkPackageDependencies
+                    .Where(d => d.DependentWorkPackageId == wp.Id)
+                    .Include(d => d.DependsOnWorkPackage)
+                    .CountAsync(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnWorkPackage.State), ct);
+
+                if (activeBlockerCount > 0)
+                {
+                    stateChanges.Add(new StateChangeDto
+                    {
+                        EntityType = "WorkPackage",
+                        EntityId = $"proj-{projectId}-wp-{wpNumber}",
+                        OldState = oldState.ToString(),
+                        NewState = newState.ToString(),
+                        Reason = $"Warning: entity has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
+                    });
+                }
+            }
+
             StateTransitionHelper.ApplyBlockedStateLogic(wp, oldState, newState);
             StateTransitionHelper.ApplyStateTimestamps(wp, oldState, newState);
         }
@@ -493,7 +529,23 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             StateTransitionHelper.ApplyStateTimestamps(wp, CompletionState.NotStarted, request.State);
 
             db.WorkPackages.Add(wp);
-            db.WorkPackageAuditLogs.AddRange(BuildCreateAuditEntries(wp, changedBy));
+            {
+                var wpAuditEntries = new List<WorkPackageAuditLog>();
+                var wpCreateAudit = () => new WorkPackageAuditLog { WorkPackage = wp, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Name", wp.Name);
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Description", wp.Description);
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Type", wp.Type.ToString());
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Priority", wp.Priority.ToString());
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Plan", wp.Plan);
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "EstimatedComplexity", wp.EstimatedComplexity?.ToString());
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "EstimationRationale", wp.EstimationRationale);
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "State", wp.State.ToString());
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "LinkedIssueId", wp.LinkedIssueId?.ToString());
+                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
+                if (wp.Attachments.Count > 0)
+                    AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
+                db.WorkPackageAuditLogs.AddRange(wpAuditEntries);
+            }
 
             // 2. Create Phases, Tasks, AcceptanceCriteria
             var nextPhaseNumber = 1;
@@ -522,7 +574,15 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 };
 
                 db.WorkPackagePhases.Add(phase);
-                db.PhaseAuditLogs.AddRange(BuildPhaseCreateAuditEntries(phase, changedBy));
+                {
+                    var phaseAuditEntries = new List<PhaseAuditLog>();
+                    var phaseCreateAudit = () => new PhaseAuditLog { Phase = phase, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                    AuditHelper.AddCreateEntry(phaseAuditEntries, phaseCreateAudit, "Name", phase.Name);
+                    AuditHelper.AddCreateEntry(phaseAuditEntries, phaseCreateAudit, "Description", phase.Description);
+                    AuditHelper.AddCreateEntry(phaseAuditEntries, phaseCreateAudit, "SortOrder", phase.SortOrder.ToString());
+                    AuditHelper.AddCreateEntry(phaseAuditEntries, phaseCreateAudit, "State", phase.State.ToString());
+                    db.PhaseAuditLogs.AddRange(phaseAuditEntries);
+                }
                 phaseEntities.Add(phase);
 
                 // Acceptance Criteria
@@ -572,7 +632,20 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                         StateTransitionHelper.ApplyBlockedStateLogic(task, CompletionState.NotStarted, taskReq.State);
 
                         db.WorkPackageTasks.Add(task);
-                        db.TaskAuditLogs.AddRange(BuildTaskCreateAuditEntries(task, changedBy));
+                        {
+                            var taskAuditEntries = new List<TaskAuditLog>();
+                            var taskCreateAudit = () => new TaskAuditLog { Task = task, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                            AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "Name", task.Name);
+                            AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "Description", task.Description);
+                            AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "SortOrder", task.SortOrder.ToString());
+                            AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "ImplementationNotes", task.ImplementationNotes);
+                            AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "State", task.State.ToString());
+                            if (task.TargetFiles.Count > 0)
+                                AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                            if (task.Attachments.Count > 0)
+                                AuditHelper.AddCreateEntry(taskAuditEntries, taskCreateAudit, "Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                            db.TaskAuditLogs.AddRange(taskAuditEntries);
+                        }
                         phaseTasks.Add(task);
                     }
                 }
@@ -757,68 +830,6 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 $"Review the dependsOnTaskIndices to remove the cycle.");
     }
 
-    // Reused by ScaffoldAsync — same audit pattern as PhaseService
-    private static List<PhaseAuditLog> BuildPhaseCreateAuditEntries(WorkPackagePhase phase, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<PhaseAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new PhaseAuditLog
-            {
-                Phase = phase,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", phase.Name);
-        Add("Description", phase.Description);
-        Add("SortOrder", phase.SortOrder.ToString());
-        Add("State", phase.State.ToString());
-
-        return entries;
-    }
-
-    private static List<TaskAuditLog> BuildTaskCreateAuditEntries(WorkPackageTask task, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<TaskAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new TaskAuditLog
-            {
-                Task = task,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", task.Name);
-        Add("Description", task.Description);
-        Add("SortOrder", task.SortOrder.ToString());
-        Add("ImplementationNotes", task.ImplementationNotes);
-        Add("State", task.State.ToString());
-
-        if (task.TargetFiles.Count > 0)
-            Add("TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
-
-        if (task.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
-
-        return entries;
-    }
-
     // ── Private helpers ──
 
     private static IQueryable<WorkPackage> ApplyStateFilter(IQueryable<WorkPackage> query, string? stateFilter)
@@ -835,110 +846,6 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         };
 
         return states is null ? query : query.Where(w => states.Contains(w.State));
-    }
-
-    private static List<WorkPackageAuditLog> BuildCreateAuditEntries(WorkPackage wp, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<WorkPackageAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new WorkPackageAuditLog
-            {
-                WorkPackage = wp,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", wp.Name);
-        Add("Description", wp.Description);
-        Add("Type", wp.Type.ToString());
-        Add("Priority", wp.Priority.ToString());
-        Add("Plan", wp.Plan);
-        Add("EstimatedComplexity", wp.EstimatedComplexity?.ToString());
-        Add("EstimationRationale", wp.EstimationRationale);
-        Add("State", wp.State.ToString());
-        Add("LinkedIssueId", wp.LinkedIssueId?.ToString());
-        Add("LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
-
-        if (wp.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
-
-        return entries;
-    }
-
-    private static void AuditAndSet(
-        List<WorkPackageAuditLog> entries, long wpId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new WorkPackageAuditLog
-        {
-            WorkPackageId = wpId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetEnum<TEnum>(
-        List<WorkPackageAuditLog> entries, long wpId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new WorkPackageAuditLog
-        {
-            WorkPackageId = wpId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetNullableInt(
-        List<WorkPackageAuditLog> entries, long wpId, string changedBy, DateTimeOffset now,
-        string field, int? oldValue, int? newValue, Action<int?> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new WorkPackageAuditLog
-        {
-            WorkPackageId = wpId,
-            FieldName = field,
-            OldValue = oldValue?.ToString(),
-            NewValue = newValue?.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetNullableLong(
-        List<WorkPackageAuditLog> entries, long wpId, string changedBy, DateTimeOffset now,
-        string field, long? oldValue, long? newValue, Action<long?> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new WorkPackageAuditLog
-        {
-            WorkPackageId = wpId,
-            FieldName = field,
-            OldValue = oldValue?.ToString(),
-            NewValue = newValue?.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
     }
 
     private static WorkPackageResponse ToListResponse(WorkPackage w) => new()

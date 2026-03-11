@@ -102,14 +102,33 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
                     db.WorkPackageTasks.Add(task);
 
                     // Build audit entries for each task
-                    var taskAuditEntries = BuildTaskCreateAuditEntries(task, changedBy);
-                    db.TaskAuditLogs.AddRange(taskAuditEntries);
+                    {
+                        var taskAudit = new List<TaskAuditLog>();
+                        var taskCreateAudit = () => new TaskAuditLog { Task = task, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                        AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "Name", task.Name);
+                        AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "Description", task.Description);
+                        AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "SortOrder", task.SortOrder.ToString());
+                        AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "ImplementationNotes", task.ImplementationNotes);
+                        AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "State", task.State.ToString());
+                        if (task.TargetFiles.Count > 0)
+                            AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                        if (task.Attachments.Count > 0)
+                            AuditHelper.AddCreateEntry(taskAudit, taskCreateAudit, "Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                        db.TaskAuditLogs.AddRange(taskAudit);
+                    }
                 }
             }
 
             // Build phase audit entries
-            var phaseAuditEntries = BuildPhaseCreateAuditEntries(phase, changedBy);
-            db.PhaseAuditLogs.AddRange(phaseAuditEntries);
+            {
+                var phaseAudit = new List<PhaseAuditLog>();
+                var phaseCreateAudit = () => new PhaseAuditLog { Phase = phase, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                AuditHelper.AddCreateEntry(phaseAudit, phaseCreateAudit, "Name", phase.Name);
+                AuditHelper.AddCreateEntry(phaseAudit, phaseCreateAudit, "Description", phase.Description);
+                AuditHelper.AddCreateEntry(phaseAudit, phaseCreateAudit, "SortOrder", phase.SortOrder.ToString());
+                AuditHelper.AddCreateEntry(phaseAudit, phaseCreateAudit, "State", phase.State.ToString());
+                db.PhaseAuditLogs.AddRange(phaseAudit);
+            }
 
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
@@ -158,35 +177,20 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         var phaseAuditEntries = new List<PhaseAuditLog>();
         var taskAuditEntries = new List<TaskAuditLog>();
         var now = DateTimeOffset.UtcNow;
+        var phaseAudit = () => new PhaseAuditLog { PhaseId = phase.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
 
         // Per-field audit for phase fields
         if (request.Name is not null)
-            PhaseAuditAndSet(phaseAuditEntries, phase.Id, changedBy, now, "Name", phase.Name, request.Name, v => phase.Name = v);
+            AuditHelper.AuditAndSet(phaseAuditEntries, phaseAudit, "Name", phase.Name, request.Name, v => phase.Name = v);
 
         if (request.Description is not null)
-            PhaseAuditAndSet(phaseAuditEntries, phase.Id, changedBy, now, "Description", phase.Description, request.Description, v => phase.Description = v);
+            AuditHelper.AuditAndSet(phaseAuditEntries, phaseAudit, "Description", phase.Description, request.Description, v => phase.Description = v);
 
         if (request.SortOrder is not null)
-        {
-            var oldSortOrder = phase.SortOrder;
-            var newSortOrder = request.SortOrder.Value;
-            if (oldSortOrder != newSortOrder)
-            {
-                phaseAuditEntries.Add(new PhaseAuditLog
-                {
-                    PhaseId = phase.Id,
-                    FieldName = "SortOrder",
-                    OldValue = oldSortOrder.ToString(),
-                    NewValue = newSortOrder.ToString(),
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-                phase.SortOrder = newSortOrder;
-            }
-        }
+            AuditHelper.AuditAndSetValue(phaseAuditEntries, phaseAudit, "SortOrder", phase.SortOrder, request.SortOrder.Value, v => phase.SortOrder = v);
 
         if (request.State is not null)
-            PhaseAuditAndSetEnum(phaseAuditEntries, phase.Id, changedBy, now, "State", phase.State, request.State.Value, v => phase.State = v);
+            AuditHelper.AuditAndSetEnum(phaseAuditEntries, phaseAudit, "State", phase.State, request.State.Value, v => phase.State = v);
 
         // AcceptanceCriteria: full replacement if provided
         if (request.AcceptanceCriteria is not null)
@@ -235,37 +239,22 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
                         continue;
 
                     var oldTaskState = existingTask.State;
+                    var taskAudit = () => new TaskAuditLog { TaskId = existingTask.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
 
                     if (taskDto.Name is not null)
-                        TaskAuditAndSet(taskAuditEntries, existingTask.Id, changedBy, now, "Name", existingTask.Name, taskDto.Name, v => existingTask.Name = v);
+                        AuditHelper.AuditAndSet(taskAuditEntries, taskAudit, "Name", existingTask.Name, taskDto.Name, v => existingTask.Name = v);
 
                     if (taskDto.Description is not null)
-                        TaskAuditAndSet(taskAuditEntries, existingTask.Id, changedBy, now, "Description", existingTask.Description, taskDto.Description, v => existingTask.Description = v);
+                        AuditHelper.AuditAndSet(taskAuditEntries, taskAudit, "Description", existingTask.Description, taskDto.Description, v => existingTask.Description = v);
 
                     if (taskDto.SortOrder is not null)
-                    {
-                        var oldSort = existingTask.SortOrder;
-                        var newSort = taskDto.SortOrder.Value;
-                        if (oldSort != newSort)
-                        {
-                            taskAuditEntries.Add(new TaskAuditLog
-                            {
-                                TaskId = existingTask.Id,
-                                FieldName = "SortOrder",
-                                OldValue = oldSort.ToString(),
-                                NewValue = newSort.ToString(),
-                                ChangedBy = changedBy,
-                                ChangedAt = now
-                            });
-                            existingTask.SortOrder = newSort;
-                        }
-                    }
+                        AuditHelper.AuditAndSetValue(taskAuditEntries, taskAudit, "SortOrder", existingTask.SortOrder, taskDto.SortOrder.Value, v => existingTask.SortOrder = v);
 
                     if (taskDto.ImplementationNotes is not null)
-                        TaskAuditAndSet(taskAuditEntries, existingTask.Id, changedBy, now, "ImplementationNotes", existingTask.ImplementationNotes, taskDto.ImplementationNotes, v => existingTask.ImplementationNotes = v);
+                        AuditHelper.AuditAndSet(taskAuditEntries, taskAudit, "ImplementationNotes", existingTask.ImplementationNotes, taskDto.ImplementationNotes, v => existingTask.ImplementationNotes = v);
 
                     if (taskDto.State is not null)
-                        TaskAuditAndSetEnum(taskAuditEntries, existingTask.Id, changedBy, now, "State", existingTask.State, taskDto.State.Value, v => existingTask.State = v);
+                        AuditHelper.AuditAndSetEnum(taskAuditEntries, taskAudit, "State", existingTask.State, taskDto.State.Value, v => existingTask.State = v);
 
                     if (taskDto.TargetFiles is not null)
                     {
@@ -343,8 +332,20 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
                     db.WorkPackageTasks.Add(newTask);
 
                     // Build create audit entries
-                    var createEntries = BuildTaskCreateAuditEntries(newTask, changedBy);
-                    db.TaskAuditLogs.AddRange(createEntries);
+                    {
+                        var newTaskAudit = new List<TaskAuditLog>();
+                        var newTaskCreateAudit = () => new TaskAuditLog { Task = newTask, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+                        AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "Name", newTask.Name);
+                        AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "Description", newTask.Description);
+                        AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "SortOrder", newTask.SortOrder.ToString());
+                        AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "ImplementationNotes", newTask.ImplementationNotes);
+                        AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "State", newTask.State.ToString());
+                        if (newTask.TargetFiles.Count > 0)
+                            AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "TargetFiles", JsonSerializer.Serialize(newTask.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                        if (newTask.Attachments.Count > 0)
+                            AuditHelper.AddCreateEntry(newTaskAudit, newTaskCreateAudit, "Attachments", JsonSerializer.Serialize(newTask.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
+                        db.TaskAuditLogs.AddRange(newTaskAudit);
+                    }
                 }
             }
         }
@@ -500,141 +501,6 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         });
 
         return ToResponse(phase);
-    }
-
-    // ── Private helpers ──
-
-    private static List<PhaseAuditLog> BuildPhaseCreateAuditEntries(WorkPackagePhase phase, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<PhaseAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new PhaseAuditLog
-            {
-                Phase = phase,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", phase.Name);
-        Add("Description", phase.Description);
-        Add("SortOrder", phase.SortOrder.ToString());
-        Add("State", phase.State.ToString());
-
-        return entries;
-    }
-
-    private static List<TaskAuditLog> BuildTaskCreateAuditEntries(WorkPackageTask task, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<TaskAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new TaskAuditLog
-            {
-                Task = task,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", task.Name);
-        Add("Description", task.Description);
-        Add("SortOrder", task.SortOrder.ToString());
-        Add("ImplementationNotes", task.ImplementationNotes);
-        Add("State", task.State.ToString());
-
-        if (task.TargetFiles.Count > 0)
-            Add("TargetFiles", JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description })));
-
-        if (task.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(task.Attachments.Select(f => new { f.FileName, f.RelativePath, f.Description })));
-
-        return entries;
-    }
-
-    // ── Phase audit helpers ──
-
-    private static void PhaseAuditAndSet(
-        List<PhaseAuditLog> entries, long phaseId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new PhaseAuditLog
-        {
-            PhaseId = phaseId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void PhaseAuditAndSetEnum<TEnum>(
-        List<PhaseAuditLog> entries, long phaseId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new PhaseAuditLog
-        {
-            PhaseId = phaseId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    // ── Task audit helpers ──
-
-    private static void TaskAuditAndSet(
-        List<TaskAuditLog> entries, long taskId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new TaskAuditLog
-        {
-            TaskId = taskId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void TaskAuditAndSetEnum<TEnum>(
-        List<TaskAuditLog> entries, long taskId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new TaskAuditLog
-        {
-            TaskId = taskId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
     }
 
     // ── Response mapping ──

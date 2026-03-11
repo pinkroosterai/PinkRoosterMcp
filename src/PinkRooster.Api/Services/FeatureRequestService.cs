@@ -75,7 +75,20 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
 
             db.FeatureRequests.Add(fr);
 
-            var auditEntries = BuildCreateAuditEntries(fr, changedBy);
+            var auditEntries = new List<FeatureRequestAuditLog>();
+            var createAudit = () => new FeatureRequestAuditLog { FeatureRequest = fr, FieldName = default!, ChangedBy = changedBy, ChangedAt = DateTimeOffset.UtcNow };
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Name", fr.Name);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Description", fr.Description);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Category", fr.Category.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Priority", fr.Priority.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Status", fr.Status.ToString());
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "BusinessValue", fr.BusinessValue);
+            if (fr.UserStories.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "UserStories", JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit })));
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "Requester", fr.Requester);
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "AcceptanceSummary", fr.AcceptanceSummary);
+            if (fr.Attachments.Count > 0)
+                AuditHelper.AddCreateEntry(auditEntries, createAudit, "Attachments", JsonSerializer.Serialize(fr.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
             db.FeatureRequestAuditLogs.AddRange(auditEntries);
 
             await db.SaveChangesAsync(cancellation);
@@ -104,31 +117,32 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
 
         var auditEntries = new List<FeatureRequestAuditLog>();
         var now = DateTimeOffset.UtcNow;
+        var audit = () => new FeatureRequestAuditLog { FeatureRequestId = fr.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
         var oldStatus = fr.Status;
 
         if (request.Name is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "Name", fr.Name, request.Name, v => fr.Name = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Name", fr.Name, request.Name, v => fr.Name = v);
 
         if (request.Description is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "Description", fr.Description, request.Description, v => fr.Description = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Description", fr.Description, request.Description, v => fr.Description = v);
 
         if (request.Category is not null)
-            AuditAndSetEnum(auditEntries, fr.Id, changedBy, now, "Category", fr.Category, request.Category.Value, v => fr.Category = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Category", fr.Category, request.Category.Value, v => fr.Category = v);
 
         if (request.Priority is not null)
-            AuditAndSetEnum(auditEntries, fr.Id, changedBy, now, "Priority", fr.Priority, request.Priority.Value, v => fr.Priority = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Priority", fr.Priority, request.Priority.Value, v => fr.Priority = v);
 
         if (request.Status is not null)
-            AuditAndSetEnum(auditEntries, fr.Id, changedBy, now, "Status", fr.Status, request.Status.Value, v => fr.Status = v);
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "Status", fr.Status, request.Status.Value, v => fr.Status = v);
 
         if (request.BusinessValue is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "BusinessValue", fr.BusinessValue, request.BusinessValue, v => fr.BusinessValue = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "BusinessValue", fr.BusinessValue, request.BusinessValue, v => fr.BusinessValue = v);
 
         if (request.Requester is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "Requester", fr.Requester, request.Requester, v => fr.Requester = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "Requester", fr.Requester, request.Requester, v => fr.Requester = v);
 
         if (request.AcceptanceSummary is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "AcceptanceSummary", fr.AcceptanceSummary, request.AcceptanceSummary, v => fr.AcceptanceSummary = v);
+            AuditHelper.AuditAndSet(auditEntries, audit, "AcceptanceSummary", fr.AcceptanceSummary, request.AcceptanceSummary, v => fr.AcceptanceSummary = v);
 
         if (request.Attachments is not null)
         {
@@ -321,76 +335,6 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
             "terminal" => query.Where(fr => FeatureStatusConstants.TerminalStates.Contains(fr.Status)),
             _ => query
         };
-    }
-
-    private static List<FeatureRequestAuditLog> BuildCreateAuditEntries(FeatureRequest fr, string changedBy)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var entries = new List<FeatureRequestAuditLog>();
-
-        void Add(string field, string? value)
-        {
-            if (value is null) return;
-            entries.Add(new FeatureRequestAuditLog
-            {
-                FeatureRequest = fr,
-                FieldName = field,
-                OldValue = null,
-                NewValue = value,
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-        }
-
-        Add("Name", fr.Name);
-        Add("Description", fr.Description);
-        Add("Category", fr.Category.ToString());
-        Add("Priority", fr.Priority.ToString());
-        Add("Status", fr.Status.ToString());
-        Add("BusinessValue", fr.BusinessValue);
-        if (fr.UserStories.Count > 0)
-            Add("UserStories", JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit })));
-        Add("Requester", fr.Requester);
-        Add("AcceptanceSummary", fr.AcceptanceSummary);
-
-        if (fr.Attachments.Count > 0)
-            Add("Attachments", JsonSerializer.Serialize(fr.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
-
-        return entries;
-    }
-
-    private static void AuditAndSet(
-        List<FeatureRequestAuditLog> entries, long frId, string changedBy, DateTimeOffset now,
-        string field, string? oldValue, string newValue, Action<string> setter)
-    {
-        if (oldValue == newValue) return;
-        entries.Add(new FeatureRequestAuditLog
-        {
-            FeatureRequestId = frId,
-            FieldName = field,
-            OldValue = oldValue,
-            NewValue = newValue,
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
-    }
-
-    private static void AuditAndSetEnum<TEnum>(
-        List<FeatureRequestAuditLog> entries, long frId, string changedBy, DateTimeOffset now,
-        string field, TEnum oldValue, TEnum newValue, Action<TEnum> setter) where TEnum : struct, Enum
-    {
-        if (EqualityComparer<TEnum>.Default.Equals(oldValue, newValue)) return;
-        entries.Add(new FeatureRequestAuditLog
-        {
-            FeatureRequestId = frId,
-            FieldName = field,
-            OldValue = oldValue.ToString(),
-            NewValue = newValue.ToString(),
-            ChangedBy = changedBy,
-            ChangedAt = now
-        });
-        setter(newValue);
     }
 
     private static List<UserStory> MapUserStories(List<UserStoryDto>? dtos) =>
