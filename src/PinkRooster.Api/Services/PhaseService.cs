@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
 using PinkRooster.Data.Entities;
+using PinkRooster.Shared.DTOs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeService) : IPhaseService
+public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeService, IEventBroadcaster broadcaster) : IPhaseService
 {
     public async Task<PhaseResponse> CreateAsync(
         long projectId, int wpNumber, CreatePhaseRequest request, string changedBy, CancellationToken ct = default)
@@ -112,6 +113,15 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
 
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
+
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "Phase",
+                EntityId = $"proj-{projectId}-wp-{wpNumber}-phase-{phase.PhaseNumber}",
+                Action = "created",
+                ProjectId = projectId
+            });
 
             // Re-query to get full tree including tasks with dependencies
             var fullPhase = await db.WorkPackagePhases
@@ -355,6 +365,16 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Phase",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-phase-{phaseNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         // Re-query with full tree for response
         var fullPhase = await db.WorkPackagePhases
             .Include(p => p.Tasks.OrderBy(t => t.SortOrder))
@@ -382,8 +402,21 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         if (phase is null)
             return false;
 
+        var phaseProjectId = phase.WorkPackage.ProjectId;
+        var phaseWpNumber = phase.WorkPackage.WorkPackageNumber;
+
         db.WorkPackagePhases.Remove(phase);
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Phase",
+            EntityId = $"proj-{phaseProjectId}-wp-{phaseWpNumber}-phase-{phase.PhaseNumber}",
+            Action = "deleted",
+            ProjectId = phaseProjectId
+        });
+
         return true;
     }
 
@@ -456,6 +489,15 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
             db.PhaseAuditLogs.AddRange(auditEntries);
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Phase",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-phase-{phaseNumber}",
+            Action = "updated",
+            ProjectId = projectId
+        });
 
         return ToResponse(phase);
     }

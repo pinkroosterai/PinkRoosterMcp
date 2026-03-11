@@ -19,6 +19,7 @@ builder.Services.AddScoped<IWorkPackageService, WorkPackageService>();
 builder.Services.AddScoped<IPhaseService, PhaseService>();
 builder.Services.AddScoped<IWorkPackageTaskService, WorkPackageTaskService>();
 builder.Services.AddScoped<IStateCascadeService, StateCascadeService>();
+builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
 
 // Controllers + Swagger
 builder.Services.AddControllers()

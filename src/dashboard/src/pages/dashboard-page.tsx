@@ -7,6 +7,7 @@ import { AnimatedCount } from "@/components/animated-count";
 import { useProjectContext } from "@/hooks/use-project-context";
 import { useProjectStatus, useNextActions } from "@/hooks/use-projects";
 import { stateColorClass, priorityAccent } from "@/lib/state-colors";
+import { AnimatedBadge } from "@/components/animated-badge";
 import { MarkdownContent } from "@/components/markdown-content";
 import { FolderOpen, Bug, Layers, Lightbulb, ArrowRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -223,9 +224,7 @@ export function DashboardPage() {
                     {typeIcons[item.type] ?? item.type}
                   </Badge>
                   <span className="text-sm font-medium truncate flex-1">{item.name}</span>
-                  <span className={stateColorClass(item.state)}>
-                    {item.state}
-                  </span>
+                  <AnimatedBadge value={item.state} className={stateColorClass(item.state)}>{item.state}</AnimatedBadge>
                 </div>
               ))}
             </div>

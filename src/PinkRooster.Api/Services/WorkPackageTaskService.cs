@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
 using PinkRooster.Data.Entities;
+using PinkRooster.Shared.DTOs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService cascadeService) : IWorkPackageTaskService
+public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService cascadeService, IEventBroadcaster broadcaster) : IWorkPackageTaskService
 {
     public async Task<TaskResponse> CreateAsync(
         long projectId, int wpNumber, int phaseNumber, CreateTaskRequest request, string changedBy, CancellationToken ct = default)
@@ -72,6 +73,15 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
+
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "Task",
+                EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{task.TaskNumber}",
+                Action = "created",
+                ProjectId = projectId
+            });
 
             return ToResponse(task, wp, phase);
         }, ct);
@@ -214,6 +224,16 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Task",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         // Re-query with includes for full response
         var fullTask = await db.WorkPackageTasks
             .Include(t => t.Phase)
@@ -310,6 +330,16 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Task",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}",
+            Action = "batch-updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         return new BatchUpdateTaskStatesResponse
         {
             UpdatedCount = results.Count(r => r.OldState != r.NewState),
@@ -335,6 +365,16 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
         db.WorkPackageTasks.Remove(task);
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Task",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{task.TaskNumber}",
+            Action = "deleted",
+            ProjectId = projectId
+        });
+
         return true;
     }
 
@@ -411,6 +451,16 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         }
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Task",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
 
         var response = new TaskDependencyResponse
         {
@@ -489,6 +539,17 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         }
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Task",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         return true;
     }
 

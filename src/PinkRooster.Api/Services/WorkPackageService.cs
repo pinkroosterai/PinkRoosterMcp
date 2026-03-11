@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
 using PinkRooster.Data.Entities;
+using PinkRooster.Shared.DTOs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cascadeService) : IWorkPackageService
+public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cascadeService, IEventBroadcaster broadcaster) : IWorkPackageService
 {
     public async Task<List<WorkPackageResponse>> GetByProjectAsync(
         long projectId, string? stateFilter, CancellationToken ct = default)
@@ -104,6 +105,15 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
 
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "WorkPackage",
+                EntityId = $"proj-{projectId}-wp-{wp.WorkPackageNumber}",
+                Action = "created",
+                ProjectId = projectId
+            });
+
             return ToListResponse(wp);
         }, ct);
     }
@@ -195,6 +205,16 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         // Re-query with full tree for response
         var fullWp = await db.WorkPackages
             .Include(w => w.Phases.OrderBy(p => p.SortOrder))
@@ -228,6 +248,16 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         db.WorkPackages.Remove(wp);
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{projectId}-wp-{wp.WorkPackageNumber}",
+            Action = "deleted",
+            ProjectId = projectId
+        });
+
         return true;
     }
 
@@ -301,6 +331,16 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         var response = new DependencyResponse
         {
             WorkPackageId = $"proj-{dependsOnWp.ProjectId}-wp-{dependsOnWp.WorkPackageNumber}",
@@ -372,6 +412,17 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         }
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{projectId}-wp-{dependentWp.WorkPackageNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
         return true;
     }
 
@@ -624,6 +675,16 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
+
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "WorkPackage",
+                EntityId = $"proj-{projectId}-wp-{nextWpNumber}",
+                Action = "created",
+                ProjectId = projectId,
+                StateChanges = stateChanges.Count > 0 ? stateChanges : null
+            });
 
             // 5. Build compact response
             var totalTasks = phaseTaskMap.Sum(pt => pt.Count);

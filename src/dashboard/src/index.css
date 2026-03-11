@@ -207,6 +207,35 @@
 .stagger-children > *:nth-child(9) { animation-delay: 480ms; }
 .stagger-children > *:nth-child(10) { animation-delay: 540ms; }
 
+/* ── State-change micro-animations ── */
+@keyframes badge-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--glow-color, hsl(350 80% 55% / 0.4)); }
+  50% { transform: scale(1.15); box-shadow: 0 0 8px 2px var(--glow-color, hsl(350 80% 55% / 0.3)); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 var(--glow-color, hsl(350 80% 55% / 0)); }
+}
+
+@keyframes row-highlight {
+  from { background-color: var(--highlight-color, hsl(350 80% 55% / 0.15)); }
+  to { background-color: transparent; }
+}
+
+@keyframes field-flash {
+  from { color: var(--flash-color, hsl(350 80% 55%)); }
+  to { color: inherit; }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 0.6s ease-out forwards;
+}
+
+.animate-row-highlight {
+  animation: row-highlight 1.5s ease-out forwards;
+}
+
+.animate-field-flash {
+  animation: field-flash 0.8s ease-out forwards;
+}
+
 /* ── Prose / Markdown content styles ── */
 .prose {
   color: var(--color-foreground);

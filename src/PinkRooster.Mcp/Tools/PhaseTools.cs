@@ -32,15 +32,22 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
         [Description("Tasks to create or update. For new tasks: provide name and description. For existing tasks: provide taskNumber and fields to change.")] List<PhaseTaskInput>? tasks = null,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
-            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
+        try
+        {
+            if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
+                return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
 
-        if (phaseId is not null)
-            return await UpdateExistingPhase(projId, wpNumber, phaseId, name, description, sortOrder,
-                state, acceptanceCriteria, tasks, ct);
+            if (phaseId is not null)
+                return await UpdateExistingPhase(projId, wpNumber, phaseId, name, description, sortOrder,
+                    state, acceptanceCriteria, tasks, ct);
 
-        return await CreateNewPhase(projId, wpNumber, name, description, sortOrder,
-            acceptanceCriteria, tasks, ct);
+            return await CreateNewPhase(projId, wpNumber, name, description, sortOrder,
+                acceptanceCriteria, tasks, ct);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to create/update phase: {ex.Message}");
+        }
     }
 
     [McpServerTool(Name = "verify_acceptance_criteria",

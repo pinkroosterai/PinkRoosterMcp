@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { stateColorClass } from "@/lib/state-colors";
+import { AnimatedBadge } from "@/components/animated-badge";
 import {
   Select,
   SelectContent,
@@ -441,11 +442,7 @@ export function WorkPackageDetailPage() {
                   {wp.blockedBy.map((dep, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm">
                       <span className="font-medium">{dep.name}</span>
-                      <span
-                        className={stateColorClass(dep.state)}
-                      >
-                        {dep.state}
-                      </span>
+                      <AnimatedBadge value={dep.state} className={stateColorClass(dep.state)}>{dep.state}</AnimatedBadge>
                       {dep.reason && (
                         <span className="text-muted-foreground">- {dep.reason}</span>
                       )}
@@ -461,11 +458,7 @@ export function WorkPackageDetailPage() {
                   {wp.blocking.map((dep, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm">
                       <span className="font-medium">{dep.name}</span>
-                      <span
-                        className={stateColorClass(dep.state)}
-                      >
-                        {dep.state}
-                      </span>
+                      <AnimatedBadge value={dep.state} className={stateColorClass(dep.state)}>{dep.state}</AnimatedBadge>
                       {dep.reason && (
                         <span className="text-muted-foreground">- {dep.reason}</span>
                       )}
@@ -603,11 +596,7 @@ export function WorkPackageDetailPage() {
                       )}
                       <CardTitle className="text-base">{phase.name}</CardTitle>
                       <Badge variant="outline">Phase {phase.phaseNumber}</Badge>
-                      <span
-                        className={stateColorClass(phase.state)}
-                      >
-                        {phase.state}
-                      </span>
+                      <AnimatedBadge value={phase.state} className={stateColorClass(phase.state)}>{phase.state}</AnimatedBadge>
                       <span className="text-xs text-muted-foreground">
                         {taskCount} task{taskCount !== 1 ? "s" : ""}
                       </span>
@@ -803,11 +792,7 @@ export function WorkPackageDetailPage() {
                                               className="flex items-center gap-2 text-sm"
                                             >
                                               <span className="font-medium">{dep.name}</span>
-                                              <span
-                                                className={stateColorClass(dep.state)}
-                                              >
-                                                {dep.state}
-                                              </span>
+                                              <AnimatedBadge value={dep.state} className={stateColorClass(dep.state)}>{dep.state}</AnimatedBadge>
                                               {dep.reason && (
                                                 <span className="text-muted-foreground">
                                                   - {dep.reason}

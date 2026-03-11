@@ -42,6 +42,7 @@ interface DataTableProps<TData, TValue> {
   filters?: ColumnFilterConfig[];
   pageSize?: number;
   onRowClick?: (row: TData) => void;
+  rowClassName?: (row: TData) => string;
   emptyMessage?: string;
 }
 
@@ -57,6 +58,7 @@ export function DataTable<TData, TValue>({
   filters = [],
   pageSize = 10,
   onRowClick,
+  rowClassName,
   emptyMessage = "No results.",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -153,7 +155,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={onRowClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}
+                  className={`${onRowClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} ${rowClassName?.(row.original) ?? ""}`.trim()}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

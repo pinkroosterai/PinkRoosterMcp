@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Lightbulb, Plus } from "lucide-react";
 import { useFeatureRequests, useDeleteFeatureRequest } from "@/hooks/use-feature-requests";
+import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedBadge } from "@/components/animated-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -61,6 +63,7 @@ export function FeatureRequestsListPage() {
   const { data: featureRequests, isLoading } = useFeatureRequests(projectId, stateFilter);
   const deleteFr = useDeleteFeatureRequest();
   const [frToDelete, setFrToDelete] = useState<FeatureRequest | null>(null);
+  const { rowClassName } = useRowHighlight(featureRequests ?? [], (fr) => fr.featureRequestId);
 
   const handleDelete = () => {
     if (!frToDelete) return;
@@ -105,9 +108,7 @@ export function FeatureRequestsListPage() {
       header: "Status",
       enableSorting: false,
       cell: ({ row }) => (
-        <span className={stateColorClass(row.getValue("status"), "feature")}>
-          {row.getValue("status")}
-        </span>
+        <AnimatedBadge value={row.getValue("status")} className={stateColorClass(row.getValue("status"), "feature")}>{row.getValue("status")}</AnimatedBadge>
       ),
     },
     {
@@ -196,6 +197,7 @@ export function FeatureRequestsListPage() {
           data={featureRequests}
           filters={columnFilters}
           onRowClick={(fr) => navigate(`/projects/${projectId}/feature-requests/${fr.featureRequestNumber}`)}
+          rowClassName={rowClassName}
           emptyMessage="No feature requests match the current filters."
         />
       )}

@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
 using PinkRooster.Data.Entities;
+using PinkRooster.Shared.DTOs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestService
+public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster broadcaster) : IFeatureRequestService
 {
     public async Task<List<FeatureRequestResponse>> GetByProjectAsync(
         long projectId, string? stateFilter, CancellationToken ct = default)
@@ -80,6 +81,15 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
 
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "FeatureRequest",
+                EntityId = $"proj-{projectId}-fr-{fr.FeatureRequestNumber}",
+                Action = "created",
+                ProjectId = projectId
+            });
+
             return ToResponse(fr);
         }, ct);
     }
@@ -147,6 +157,15 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
 
         await db.SaveChangesAsync(ct);
 
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "FeatureRequest",
+            EntityId = $"proj-{projectId}-fr-{frNumber}",
+            Action = "updated",
+            ProjectId = projectId
+        });
+
         var response = ToResponse(fr);
         await EnrichWithLinkedWorkPackagesAsync([response], ct);
         return response;
@@ -161,6 +180,16 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
 
         db.FeatureRequests.Remove(fr);
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "FeatureRequest",
+            EntityId = $"proj-{projectId}-fr-{fr.FeatureRequestNumber}",
+            Action = "deleted",
+            ProjectId = projectId
+        });
+
         return true;
     }
 
@@ -228,6 +257,15 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         }
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "FeatureRequest",
+            EntityId = $"proj-{projectId}-fr-{frNumber}",
+            Action = "updated",
+            ProjectId = projectId
+        });
 
         var response = ToResponse(fr);
         await EnrichWithLinkedWorkPackagesAsync([response], ct);

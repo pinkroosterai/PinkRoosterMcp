@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Data;
 using PinkRooster.Data.Entities;
+using PinkRooster.Shared.DTOs;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class IssueService(AppDbContext db) : IIssueService
+public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster) : IIssueService
 {
     public async Task<List<IssueResponse>> GetByProjectAsync(
         long projectId, string? stateFilter, CancellationToken ct = default)
@@ -135,6 +136,15 @@ public sealed class IssueService(AppDbContext db) : IIssueService
             await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
 
+            broadcaster.Publish(new ServerEvent
+            {
+                EventType = "entity:changed",
+                EntityType = "Issue",
+                EntityId = $"proj-{projectId}-issue-{issue.IssueNumber}",
+                Action = "created",
+                ProjectId = projectId
+            });
+
             return ToResponse(issue);
         }, ct);
     }
@@ -221,6 +231,16 @@ public sealed class IssueService(AppDbContext db) : IIssueService
             db.IssueAuditLogs.AddRange(auditEntries);
 
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Issue",
+            EntityId = $"proj-{projectId}-issue-{issueNumber}",
+            Action = "updated",
+            ProjectId = projectId
+        });
+
         return ToResponse(issue);
     }
 
@@ -234,6 +254,16 @@ public sealed class IssueService(AppDbContext db) : IIssueService
 
         db.Issues.Remove(issue);
         await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "Issue",
+            EntityId = $"proj-{projectId}-issue-{issue.IssueNumber}",
+            Action = "deleted",
+            ProjectId = projectId
+        });
+
         return true;
     }
 

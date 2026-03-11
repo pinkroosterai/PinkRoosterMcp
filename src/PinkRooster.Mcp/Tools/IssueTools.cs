@@ -41,17 +41,24 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseProjectId(projectId, out var projId))
-            return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
+        try
+        {
+            if (!IdParser.TryParseProjectId(projectId, out var projId))
+                return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        if (issueId is not null)
-            return await UpdateExistingIssue(projId, issueId, name, description, issueType, severity,
+            if (issueId is not null)
+                return await UpdateExistingIssue(projId, issueId, name, description, issueType, severity,
+                    priority, state, stepsToReproduce, expectedBehavior, actualBehavior,
+                    affectedComponent, stackTrace, rootCause, resolution, attachments, ct);
+
+            return await CreateNewIssue(projId, name, description, issueType, severity,
                 priority, state, stepsToReproduce, expectedBehavior, actualBehavior,
                 affectedComponent, stackTrace, rootCause, resolution, attachments, ct);
-
-        return await CreateNewIssue(projId, name, description, issueType, severity,
-            priority, state, stepsToReproduce, expectedBehavior, actualBehavior,
-            affectedComponent, stackTrace, rootCause, resolution, attachments, ct);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to create/update issue: {ex.Message}");
+        }
     }
 
     [McpServerTool(Name = "get_issue_details", ReadOnly = true,
@@ -63,40 +70,47 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("Issue ID (e.g. 'proj-1-issue-3').")] string issueId,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseIssueId(issueId, out var projId, out var issueNumber))
-            return OperationResult.Error($"Invalid issue ID format: '{issueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
-
-        var issue = await apiClient.GetIssueAsync(projId, issueNumber, ct);
-        if (issue is null)
-            return OperationResult.Warning($"Issue '{issueId}' not found.");
-
-        var detail = new IssueDetailResponse
+        try
         {
-            IssueId = issue.IssueId,
-            ProjectId = issue.ProjectId,
-            Name = issue.Name,
-            Description = issue.Description,
-            IssueType = issue.IssueType,
-            Severity = issue.Severity,
-            Priority = issue.Priority,
-            State = issue.State,
-            StepsToReproduce = issue.StepsToReproduce,
-            ExpectedBehavior = issue.ExpectedBehavior,
-            ActualBehavior = issue.ActualBehavior,
-            AffectedComponent = issue.AffectedComponent,
-            StackTrace = issue.StackTrace,
-            RootCause = issue.RootCause,
-            Resolution = issue.Resolution,
-            Attachments = issue.Attachments,
-            LinkedWorkPackages = McpInputParser.NullIfEmpty(issue.LinkedWorkPackages),
-            StartedAt = issue.StartedAt,
-            CompletedAt = issue.CompletedAt,
-            ResolvedAt = issue.ResolvedAt,
-            CreatedAt = issue.CreatedAt,
-            UpdatedAt = issue.UpdatedAt
-        };
+            if (!IdParser.TryParseIssueId(issueId, out var projId, out var issueNumber))
+                return OperationResult.Error($"Invalid issue ID format: '{issueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
 
-        return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
+            var issue = await apiClient.GetIssueAsync(projId, issueNumber, ct);
+            if (issue is null)
+                return OperationResult.Warning($"Issue '{issueId}' not found.");
+
+            var detail = new IssueDetailResponse
+            {
+                IssueId = issue.IssueId,
+                ProjectId = issue.ProjectId,
+                Name = issue.Name,
+                Description = issue.Description,
+                IssueType = issue.IssueType,
+                Severity = issue.Severity,
+                Priority = issue.Priority,
+                State = issue.State,
+                StepsToReproduce = issue.StepsToReproduce,
+                ExpectedBehavior = issue.ExpectedBehavior,
+                ActualBehavior = issue.ActualBehavior,
+                AffectedComponent = issue.AffectedComponent,
+                StackTrace = issue.StackTrace,
+                RootCause = issue.RootCause,
+                Resolution = issue.Resolution,
+                Attachments = issue.Attachments,
+                LinkedWorkPackages = McpInputParser.NullIfEmpty(issue.LinkedWorkPackages),
+                StartedAt = issue.StartedAt,
+                CompletedAt = issue.CompletedAt,
+                ResolvedAt = issue.ResolvedAt,
+                CreatedAt = issue.CreatedAt,
+                UpdatedAt = issue.UpdatedAt
+            };
+
+            return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to get issue details: {ex.Message}");
+        }
     }
 
     [McpServerTool(Name = "get_issue_overview", ReadOnly = true,
@@ -110,29 +124,36 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("Filter by state category. Omit for all issues.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseProjectId(projectId, out var projId))
-            return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
-
-        var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
-        var issues = await apiClient.GetIssuesByProjectAsync(projId, stateFilterStr, ct);
-
-        if (issues.Count == 0)
-            return OperationResult.SuccessMessage($"No issues found for project '{projectId}'" +
-                (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
-
-        var items = issues.Select(i => new
+        try
         {
-            i.IssueId,
-            i.Name,
-            i.State,
-            i.Priority,
-            i.Severity,
-            i.IssueType,
-            LinkedWorkPackageCount = i.LinkedWorkPackages.Count,
-            i.CreatedAt
-        }).ToList();
+            if (!IdParser.TryParseProjectId(projectId, out var projId))
+                return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        return JsonSerializer.Serialize(items, JsonDefaults.Indented);
+            var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
+            var issues = await apiClient.GetIssuesByProjectAsync(projId, stateFilterStr, ct);
+
+            if (issues.Count == 0)
+                return OperationResult.SuccessMessage($"No issues found for project '{projectId}'" +
+                    (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
+
+            var items = issues.Select(i => new
+            {
+                i.IssueId,
+                i.Name,
+                i.State,
+                i.Priority,
+                i.Severity,
+                i.IssueType,
+                LinkedWorkPackageCount = i.LinkedWorkPackages.Count,
+                i.CreatedAt
+            }).ToList();
+
+            return JsonSerializer.Serialize(items, JsonDefaults.Indented);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to get issue overview: {ex.Message}");
+        }
     }
 
     // ── Private helpers ──

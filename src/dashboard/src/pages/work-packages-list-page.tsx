@@ -4,7 +4,9 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Layers, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
+import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedBadge } from "@/components/animated-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -117,6 +119,7 @@ export function WorkPackagesListPage() {
   const { data: summary } = useWorkPackageSummary(projectId);
   const deleteWp = useDeleteWorkPackage();
   const [wpToDelete, setWpToDelete] = useState<WorkPackage | null>(null);
+  const { rowClassName } = useRowHighlight(workPackages ?? [], (wp) => wp.workPackageId);
 
   const handleDelete = () => {
     if (!wpToDelete) return;
@@ -162,7 +165,7 @@ export function WorkPackagesListPage() {
       header: "State",
       enableSorting: false,
       cell: ({ row }) => (
-        <span className={stateColorClass(row.getValue("state"))}>{row.getValue("state")}</span>
+        <AnimatedBadge value={row.getValue("state")} className={stateColorClass(row.getValue("state"))}>{row.getValue("state")}</AnimatedBadge>
       ),
     },
     {
@@ -308,6 +311,7 @@ export function WorkPackagesListPage() {
           data={workPackages}
           filters={columnFilters}
           onRowClick={(wp) => navigate(`/projects/${projectId}/work-packages/${wp.workPackageNumber}`)}
+          rowClassName={rowClassName}
           emptyMessage="No work packages match the current filters."
         />
       )}

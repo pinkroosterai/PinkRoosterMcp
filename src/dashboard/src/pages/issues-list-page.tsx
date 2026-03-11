@@ -4,7 +4,9 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Bug, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
+import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedBadge } from "@/components/animated-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -102,6 +104,7 @@ export function IssuesListPage() {
   const { data: summary } = useIssueSummary(projectId);
   const deleteIssue = useDeleteIssue();
   const [issueToDelete, setIssueToDelete] = useState<Issue | null>(null);
+  const { rowClassName } = useRowHighlight(issues ?? [], (i) => i.issueId);
 
   const handleDelete = () => {
     if (!issueToDelete) return;
@@ -155,7 +158,7 @@ export function IssuesListPage() {
       header: "State",
       enableSorting: false,
       cell: ({ row }) => (
-        <span className={stateColorClass(row.getValue("state"))}>{row.getValue("state")}</span>
+        <AnimatedBadge value={row.getValue("state")} className={stateColorClass(row.getValue("state"))}>{row.getValue("state")}</AnimatedBadge>
       ),
     },
     {
@@ -279,6 +282,7 @@ export function IssuesListPage() {
           data={issues}
           filters={columnFilters}
           onRowClick={(issue) => navigate(`/projects/${projectId}/issues/${issue.issueNumber}`)}
+          rowClassName={rowClassName}
           emptyMessage="No issues match the current filters."
         />
       )}

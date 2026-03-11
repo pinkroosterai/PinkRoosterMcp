@@ -34,15 +34,22 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        if (taskId is not null)
-            return await UpdateExistingTask(taskId, name, description, sortOrder,
+        try
+        {
+            if (taskId is not null)
+                return await UpdateExistingTask(taskId, name, description, sortOrder,
+                    implementationNotes, state, targetFiles, attachments, ct);
+
+            if (phaseId is null)
+                return OperationResult.Error("Either 'phaseId' (for create) or 'taskId' (for update) must be provided.");
+
+            return await CreateNewTask(phaseId, name, description, sortOrder,
                 implementationNotes, state, targetFiles, attachments, ct);
-
-        if (phaseId is null)
-            return OperationResult.Error("Either 'phaseId' (for create) or 'taskId' (for update) must be provided.");
-
-        return await CreateNewTask(phaseId, name, description, sortOrder,
-            implementationNotes, state, targetFiles, attachments, ct);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to create/update task: {ex.Message}");
+        }
     }
 
     [McpServerTool(Name = "batch_update_task_states",

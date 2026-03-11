@@ -28,31 +28,38 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Filter by state category. Omit for all work packages.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseProjectId(projectId, out var projId))
-            return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
-
-        var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
-        var workPackages = await apiClient.GetWorkPackagesByProjectAsync(projId, stateFilterStr, ct);
-
-        if (workPackages.Count == 0)
-            return OperationResult.SuccessMessage($"No work packages found for project '{projectId}'" +
-                (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
-
-        var items = workPackages.Select(wp => new
+        try
         {
-            wp.WorkPackageId,
-            wp.Name,
-            wp.Type,
-            wp.Priority,
-            wp.State,
-            PhaseCount = wp.Phases.Count,
-            TaskCount = wp.Phases.Sum(p => p.Tasks.Count),
-            CompletedTaskCount = wp.Phases.Sum(p => p.Tasks.Count(t => McpInputParser.IsTerminalState(t.State))),
-            wp.CreatedAt,
-            wp.ResolvedAt
-        }).ToList();
+            if (!IdParser.TryParseProjectId(projectId, out var projId))
+                return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        return JsonSerializer.Serialize(items, JsonDefaults.Indented);
+            var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
+            var workPackages = await apiClient.GetWorkPackagesByProjectAsync(projId, stateFilterStr, ct);
+
+            if (workPackages.Count == 0)
+                return OperationResult.SuccessMessage($"No work packages found for project '{projectId}'" +
+                    (stateFilter is not null ? $" with filter '{stateFilter}'." : "."));
+
+            var items = workPackages.Select(wp => new
+            {
+                wp.WorkPackageId,
+                wp.Name,
+                wp.Type,
+                wp.Priority,
+                wp.State,
+                PhaseCount = wp.Phases.Count,
+                TaskCount = wp.Phases.Sum(p => p.Tasks.Count),
+                CompletedTaskCount = wp.Phases.Sum(p => p.Tasks.Count(t => McpInputParser.IsTerminalState(t.State))),
+                wp.CreatedAt,
+                wp.ResolvedAt
+            }).ToList();
+
+            return JsonSerializer.Serialize(items, JsonDefaults.Indented);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to get work packages: {ex.Message}");
+        }
     }
 
     // ── 2. get_work_package_details ──
@@ -68,40 +75,47 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
-            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
-
-        var wp = await apiClient.GetWorkPackageAsync(projId, wpNumber, ct);
-        if (wp is null)
-            return OperationResult.Warning($"Work package '{workPackageId}' not found.");
-
-        var detail = new WorkPackageDetailResponse
+        try
         {
-            WorkPackageId = wp.WorkPackageId,
-            ProjectId = wp.ProjectId,
-            Name = wp.Name,
-            Description = wp.Description,
-            Type = wp.Type,
-            Priority = wp.Priority,
-            Plan = wp.Plan,
-            EstimatedComplexity = wp.EstimatedComplexity,
-            EstimationRationale = wp.EstimationRationale,
-            State = wp.State,
-            PreviousActiveState = wp.PreviousActiveState,
-            LinkedIssueId = wp.LinkedIssueId,
-            LinkedFeatureRequestId = wp.LinkedFeatureRequestId,
-            StartedAt = wp.StartedAt,
-            CompletedAt = wp.CompletedAt,
-            ResolvedAt = wp.ResolvedAt,
-            Attachments = McpInputParser.NullIfEmpty(wp.Attachments),
-            Phases = wp.Phases.Select(MapPhaseDetail).ToList(),
-            BlockedBy = McpInputParser.NullIfEmpty(wp.BlockedBy.Select(MapWpDependency).ToList()),
-            Blocking = McpInputParser.NullIfEmpty(wp.Blocking.Select(MapWpDependency).ToList()),
-            CreatedAt = wp.CreatedAt,
-            UpdatedAt = wp.UpdatedAt
-        };
+            if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
+                return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
 
-        return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
+            var wp = await apiClient.GetWorkPackageAsync(projId, wpNumber, ct);
+            if (wp is null)
+                return OperationResult.Warning($"Work package '{workPackageId}' not found.");
+
+            var detail = new WorkPackageDetailResponse
+            {
+                WorkPackageId = wp.WorkPackageId,
+                ProjectId = wp.ProjectId,
+                Name = wp.Name,
+                Description = wp.Description,
+                Type = wp.Type,
+                Priority = wp.Priority,
+                Plan = wp.Plan,
+                EstimatedComplexity = wp.EstimatedComplexity,
+                EstimationRationale = wp.EstimationRationale,
+                State = wp.State,
+                PreviousActiveState = wp.PreviousActiveState,
+                LinkedIssueId = wp.LinkedIssueId,
+                LinkedFeatureRequestId = wp.LinkedFeatureRequestId,
+                StartedAt = wp.StartedAt,
+                CompletedAt = wp.CompletedAt,
+                ResolvedAt = wp.ResolvedAt,
+                Attachments = McpInputParser.NullIfEmpty(wp.Attachments),
+                Phases = wp.Phases.Select(MapPhaseDetail).ToList(),
+                BlockedBy = McpInputParser.NullIfEmpty(wp.BlockedBy.Select(MapWpDependency).ToList()),
+                Blocking = McpInputParser.NullIfEmpty(wp.Blocking.Select(MapWpDependency).ToList()),
+                CreatedAt = wp.CreatedAt,
+                UpdatedAt = wp.UpdatedAt
+            };
+
+            return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to get work package details: {ex.Message}");
+        }
     }
 
     // ── 3. create_or_update_work_package ──
@@ -129,15 +143,22 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        if (!IdParser.TryParseProjectId(projectId, out var projId))
-            return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
+        try
+        {
+            if (!IdParser.TryParseProjectId(projectId, out var projId))
+                return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        if (workPackageId is not null)
-            return await UpdateExistingWorkPackage(projId, workPackageId, name, description, type,
-                priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
+            if (workPackageId is not null)
+                return await UpdateExistingWorkPackage(projId, workPackageId, name, description, type,
+                    priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
 
-        return await CreateNewWorkPackage(projId, name, description, type, priority, plan,
-            estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
+            return await CreateNewWorkPackage(projId, name, description, type, priority, plan,
+                estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to create/update work package: {ex.Message}");
+        }
     }
 
     // ── 4. scaffold_work_package ──

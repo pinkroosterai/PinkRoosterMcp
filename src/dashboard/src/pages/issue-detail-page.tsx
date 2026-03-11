@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { stateColorClass } from "@/lib/state-colors";
+import { AnimatedBadge } from "@/components/animated-badge";
 import { MarkdownContent } from "@/components/markdown-content";
 import type { Issue } from "@/types";
 
@@ -458,7 +459,7 @@ export function IssueDetailPage() {
                         <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
                         <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
                         <TableCell>
-                          <span className={stateColorClass(wp.state)}>{wp.state}</span>
+                          <AnimatedBadge value={wp.state} className={stateColorClass(wp.state)}>{wp.state}</AnimatedBadge>
                         </TableCell>
                       </TableRow>
                     );
