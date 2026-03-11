@@ -13,7 +13,7 @@ public sealed class FeatureRequestDetailResponse
     public required string Priority { get; init; }
     public required string Status { get; init; }
     public string? BusinessValue { get; init; }
-    public string? UserStory { get; init; }
+    public List<UserStoryDto>? UserStories { get; init; }
     public string? Requester { get; init; }
     public string? AcceptanceSummary { get; init; }
     public required List<FileReferenceDto> Attachments { get; init; }

@@ -10,4 +10,5 @@ public interface IFeatureRequestService
     Task<FeatureRequestResponse> CreateAsync(long projectId, CreateFeatureRequestRequest request, string changedBy, CancellationToken ct = default);
     Task<FeatureRequestResponse?> UpdateAsync(long projectId, int frNumber, UpdateFeatureRequestRequest request, string changedBy, CancellationToken ct = default);
     Task<bool> DeleteAsync(long projectId, int frNumber, CancellationToken ct = default);
+    Task<FeatureRequestResponse?> ManageUserStoriesAsync(long projectId, int frNumber, ManageUserStoriesRequest request, string changedBy, CancellationToken ct = default);
 }

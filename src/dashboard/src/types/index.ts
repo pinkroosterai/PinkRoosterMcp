@@ -108,6 +108,7 @@ export interface WorkPackage {
   phases: Phase[];
   blockedBy: WorkPackageDep[];
   blocking: WorkPackageDep[];
+  stateChanges?: StateChangeDto[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -144,6 +145,7 @@ export interface WpTask {
   attachments: FileReference[];
   blockedBy: TaskDep[];
   blocking: TaskDep[];
+  stateChanges?: StateChangeDto[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -176,6 +178,12 @@ export interface WorkPackageSummary {
   terminalCount: number;
 }
 
+export interface UserStory {
+  role: string;
+  goal: string;
+  benefit: string;
+}
+
 export interface FeatureRequest {
   featureRequestId: string;
   id: number;
@@ -187,7 +195,7 @@ export interface FeatureRequest {
   priority: string;
   status: string;
   businessValue: string | null;
-  userStory: string | null;
+  userStories: UserStory[];
   requester: string | null;
   acceptanceSummary: string | null;
   startedAt: string | null;
@@ -230,6 +238,14 @@ export interface ProjectStatus {
   issues: EntityStatusSummary;
   featureRequests: EntityStatusSummary;
   workPackages: WorkPackageStatusSummary;
+}
+
+export interface StateChangeDto {
+  entityType: string;
+  entityId: string;
+  oldState: string;
+  newState: string;
+  reason: string;
 }
 
 export interface NextActionItem {

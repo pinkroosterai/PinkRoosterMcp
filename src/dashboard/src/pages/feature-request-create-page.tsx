@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Lightbulb } from "lucide-react";
+import { ArrowLeft, Lightbulb, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateFeatureRequest } from "@/hooks/use-feature-requests";
 import { createFeatureRequestSchema, type CreateFeatureRequestInput, featureCategories, priorities } from "@/lib/schemas";
+import { AddUserStoryForm } from "@/components/add-user-story-form";
+import type { UserStory } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +33,7 @@ export function FeatureRequestCreatePage() {
   const projectId = Number(id);
   const navigate = useNavigate();
   const createFr = useCreateFeatureRequest();
+  const [userStories, setUserStories] = useState<UserStory[]>([]);
 
   const form = useForm<CreateFeatureRequestInput>({
     resolver: zodResolver(createFeatureRequestSchema),
@@ -38,16 +42,18 @@ export function FeatureRequestCreatePage() {
       description: "",
       priority: "Medium",
       businessValue: "",
-      userStory: "",
       requester: "",
       acceptanceSummary: "",
     },
   });
 
   const onSubmit = (data: CreateFeatureRequestInput) => {
-    const payload = Object.fromEntries(
+    const payload: Record<string, unknown> = Object.fromEntries(
       Object.entries(data).filter(([, v]) => v !== "" && v !== undefined),
     );
+    if (userStories.length > 0) {
+      payload.userStories = userStories;
+    }
 
     createFr.mutate(
       { projectId, data: payload },
@@ -175,16 +181,34 @@ export function FeatureRequestCreatePage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="userStory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Story</FormLabel>
-                    <FormControl><Textarea placeholder="As a [user], I want [goal] so that [benefit]" rows={2} {...field} /></FormControl>
-                  </FormItem>
-                )}
-              />
+              {/* User Stories */}
+              <div>
+                <div className="text-sm font-medium mb-2">User Stories</div>
+                <div className="space-y-2">
+                  {userStories.map((story, idx) => (
+                    <div key={idx} className="flex items-start gap-2 rounded-lg border p-3">
+                      <p className="text-sm flex-1">
+                        <span className="text-muted-foreground">As a</span>{" "}
+                        <span className="font-medium">{story.role}</span>
+                        <span className="text-muted-foreground">, I want</span>{" "}
+                        <span className="font-medium">{story.goal}</span>
+                        <span className="text-muted-foreground">, so that</span>{" "}
+                        <span className="font-medium">{story.benefit}</span>
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-destructive shrink-0"
+                        onClick={() => setUserStories(prev => prev.filter((_, i) => i !== idx))}
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <AddUserStoryForm onAdd={(story) => setUserStories(prev => [...prev, story])} />
+                </div>
+              </div>
 
               <FormField
                 control={form.control}

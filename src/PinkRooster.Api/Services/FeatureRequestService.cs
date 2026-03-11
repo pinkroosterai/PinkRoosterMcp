@@ -64,7 +64,7 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
                 Priority = request.Priority,
                 Status = request.Status,
                 BusinessValue = request.BusinessValue,
-                UserStory = request.UserStory,
+                UserStories = MapUserStories(request.UserStories),
                 Requester = request.Requester,
                 AcceptanceSummary = request.AcceptanceSummary,
                 Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
@@ -114,9 +114,6 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         if (request.BusinessValue is not null)
             AuditAndSet(auditEntries, fr.Id, changedBy, now, "BusinessValue", fr.BusinessValue, request.BusinessValue, v => fr.BusinessValue = v);
 
-        if (request.UserStory is not null)
-            AuditAndSet(auditEntries, fr.Id, changedBy, now, "UserStory", fr.UserStory, request.UserStory, v => fr.UserStory = v);
-
         if (request.Requester is not null)
             AuditAndSet(auditEntries, fr.Id, changedBy, now, "Requester", fr.Requester, request.Requester, v => fr.Requester = v);
 
@@ -165,6 +162,76 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         db.FeatureRequests.Remove(fr);
         await db.SaveChangesAsync(ct);
         return true;
+    }
+
+    public async Task<FeatureRequestResponse?> ManageUserStoriesAsync(
+        long projectId, int frNumber, ManageUserStoriesRequest request, string changedBy, CancellationToken ct = default)
+    {
+        var fr = await db.FeatureRequests
+            .FirstOrDefaultAsync(f => f.ProjectId == projectId && f.FeatureRequestNumber == frNumber, ct);
+
+        if (fr is null) return null;
+
+        var now = DateTimeOffset.UtcNow;
+        var oldJson = JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit }));
+
+        switch (request.Action.ToLowerInvariant())
+        {
+            case "add":
+                if (string.IsNullOrWhiteSpace(request.Role) || string.IsNullOrWhiteSpace(request.Goal) || string.IsNullOrWhiteSpace(request.Benefit))
+                    throw new ArgumentException("Role, Goal, and Benefit are required for Add action.");
+                fr.UserStories.Add(new UserStory
+                {
+                    Role = request.Role,
+                    Goal = request.Goal,
+                    Benefit = request.Benefit
+                });
+                break;
+
+            case "update":
+                if (request.Index is null || request.Index < 0 || request.Index >= fr.UserStories.Count)
+                    throw new ArgumentOutOfRangeException(nameof(request.Index),
+                        $"Index must be between 0 and {fr.UserStories.Count - 1}.");
+                if (string.IsNullOrWhiteSpace(request.Role) || string.IsNullOrWhiteSpace(request.Goal) || string.IsNullOrWhiteSpace(request.Benefit))
+                    throw new ArgumentException("Role, Goal, and Benefit are required for Update action.");
+                fr.UserStories[request.Index.Value] = new UserStory
+                {
+                    Role = request.Role,
+                    Goal = request.Goal,
+                    Benefit = request.Benefit
+                };
+                break;
+
+            case "remove":
+                if (request.Index is null || request.Index < 0 || request.Index >= fr.UserStories.Count)
+                    throw new ArgumentOutOfRangeException(nameof(request.Index),
+                        $"Index must be between 0 and {fr.UserStories.Count - 1}.");
+                fr.UserStories.RemoveAt(request.Index.Value);
+                break;
+
+            default:
+                throw new ArgumentException($"Invalid action '{request.Action}'. Must be Add, Update, or Remove.");
+        }
+
+        var newJson = JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit }));
+        if (oldJson != newJson)
+        {
+            db.FeatureRequestAuditLogs.Add(new FeatureRequestAuditLog
+            {
+                FeatureRequestId = fr.Id,
+                FieldName = "UserStories",
+                OldValue = oldJson,
+                NewValue = newJson,
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var response = ToResponse(fr);
+        await EnrichWithLinkedWorkPackagesAsync([response], ct);
+        return response;
     }
 
     // ── Private helpers ──
@@ -243,7 +310,8 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         Add("Priority", fr.Priority.ToString());
         Add("Status", fr.Status.ToString());
         Add("BusinessValue", fr.BusinessValue);
-        Add("UserStory", fr.UserStory);
+        if (fr.UserStories.Count > 0)
+            Add("UserStories", JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit })));
         Add("Requester", fr.Requester);
         Add("AcceptanceSummary", fr.AcceptanceSummary);
 
@@ -287,6 +355,14 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         setter(newValue);
     }
 
+    private static List<UserStory> MapUserStories(List<UserStoryDto>? dtos) =>
+        dtos?.Select(us => new UserStory
+        {
+            Role = us.Role,
+            Goal = us.Goal,
+            Benefit = us.Benefit
+        }).ToList() ?? [];
+
     private static FeatureRequestResponse ToResponse(FeatureRequest fr) => new()
     {
         FeatureRequestId = $"proj-{fr.ProjectId}-fr-{fr.FeatureRequestNumber}",
@@ -299,7 +375,12 @@ public sealed class FeatureRequestService(AppDbContext db) : IFeatureRequestServ
         Priority = fr.Priority.ToString(),
         Status = fr.Status.ToString(),
         BusinessValue = fr.BusinessValue,
-        UserStory = fr.UserStory,
+        UserStories = fr.UserStories.Select(us => new UserStoryDto
+        {
+            Role = us.Role,
+            Goal = us.Goal,
+            Benefit = us.Benefit
+        }).ToList(),
         Requester = fr.Requester,
         AcceptanceSummary = fr.AcceptanceSummary,
         StartedAt = fr.StartedAt,

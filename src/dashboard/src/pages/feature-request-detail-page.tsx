@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Lightbulb, Package, Paperclip, Clock, Pencil, X, Save } from "lucide-react";
-import { useFeatureRequest, useDeleteFeatureRequest, useUpdateFeatureRequest } from "@/hooks/use-feature-requests";
+import { useFeatureRequest, useDeleteFeatureRequest, useUpdateFeatureRequest, useManageUserStories } from "@/hooks/use-feature-requests";
 import { updateFeatureRequestSchema, type UpdateFeatureRequestInput, featureCategories, priorities, featureStatuses } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { FeatureRequest } from "@/types";
+import { UserStoryCard } from "@/components/user-story-card";
+import { AddUserStoryForm } from "@/components/add-user-story-form";
+import type { FeatureRequest, UserStory } from "@/types";
 
 const categoryVariant: Record<string, "default" | "secondary" | "outline"> = {
   Feature: "default",
@@ -64,7 +66,6 @@ function frToFormValues(fr: FeatureRequest): UpdateFeatureRequestInput {
     category: fr.category as UpdateFeatureRequestInput["category"],
     priority: fr.priority as UpdateFeatureRequestInput["priority"],
     businessValue: fr.businessValue ?? "",
-    userStory: fr.userStory ?? "",
     requester: fr.requester ?? "",
     acceptanceSummary: fr.acceptanceSummary ?? "",
   };
@@ -92,6 +93,7 @@ export function FeatureRequestDetailPage() {
   const { data: fr, isLoading } = useFeatureRequest(projectId, frNumber);
   const deleteFr = useDeleteFeatureRequest();
   const updateFr = useUpdateFeatureRequest();
+  const manageStories = useManageUserStories();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [statusToChange, setStatusToChange] = useState<string | null>(null);
@@ -175,7 +177,35 @@ export function FeatureRequestDetailPage() {
     );
   }
 
-  const hasUserStoryOrBV = fr.userStory || fr.businessValue;
+  const handleAddStory = (story: UserStory) => {
+    manageStories.mutate(
+      { projectId, frNumber, data: { action: "Add", ...story } },
+      {
+        onSuccess: () => toast.success("User story added"),
+        onError: (error) => toast.error(`Failed to add user story: ${error.message}`),
+      },
+    );
+  };
+
+  const handleUpdateStory = (index: number, story: UserStory) => {
+    manageStories.mutate(
+      { projectId, frNumber, data: { action: "Update", index, ...story } },
+      {
+        onSuccess: () => toast.success("User story updated"),
+        onError: (error) => toast.error(`Failed to update user story: ${error.message}`),
+      },
+    );
+  };
+
+  const handleRemoveStory = (index: number) => {
+    manageStories.mutate(
+      { projectId, frNumber, data: { action: "Remove", index } },
+      {
+        onSuccess: () => toast.success("User story removed"),
+        onError: (error) => toast.error(`Failed to remove user story: ${error.message}`),
+      },
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -299,39 +329,43 @@ export function FeatureRequestDetailPage() {
         </CardContent>
       </Card>
 
-      {/* User Story & Business Value */}
-      {(hasUserStoryOrBV || isEditing) && (
+      {/* User Stories */}
+      {(fr.userStories.length > 0 || !isEditing) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">User Story & Business Value</CardTitle>
+            <CardTitle className="text-base">User Stories</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {isEditing ? (
-              <>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">User Story</div>
-                  <Textarea rows={2} {...form.register("userStory")} />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Business Value</div>
-                  <Textarea rows={2} {...form.register("businessValue")} />
-                </div>
-              </>
+          <CardContent className="space-y-3">
+            {fr.userStories.length === 0 && !isEditing ? (
+              <p className="text-sm text-muted-foreground">No user stories yet.</p>
             ) : (
-              <>
-                {fr.userStory && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">User Story</div>
-                    <p className="text-sm whitespace-pre-wrap">{fr.userStory}</p>
-                  </div>
-                )}
-                {fr.businessValue && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">Business Value</div>
-                    <p className="text-sm whitespace-pre-wrap">{fr.businessValue}</p>
-                  </div>
-                )}
-              </>
+              fr.userStories.map((story, idx) => (
+                <UserStoryCard
+                  key={idx}
+                  story={story}
+                  index={idx}
+                  onUpdate={handleUpdateStory}
+                  onRemove={handleRemoveStory}
+                  disabled={manageStories.isPending}
+                />
+              ))
+            )}
+            <AddUserStoryForm onAdd={handleAddStory} disabled={manageStories.isPending} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Business Value */}
+      {(fr.businessValue || isEditing) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Business Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditing ? (
+              <Textarea rows={2} {...form.register("businessValue")} />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{fr.businessValue}</p>
             )}
           </CardContent>
         </Card>

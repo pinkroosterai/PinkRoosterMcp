@@ -30,7 +30,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         [Description("Priority level. Default: Medium.")] Priority? priority = null,
         [Description("Feature status (e.g. Proposed, UnderReview, Approved, Scheduled, InProgress, Completed, Rejected, Deferred). Omit to keep current.")] FeatureStatus? status = null,
         [Description("Business value / justification for the feature.")] string? businessValue = null,
-        [Description("User story (e.g. 'As a... I want... So that...').")] string? userStory = null,
+        [Description("User stories for this feature (structured role/goal/benefit). Only applied on create.")] List<UserStoryInput>? userStories = null,
         [Description("Who or what requested this feature.")] string? requester = null,
         [Description("High-level acceptance criteria summary.")] string? acceptanceSummary = null,
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
@@ -43,10 +43,10 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         {
             if (featureRequestId is not null)
                 return await UpdateExisting(projId, featureRequestId, name, description, category,
-                    priority, status, businessValue, userStory, requester, acceptanceSummary, attachments, ct);
+                    priority, status, businessValue, requester, acceptanceSummary, attachments, ct);
 
             return await CreateNew(projId, name, description, category,
-                priority, status, businessValue, userStory, requester, acceptanceSummary, attachments, ct);
+                priority, status, businessValue, userStories, requester, acceptanceSummary, attachments, ct);
         }
         catch (Exception ex)
         {
@@ -82,7 +82,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
                 Priority = fr.Priority,
                 Status = fr.Status,
                 BusinessValue = fr.BusinessValue,
-                UserStory = fr.UserStory,
+                UserStories = fr.UserStories,
                 Requester = fr.Requester,
                 AcceptanceSummary = fr.AcceptanceSummary,
                 Attachments = fr.Attachments,
@@ -145,11 +145,61 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         }
     }
 
+    [McpServerTool(Name = "manage_user_stories",
+        Title = "Manage User Stories", Destructive = false, OpenWorld = false)]
+    [Description(
+        "Add, update, or remove a user story on a feature request. " +
+        "Each user story has structured fields: role, goal, benefit (maps to 'As a [role], I want [goal], so that [benefit]'). " +
+        "Use index (0-based) to target a specific story for Update or Remove.")]
+    public async Task<string> ManageUserStories(
+        [Description("Feature request ID (e.g. 'proj-1-fr-3').")] string featureRequestId,
+        [Description("Action to perform.")] UserStoryAction action,
+        [Description("0-based index of the user story to update or remove. Required for Update and Remove.")] int? index = null,
+        [Description("The user role (e.g. 'developer', 'project manager'). Required for Add and Update.")] string? role = null,
+        [Description("What the user wants to achieve. Required for Add and Update.")] string? goal = null,
+        [Description("Why the user wants this (the benefit). Required for Add and Update.")] string? benefit = null,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var projId, out var frNumber))
+            return OperationResult.Error($"Invalid feature request ID format: '{featureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
+
+        try
+        {
+            var request = new ManageUserStoriesRequest
+            {
+                Action = action.ToString(),
+                Index = index,
+                Role = role,
+                Goal = goal,
+                Benefit = benefit
+            };
+
+            var fr = await apiClient.ManageUserStoriesAsync(projId, frNumber, request, ct);
+            if (fr is null)
+                return OperationResult.Warning($"Feature request '{featureRequestId}' not found.");
+
+            var actionVerb = action switch
+            {
+                UserStoryAction.Add => "added to",
+                UserStoryAction.Update => "updated on",
+                UserStoryAction.Remove => "removed from",
+                _ => "modified on"
+            };
+
+            return OperationResult.Success(featureRequestId,
+                $"User story {actionVerb} '{featureRequestId}'. Total stories: {fr.UserStories.Count}.");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Error($"Failed to manage user stories: {ex.Message}");
+        }
+    }
+
     // ── Private helpers ──
 
     private async Task<string> CreateNew(
         long projId, string? name, string? description, FeatureCategory? category,
-        Priority? priority, FeatureStatus? status, string? businessValue, string? userStory,
+        Priority? priority, FeatureStatus? status, string? businessValue, List<UserStoryInput>? userStories,
         string? requester, string? acceptanceSummary, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -167,7 +217,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
             Priority = priority ?? Priority.Medium,
             Status = status ?? FeatureStatus.Proposed,
             BusinessValue = businessValue,
-            UserStory = userStory,
+            UserStories = McpInputParser.MapUserStories(userStories),
             Requester = requester,
             AcceptanceSummary = acceptanceSummary,
             Attachments = McpInputParser.MapFileReferences(attachments)
@@ -179,7 +229,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
 
     private async Task<string> UpdateExisting(
         long projId, string featureRequestId, string? name, string? description, FeatureCategory? category,
-        Priority? priority, FeatureStatus? status, string? businessValue, string? userStory,
+        Priority? priority, FeatureStatus? status, string? businessValue,
         string? requester, string? acceptanceSummary, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var parsedProjId, out var frNumber))
@@ -196,7 +246,6 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
             Priority = priority,
             Status = status,
             BusinessValue = businessValue,
-            UserStory = userStory,
             Requester = requester,
             AcceptanceSummary = acceptanceSummary,
             Attachments = attachments is not null ? McpInputParser.MapFileReferences(attachments) : null

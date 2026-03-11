@@ -44,13 +44,23 @@ describe("FeatureRequestDetailPage", () => {
     });
   });
 
-  it("renders user story and business value", async () => {
+  it("renders user stories as cards", async () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("User Story & Business Value")).toBeInTheDocument();
+      expect(screen.getByText("User Stories")).toBeInTheDocument();
     });
-    expect(screen.getByText("As a user I want dark mode")).toBeInTheDocument();
+    expect(screen.getByText("user")).toBeInTheDocument();
+    expect(screen.getByText("toggle dark mode in the dashboard")).toBeInTheDocument();
+    expect(screen.getByText("reduced eye strain at night")).toBeInTheDocument();
+  });
+
+  it("renders business value", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Business Value")).toBeInTheDocument();
+    });
     expect(screen.getByText("Improves UX for night users")).toBeInTheDocument();
   });
 
@@ -114,7 +124,7 @@ describe("FeatureRequestDetailPage", () => {
           priority: "High",
           status: "InProgress",
           businessValue: null,
-          userStory: null,
+          userStories: [],
           requester: null,
           acceptanceSummary: null,
           startedAt: "2026-01-02T00:00:00Z",
@@ -139,6 +149,149 @@ describe("FeatureRequestDetailPage", () => {
     expect(screen.getByText("proj-1-wp-1")).toBeInTheDocument();
   });
 
+  it("shows Edit button that toggles to edit mode with Save/Cancel", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: /edit/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
+  });
+
+  it("cancel restores read-only mode", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /edit/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+  });
+
+  it("save sends PATCH with changed fields and exits edit mode", async () => {
+    const user = userEvent.setup();
+    let patchBody: Record<string, unknown> | null = null;
+
+    server.use(
+      http.patch("/api/projects/:id/feature-requests/:n", async ({ request }) => {
+        patchBody = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({
+          featureRequestId: "proj-1-fr-1",
+          id: 1,
+          featureRequestNumber: 1,
+          projectId: "proj-1",
+          name: "Updated FR",
+          description: "Add dark mode support to the dashboard",
+          category: "Feature",
+          priority: "High",
+          status: "Approved",
+          businessValue: "Improves UX for night users",
+          userStories: [{ role: "user", goal: "toggle dark mode", benefit: "reduced eye strain" }],
+          requester: "product-team",
+          acceptanceSummary: "Theme toggle works in header",
+          startedAt: null,
+          completedAt: null,
+          resolvedAt: null,
+          attachments: [],
+          linkedWorkPackages: [],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        });
+      }),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByDisplayValue("Dashboard Dark Mode");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Updated FR");
+
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(patchBody).not.toBeNull();
+    });
+    expect(patchBody!.name).toBe("Updated FR");
+    expect(patchBody!.priority).toBeUndefined();
+  });
+
+  it("save with no changes exits edit mode without PATCH", async () => {
+    const user = userEvent.setup();
+    let patchCalled = false;
+
+    server.use(
+      http.patch("/api/projects/:id/feature-requests/:n", () => {
+        patchCalled = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /edit/i })).toBeInTheDocument();
+    });
+    expect(patchCalled).toBe(false);
+  });
+
+  it("renders status as a select combobox", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+    });
+
+    const statusCombobox = screen.getAllByRole("combobox").find(
+      (el) => el.textContent?.includes("Approved"),
+    );
+    expect(statusCombobox).toBeTruthy();
+  });
+
   it("hides optional sections when data is null", async () => {
     server.use(
       http.get("/api/projects/:id/feature-requests/:n", () =>
@@ -153,7 +306,7 @@ describe("FeatureRequestDetailPage", () => {
           priority: "Low",
           status: "Proposed",
           businessValue: null,
-          userStory: null,
+          userStories: [],
           requester: null,
           acceptanceSummary: null,
           startedAt: null,
@@ -172,7 +325,7 @@ describe("FeatureRequestDetailPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Minimal FR")).toBeInTheDocument();
     });
-    expect(screen.queryByText("User Story & Business Value")).not.toBeInTheDocument();
+    expect(screen.queryByText("Business Value")).not.toBeInTheDocument();
     expect(screen.queryByText("Acceptance Summary")).not.toBeInTheDocument();
     expect(screen.queryByText("Related Work Packages")).not.toBeInTheDocument();
   });

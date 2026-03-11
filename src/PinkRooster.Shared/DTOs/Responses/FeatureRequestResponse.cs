@@ -14,7 +14,7 @@ public sealed class FeatureRequestResponse
     public required string Priority { get; init; }
     public required string Status { get; init; }
     public string? BusinessValue { get; init; }
-    public string? UserStory { get; init; }
+    public required List<UserStoryDto> UserStories { get; init; }
     public string? Requester { get; init; }
     public string? AcceptanceSummary { get; init; }
     public DateTimeOffset? StartedAt { get; init; }

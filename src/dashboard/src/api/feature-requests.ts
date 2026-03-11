@@ -37,6 +37,20 @@ export function updateFeatureRequest(
   });
 }
 
+export function manageUserStories(
+  projectId: number,
+  frNumber: number,
+  data: { action: string; index?: number; role?: string; goal?: string; benefit?: string },
+): Promise<import("@/types").FeatureRequest> {
+  return apiFetch<import("@/types").FeatureRequest>(
+    `/projects/${projectId}/feature-requests/${frNumber}/user-stories/manage`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+  );
+}
+
 export function deleteFeatureRequest(
   projectId: number,
   frNumber: number,

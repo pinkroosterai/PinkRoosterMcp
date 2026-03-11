@@ -5,6 +5,7 @@ import {
   createFeatureRequest,
   updateFeatureRequest,
   deleteFeatureRequest,
+  manageUserStories,
 } from "@/api/feature-requests";
 
 export function useFeatureRequests(projectId: number | undefined, stateFilter?: string) {
@@ -40,6 +41,26 @@ export function useUpdateFeatureRequest() {
   return useMutation({
     mutationFn: ({ projectId, frNumber, data }: { projectId: number; frNumber: number; data: Record<string, unknown> }) =>
       updateFeatureRequest(projectId, frNumber, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["feature-request", variables.projectId, variables.frNumber] });
+      queryClient.invalidateQueries({ queryKey: ["feature-requests"] });
+    },
+  });
+}
+
+export function useManageUserStories() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      frNumber,
+      data,
+    }: {
+      projectId: number;
+      frNumber: number;
+      data: { action: string; index?: number; role?: string; goal?: string; benefit?: string };
+    }) => manageUserStories(projectId, frNumber, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["feature-request", variables.projectId, variables.frNumber] });
       queryClient.invalidateQueries({ queryKey: ["feature-requests"] });

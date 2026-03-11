@@ -17,7 +17,7 @@ public sealed class FeatureRequest : IHasStateTimestamps, IHasUpdatedAt
 
     // ── Context ──
     public string? BusinessValue { get; set; }
-    public string? UserStory { get; set; }
+    public List<UserStory> UserStories { get; set; } = [];
     public string? Requester { get; set; }
     public string? AcceptanceSummary { get; set; }
 

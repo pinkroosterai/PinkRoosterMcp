@@ -10,7 +10,7 @@ public sealed class CreateFeatureRequestRequest
     public Priority Priority { get; init; } = Priority.Medium;
     public FeatureStatus Status { get; init; } = FeatureStatus.Proposed;
     public string? BusinessValue { get; init; }
-    public string? UserStory { get; init; }
+    public List<UserStoryDto>? UserStories { get; init; }
     public string? Requester { get; init; }
     public string? AcceptanceSummary { get; init; }
     public List<FileReferenceDto>? Attachments { get; init; }

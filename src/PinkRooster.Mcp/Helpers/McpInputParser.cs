@@ -17,6 +17,14 @@ internal static class McpInputParser
 
     // ── Mapping: MCP inputs → Shared DTOs ──
 
+    internal static List<UserStoryDto>? MapUserStories(List<UserStoryInput>? inputs) =>
+        inputs?.Select(us => new UserStoryDto
+        {
+            Role = us.Role,
+            Goal = us.Goal,
+            Benefit = us.Benefit
+        }).ToList();
+
     internal static List<FileReferenceDto>? MapFileReferences(List<FileReferenceInput>? inputs) =>
         inputs?.Select(f => new FileReferenceDto
         {

@@ -107,6 +107,19 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
     }
 
+    public async Task<FeatureRequestResponse?> ManageUserStoriesAsync(
+        long projectId, int frNumber, ManageUserStoriesRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/projects/{projectId}/feature-requests/{frNumber}/user-stories/manage", request, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+    }
+
     // ── Issue endpoints ──
 
     public async Task<List<IssueResponse>> GetIssuesByProjectAsync(

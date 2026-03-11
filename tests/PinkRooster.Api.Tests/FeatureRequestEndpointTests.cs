@@ -95,7 +95,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
             Priority = Priority.Critical,
             Status = FeatureStatus.UnderReview,
             BusinessValue = "High ROI",
-            UserStory = "As a user, I want...",
+            UserStories = [new() { Role = "user", Goal = "something useful", Benefit = "productivity" }],
             Requester = "product-team",
             AcceptanceSummary = "Must pass all criteria"
         };
@@ -107,7 +107,8 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         Assert.Equal("Critical", fr.Priority);
         Assert.Equal("UnderReview", fr.Status);
         Assert.Equal("High ROI", fr.BusinessValue);
-        Assert.Equal("As a user, I want...", fr.UserStory);
+        Assert.Single(fr.UserStories);
+        Assert.Equal("user", fr.UserStories[0].Role);
         Assert.Equal("product-team", fr.Requester);
         Assert.Equal("Must pass all criteria", fr.AcceptanceSummary);
     }

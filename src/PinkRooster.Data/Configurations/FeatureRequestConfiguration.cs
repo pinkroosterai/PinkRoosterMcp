@@ -26,7 +26,10 @@ public sealed class FeatureRequestConfiguration : IEntityTypeConfiguration<Featu
 
         // ── Context ──
         builder.Property(x => x.BusinessValue).HasColumnName("business_value").HasMaxLength(4000);
-        builder.Property(x => x.UserStory).HasColumnName("user_story").HasMaxLength(4000);
+        builder.OwnsMany(x => x.UserStories, us =>
+        {
+            us.ToJson("user_stories");
+        });
         builder.Property(x => x.Requester).HasColumnName("requester").HasMaxLength(200);
         builder.Property(x => x.AcceptanceSummary).HasColumnName("acceptance_summary").HasMaxLength(4000);
 

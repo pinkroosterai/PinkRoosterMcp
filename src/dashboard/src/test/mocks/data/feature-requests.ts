@@ -12,7 +12,9 @@ export function createFeatureRequest(overrides?: Partial<FeatureRequest>): Featu
     priority: "High",
     status: "Approved",
     businessValue: "Improves UX for night users",
-    userStory: "As a user I want dark mode",
+    userStories: [
+      { role: "user", goal: "toggle dark mode in the dashboard", benefit: "reduced eye strain at night" },
+    ],
     requester: "product-team",
     acceptanceSummary: "Theme toggle works in header",
     startedAt: null,

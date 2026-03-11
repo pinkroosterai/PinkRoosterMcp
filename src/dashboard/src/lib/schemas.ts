@@ -41,6 +41,15 @@ export const updateIssueSchema = z.object({
 
 export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
 
+// User story schema
+export const userStorySchema = z.object({
+  role: z.string().min(1, "Role is required"),
+  goal: z.string().min(1, "Goal is required"),
+  benefit: z.string().min(1, "Benefit is required"),
+});
+
+export type UserStoryInput = z.infer<typeof userStorySchema>;
+
 // Feature request schemas
 export const createFeatureRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -48,7 +57,7 @@ export const createFeatureRequestSchema = z.object({
   category: z.enum(featureCategories, { message: "Category is required" }),
   priority: z.enum(priorities).optional(),
   businessValue: z.string().optional(),
-  userStory: z.string().optional(),
+  userStories: z.array(userStorySchema).optional(),
   requester: z.string().optional(),
   acceptanceSummary: z.string().optional(),
 });
@@ -61,9 +70,23 @@ export const updateFeatureRequestSchema = z.object({
   category: z.enum(featureCategories).optional(),
   priority: z.enum(priorities).optional(),
   businessValue: z.string().optional(),
-  userStory: z.string().optional(),
   requester: z.string().optional(),
   acceptanceSummary: z.string().optional(),
 });
 
 export type UpdateFeatureRequestInput = z.infer<typeof updateFeatureRequestSchema>;
+
+// Work package schemas
+export const workPackageTypes = ["Feature", "BugFix", "Refactor", "Spike", "Chore"] as const;
+
+export const updateWorkPackageSchema = z.object({
+  name: z.string().min(1, "Name is required").optional(),
+  description: z.string().min(1, "Description is required").optional(),
+  type: z.enum(workPackageTypes).optional(),
+  priority: z.enum(priorities).optional(),
+  plan: z.string().optional(),
+  estimatedComplexity: z.number().min(1).max(10).optional(),
+  estimationRationale: z.string().optional(),
+});
+
+export type UpdateWorkPackageInput = z.infer<typeof updateWorkPackageSchema>;

@@ -44,6 +44,22 @@ public sealed class FeatureRequestController(IFeatureRequestService featureReque
         return fr is null ? NotFound() : Ok(fr);
     }
 
+    [HttpPost("{frNumber:int}/user-stories/manage")]
+    public async Task<ActionResult<FeatureRequestResponse>> ManageUserStories(
+        long projectId, int frNumber, ManageUserStoriesRequest request, CancellationToken ct)
+    {
+        var changedBy = HttpContext.GetCallerIdentity();
+        try
+        {
+            var fr = await featureRequestService.ManageUserStoriesAsync(projectId, frNumber, request, changedBy, ct);
+            return fr is null ? NotFound() : Ok(fr);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpDelete("{frNumber:int}")]
     public async Task<ActionResult> Delete(
         long projectId, int frNumber, CancellationToken ct)
