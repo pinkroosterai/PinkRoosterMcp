@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TaskAuditLog> TaskAuditLogs => Set<TaskAuditLog>();
     public DbSet<FeatureRequest> FeatureRequests => Set<FeatureRequest>();
     public DbSet<FeatureRequestAuditLog> FeatureRequestAuditLogs => Set<FeatureRequestAuditLog>();
+    public DbSet<WorkPackageIssueLink> WorkPackageIssueLinks => Set<WorkPackageIssueLink>();
+    public DbSet<WorkPackageFeatureRequestLink> WorkPackageFeatureRequestLinks => Set<WorkPackageFeatureRequestLink>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -208,7 +208,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
 
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
-            Name = "WP with issue", Description = "d", LinkedIssueId = linkedIssue.Id,
+            Name = "WP with issue", Description = "d", LinkedIssueIds = [linkedIssue.Id],
             State = CompletionState.Implementing
         }, ct);
 

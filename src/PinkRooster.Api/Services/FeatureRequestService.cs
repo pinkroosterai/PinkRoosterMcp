@@ -295,21 +295,22 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
 
         var frIds = responses.Select(r => r.Id).ToHashSet();
 
-        var linkedWps = await db.WorkPackages
-            .Where(w => w.LinkedFeatureRequestId != null && frIds.Contains(w.LinkedFeatureRequestId.Value))
-            .Select(w => new
+        var linkedWps = await db.WorkPackageFeatureRequestLinks
+            .Where(l => frIds.Contains(l.FeatureRequestId))
+            .Include(l => l.WorkPackage)
+            .Select(l => new
             {
-                w.LinkedFeatureRequestId,
-                w.ProjectId,
-                w.WorkPackageNumber,
-                w.Name,
-                w.State,
-                w.Type,
-                w.Priority
+                l.FeatureRequestId,
+                l.WorkPackage.ProjectId,
+                l.WorkPackage.WorkPackageNumber,
+                l.WorkPackage.Name,
+                l.WorkPackage.State,
+                l.WorkPackage.Type,
+                l.WorkPackage.Priority
             })
             .ToListAsync(ct);
 
-        var lookup = linkedWps.ToLookup(w => w.LinkedFeatureRequestId!.Value);
+        var lookup = linkedWps.ToLookup(w => w.FeatureRequestId);
 
         foreach (var response in responses)
         {

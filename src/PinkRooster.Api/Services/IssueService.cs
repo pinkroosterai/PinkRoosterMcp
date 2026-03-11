@@ -292,24 +292,25 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
 
         var issueIds = responses.Select(r => r.Id).ToHashSet();
 
-        var linkedWps = await db.WorkPackages
-            .Where(wp => wp.ProjectId == projectId && wp.LinkedIssueId != null && issueIds.Contains(wp.LinkedIssueId.Value))
-            .Select(wp => new
+        var linkedWps = await db.WorkPackageIssueLinks
+            .Where(l => issueIds.Contains(l.IssueId))
+            .Include(l => l.WorkPackage)
+            .Select(l => new
             {
-                wp.LinkedIssueId,
-                wp.ProjectId,
-                wp.WorkPackageNumber,
-                wp.Name,
-                State = wp.State.ToString(),
-                Type = wp.Type.ToString(),
-                Priority = wp.Priority.ToString()
+                l.IssueId,
+                l.WorkPackage.ProjectId,
+                l.WorkPackage.WorkPackageNumber,
+                l.WorkPackage.Name,
+                State = l.WorkPackage.State.ToString(),
+                Type = l.WorkPackage.Type.ToString(),
+                Priority = l.WorkPackage.Priority.ToString()
             })
             .ToListAsync(ct);
 
         if (linkedWps.Count == 0)
             return;
 
-        var lookup = linkedWps.ToLookup(wp => wp.LinkedIssueId!.Value);
+        var lookup = linkedWps.ToLookup(wp => wp.IssueId);
 
         foreach (var response in responses)
         {

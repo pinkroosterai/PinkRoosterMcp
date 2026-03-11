@@ -14,10 +14,10 @@ public sealed class NextActionItem
     // ── Enrichment: WP/Task context ──
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? LinkedIssueName { get; init; }
+    public List<string>? LinkedIssueNames { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? LinkedFrName { get; init; }
+    public List<string>? LinkedFrNames { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkPackageType { get; init; }

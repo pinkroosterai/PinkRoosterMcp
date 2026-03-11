@@ -69,7 +69,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     [Description(
         "Returns the full work package tree: phases with acceptance criteria, tasks with target files " +
         "and implementation notes, WP-level and task-level dependencies, " +
-        "linked issue ID (linkedIssueId) and linked FR ID (linkedFeatureRequestId). " +
+        "linked issue IDs (linkedIssueIds) and linked FR IDs (linkedFeatureRequestIds). " +
         "Use get_work_packages for a compact list first, then drill into specific WPs with this tool.")]
     public async Task<string> GetWorkPackageDetails(
         [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
@@ -97,8 +97,8 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                 EstimationRationale = wp.EstimationRationale,
                 State = wp.State,
                 PreviousActiveState = wp.PreviousActiveState,
-                LinkedIssueId = wp.LinkedIssueId,
-                LinkedFeatureRequestId = wp.LinkedFeatureRequestId,
+                LinkedIssueIds = McpInputParser.NullIfEmpty(wp.LinkedIssueIds),
+                LinkedFeatureRequestIds = McpInputParser.NullIfEmpty(wp.LinkedFeatureRequestIds),
                 StartedAt = wp.StartedAt,
                 CompletedAt = wp.CompletedAt,
                 ResolvedAt = wp.ResolvedAt,
@@ -138,8 +138,8 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
-        [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
-        [Description("Linked feature request ID (e.g. 'proj-1-fr-1').")] string? linkedFeatureRequestId = null,
+        [Description("Linked issue IDs (e.g. ['proj-1-issue-3']). Provide to set/replace all linked issues. Omit to keep current.")] List<string>? linkedIssueIds = null,
+        [Description("Linked feature request IDs (e.g. ['proj-1-fr-1']). Provide to set/replace all linked FRs. Omit to keep current.")] List<string>? linkedFeatureRequestIds = null,
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
@@ -150,10 +150,10 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
             if (workPackageId is not null)
                 return await UpdateExistingWorkPackage(projId, workPackageId, name, description, type,
-                    priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
+                    priority, plan, estimatedComplexity, estimationRationale, state, linkedIssueIds, linkedFeatureRequestIds, attachments, ct);
 
             return await CreateNewWorkPackage(projId, name, description, type, priority, plan,
-                estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
+                estimatedComplexity, estimationRationale, state, linkedIssueIds, linkedFeatureRequestIds, attachments, ct);
         }
         catch (Exception ex)
         {
@@ -170,7 +170,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         "This is the most efficient way to create structured work. " +
         "Tasks require name + description; all other fields are optional. " +
         "Task dependencies use 0-based indices within the same phase's task array (dependsOnTaskIndices). " +
-        "Supports WP-level blockers via blockedByWorkPackageIds and linked issue/FR via linkedIssueId/linkedFeatureRequestId. " +
+        "Supports WP-level blockers via blockedByWorkPackageIds and linked issues/FRs via linkedIssueIds/linkedFeatureRequestIds. " +
         "Returns a compact ID map of all created entities (WP, phases, tasks). " +
         "For creating/updating a WP without phases, use create_or_update_work_package instead.")]
     public async Task<string> ScaffoldWorkPackage(
@@ -184,8 +184,8 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing). Default: NotStarted.")] CompletionState? state = null,
-        [Description("Linked issue ID (e.g. 'proj-1-issue-3').")] string? linkedIssueId = null,
-        [Description("Linked feature request ID (e.g. 'proj-1-fr-1').")] string? linkedFeatureRequestId = null,
+        [Description("Linked issue IDs (e.g. ['proj-1-issue-3']).")] List<string>? linkedIssueIds = null,
+        [Description("Linked feature request IDs (e.g. ['proj-1-fr-1']).")] List<string>? linkedFeatureRequestIds = null,
         [Description("Existing WP IDs that block this WP (e.g. ['proj-1-wp-1']).")] List<string>? blockedByWorkPackageIds = null,
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
@@ -212,29 +212,17 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
                 Phases = McpInputParser.MapScaffoldPhases(phases)
             };
 
-            if (linkedIssueId is not null)
-            {
-                if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
-                    return OperationResult.Error($"Invalid linked issue ID format: '{linkedIssueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
+            var resolvedIssueIds = await ResolveIssueIdsAsync(linkedIssueIds, ct);
+            if (resolvedIssueIds is null)
+                return OperationResult.Error("One or more linked issue IDs are invalid. Expected 'proj-{number}-issue-{number}'.");
+            if (resolvedIssueIds.Count > 0)
+                request.LinkedIssueIds = resolvedIssueIds;
 
-                var issue = await apiClient.GetIssueAsync(issueProjId, issueNumber, ct);
-                if (issue is null)
-                    return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
-
-                request.LinkedIssueId = issue.Id;
-            }
-
-            if (linkedFeatureRequestId is not null)
-            {
-                if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
-                    return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
-
-                var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
-                if (fr is null)
-                    return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
-
-                request.LinkedFeatureRequestId = fr.Id;
-            }
+            var resolvedFrIds = await ResolveFrIdsAsync(linkedFeatureRequestIds, ct);
+            if (resolvedFrIds is null)
+                return OperationResult.Error("One or more linked FR IDs are invalid. Expected 'proj-{number}-fr-{number}'.");
+            if (resolvedFrIds.Count > 0)
+                request.LinkedFeatureRequestIds = resolvedFrIds;
 
             if (blockedByWorkPackageIds is { Count: > 0 })
             {
@@ -283,7 +271,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     private async Task<string> CreateNewWorkPackage(
         long projId, string? name, string? description, WorkPackageType? type, Priority? priority,
         string? plan, int? estimatedComplexity, string? estimationRationale, CompletionState? state,
-        string? linkedIssueId, string? linkedFeatureRequestId, List<FileReferenceInput>? attachments, CancellationToken ct)
+        List<string>? linkedIssueIds, List<string>? linkedFeatureRequestIds, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return OperationResult.Error("'name' is required when creating a work package.");
@@ -303,29 +291,17 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             Attachments = McpInputParser.MapFileReferences(attachments)
         };
 
-        if (linkedIssueId is not null)
-        {
-            if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
-                return OperationResult.Error($"Invalid linked issue ID format: '{linkedIssueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
+        var resolvedIssueIds = await ResolveIssueIdsAsync(linkedIssueIds, ct);
+        if (resolvedIssueIds is null)
+            return OperationResult.Error("One or more linked issue IDs are invalid. Expected 'proj-{number}-issue-{number}'.");
+        if (resolvedIssueIds.Count > 0)
+            request.LinkedIssueIds = resolvedIssueIds;
 
-            var issue = await apiClient.GetIssueAsync(issueProjId, issueNumber, ct);
-            if (issue is null)
-                return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
-
-            request.LinkedIssueId = issue.Id;
-        }
-
-        if (linkedFeatureRequestId is not null)
-        {
-            if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
-                return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
-
-            var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
-            if (fr is null)
-                return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
-
-            request.LinkedFeatureRequestId = fr.Id;
-        }
+        var resolvedFrIds = await ResolveFrIdsAsync(linkedFeatureRequestIds, ct);
+        if (resolvedFrIds is null)
+            return OperationResult.Error("One or more linked FR IDs are invalid. Expected 'proj-{number}-fr-{number}'.");
+        if (resolvedFrIds.Count > 0)
+            request.LinkedFeatureRequestIds = resolvedFrIds;
 
         var created = await apiClient.CreateWorkPackageAsync(projId, request, ct);
         return OperationResult.Success(created.WorkPackageId, $"Work package '{name}' created.");
@@ -334,7 +310,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     private async Task<string> UpdateExistingWorkPackage(
         long projId, string workPackageId, string? name, string? description, WorkPackageType? type,
         Priority? priority, string? plan, int? estimatedComplexity, string? estimationRationale,
-        CompletionState? state, string? linkedIssueId, string? linkedFeatureRequestId, List<FileReferenceInput>? attachments, CancellationToken ct)
+        CompletionState? state, List<string>? linkedIssueIds, List<string>? linkedFeatureRequestIds, List<FileReferenceInput>? attachments, CancellationToken ct)
     {
         if (!IdParser.TryParseWorkPackageId(workPackageId, out var parsedProjId, out var wpNumber))
             return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
@@ -355,29 +331,21 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             Attachments = attachments is not null ? McpInputParser.MapFileReferences(attachments) : null
         };
 
-        if (linkedIssueId is not null)
-        {
-            if (!IdParser.TryParseIssueId(linkedIssueId, out var issueProjId, out var issueNumber))
-                return OperationResult.Error($"Invalid linked issue ID format: '{linkedIssueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
+        var resolvedIssueIds = await ResolveIssueIdsAsync(linkedIssueIds, ct);
+        if (resolvedIssueIds is null)
+            return OperationResult.Error("One or more linked issue IDs are invalid. Expected 'proj-{number}-issue-{number}'.");
+        if (resolvedIssueIds.Count > 0)
+            request.LinkedIssueIds = resolvedIssueIds;
+        else if (linkedIssueIds is not null)
+            request.LinkedIssueIds = []; // explicitly clear
 
-            var issue = await apiClient.GetIssueAsync(issueProjId, issueNumber, ct);
-            if (issue is null)
-                return OperationResult.Warning($"Linked issue '{linkedIssueId}' not found.");
-
-            request.LinkedIssueId = issue.Id;
-        }
-
-        if (linkedFeatureRequestId is not null)
-        {
-            if (!IdParser.TryParseFeatureRequestId(linkedFeatureRequestId, out var frProjId, out var frNumber))
-                return OperationResult.Error($"Invalid linked feature request ID format: '{linkedFeatureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
-
-            var fr = await apiClient.GetFeatureRequestAsync(frProjId, frNumber, ct);
-            if (fr is null)
-                return OperationResult.Warning($"Linked feature request '{linkedFeatureRequestId}' not found.");
-
-            request.LinkedFeatureRequestId = fr.Id;
-        }
+        var resolvedFrIds = await ResolveFrIdsAsync(linkedFeatureRequestIds, ct);
+        if (resolvedFrIds is null)
+            return OperationResult.Error("One or more linked FR IDs are invalid. Expected 'proj-{number}-fr-{number}'.");
+        if (resolvedFrIds.Count > 0)
+            request.LinkedFeatureRequestIds = resolvedFrIds;
+        else if (linkedFeatureRequestIds is not null)
+            request.LinkedFeatureRequestIds = []; // explicitly clear
 
         var updated = await apiClient.UpdateWorkPackageAsync(projId, wpNumber, request, ct);
         if (updated is null)
@@ -385,6 +353,40 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
         return OperationResult.Success(workPackageId, $"Work package '{workPackageId}' updated.",
             stateChanges: updated.StateChanges);
+    }
+
+    /// <summary>Resolves human-readable issue IDs to DB IDs. Returns null on invalid format.</summary>
+    private async Task<List<long>> ResolveIssueIdsAsync(List<string>? humanIds, CancellationToken ct)
+    {
+        if (humanIds is not { Count: > 0 }) return [];
+
+        var result = new List<long>();
+        foreach (var id in humanIds)
+        {
+            if (!IdParser.TryParseIssueId(id, out var projId, out var number))
+                return null!;
+            var issue = await apiClient.GetIssueAsync(projId, number, ct);
+            if (issue is null) return null!;
+            result.Add(issue.Id);
+        }
+        return result;
+    }
+
+    /// <summary>Resolves human-readable FR IDs to DB IDs. Returns null on invalid format.</summary>
+    private async Task<List<long>> ResolveFrIdsAsync(List<string>? humanIds, CancellationToken ct)
+    {
+        if (humanIds is not { Count: > 0 }) return [];
+
+        var result = new List<long>();
+        foreach (var id in humanIds)
+        {
+            if (!IdParser.TryParseFeatureRequestId(id, out var projId, out var number))
+                return null!;
+            var fr = await apiClient.GetFeatureRequestAsync(projId, number, ct);
+            if (fr is null) return null!;
+            result.Add(fr.Id);
+        }
+        return result;
     }
 
     // ── Mapping helpers ──

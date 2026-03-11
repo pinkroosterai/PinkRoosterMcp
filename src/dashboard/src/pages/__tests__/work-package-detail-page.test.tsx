@@ -86,7 +86,7 @@ describe("WorkPackageDetailPage", () => {
       http.get("/api/projects/:id/work-packages/:n", () =>
         HttpResponse.json(
           createWorkPackage({
-            linkedIssueId: "proj-1-issue-3",
+            linkedIssueIds: ["proj-1-issue-3"],
             phases: [],
           }),
         ),
@@ -96,7 +96,7 @@ describe("WorkPackageDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Linked Issue")).toBeInTheDocument();
+      expect(screen.getByText("Linked Issues")).toBeInTheDocument();
     });
     expect(screen.getByText("proj-1-issue-3")).toBeInTheDocument();
   });
@@ -106,7 +106,7 @@ describe("WorkPackageDetailPage", () => {
       http.get("/api/projects/:id/work-packages/:n", () =>
         HttpResponse.json(
           createWorkPackage({
-            linkedFeatureRequestId: "proj-1-fr-2",
+            linkedFeatureRequestIds: ["proj-1-fr-2"],
             phases: [],
           }),
         ),
@@ -116,7 +116,7 @@ describe("WorkPackageDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Linked Feature Request")).toBeInTheDocument();
+      expect(screen.getByText("Linked Feature Requests")).toBeInTheDocument();
     });
     expect(screen.getByText("proj-1-fr-2")).toBeInTheDocument();
   });

@@ -52,7 +52,7 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
         {
             Name = "Fix WP",
             Description = "Fixes the issue",
-            LinkedIssueId = issue!.Id
+            LinkedIssueIds = [issue!.Id]
         }, ct);
         Assert.Equal(HttpStatusCode.Created, wpResponse.StatusCode);
 
@@ -79,11 +79,11 @@ public sealed class IssueEndpointTests(PostgresFixture postgres) : IntegrationTe
         // Create two WPs linked to this issue
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
-            Name = "WP 1", Description = "First", LinkedIssueId = issue!.Id
+            Name = "WP 1", Description = "First", LinkedIssueIds = [issue!.Id]
         }, ct);
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
-            Name = "WP 2", Description = "Second", LinkedIssueId = issue.Id
+            Name = "WP 2", Description = "Second", LinkedIssueIds = [issue.Id]
         }, ct);
 
         // Fetch issue list

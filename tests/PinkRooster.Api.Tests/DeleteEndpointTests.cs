@@ -96,7 +96,7 @@ public sealed class DeleteEndpointTests(PostgresFixture postgres) : IntegrationT
         {
             Name = "Linked WP",
             Description = "Test",
-            LinkedFeatureRequestId = fr!.Id
+            LinkedFeatureRequestIds = [fr!.Id]
         }, ct);
 
         // Delete the FR (using per-project number in URL)
@@ -107,7 +107,7 @@ public sealed class DeleteEndpointTests(PostgresFixture postgres) : IntegrationT
         var wpResponse = await Client.GetAsync($"{BasePath}/{projectId}/work-packages/1", ct);
         Assert.Equal(HttpStatusCode.OK, wpResponse.StatusCode);
         var wp = await wpResponse.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
-        Assert.Null(wp!.LinkedFeatureRequestId);
+        Assert.Empty(wp!.LinkedFeatureRequestIds);
     }
 
     // ── Work Package deletion (cascades to phases/tasks) ──

@@ -15,9 +15,6 @@ public sealed class WorkPackageConfiguration : IEntityTypeConfiguration<WorkPack
 
         builder.Property(x => x.WorkPackageNumber).HasColumnName("work_package_number").IsRequired();
         builder.Property(x => x.ProjectId).HasColumnName("project_id").IsRequired();
-        builder.Property(x => x.LinkedIssueId).HasColumnName("linked_issue_id");
-        builder.Property(x => x.LinkedFeatureRequestId).HasColumnName("linked_feature_request_id");
-
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
         builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
@@ -56,23 +53,11 @@ public sealed class WorkPackageConfiguration : IEntityTypeConfiguration<WorkPack
             .HasForeignKey(x => x.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(x => x.LinkedIssue)
-            .WithMany()
-            .HasForeignKey(x => x.LinkedIssueId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        builder.HasOne(x => x.LinkedFeatureRequest)
-            .WithMany()
-            .HasForeignKey(x => x.LinkedFeatureRequestId)
-            .OnDelete(DeleteBehavior.SetNull);
-
         // ── Indexes ──
         builder.HasIndex(x => new { x.ProjectId, x.WorkPackageNumber }).IsUnique();
         builder.HasIndex(x => x.ProjectId);
         builder.HasIndex(x => x.State);
         builder.HasIndex(x => x.Priority);
         builder.HasIndex(x => x.Type);
-        builder.HasIndex(x => x.LinkedIssueId);
-        builder.HasIndex(x => x.LinkedFeatureRequestId);
     }
 }

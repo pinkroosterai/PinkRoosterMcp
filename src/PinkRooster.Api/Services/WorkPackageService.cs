@@ -17,10 +17,13 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         var query = db.WorkPackages.Where(w => w.ProjectId == projectId);
         query = ApplyStateFilter(query, stateFilter);
 
-        return await query
+        var wps = await query
+            .Include(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
+            .Include(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
             .OrderByDescending(w => w.CreatedAt)
-            .Select(w => ToListResponse(w))
             .ToListAsync(ct);
+
+        return wps.Select(ToListResponse).ToList();
     }
 
     public async Task<WorkPackageResponse?> GetByNumberAsync(
@@ -37,8 +40,8 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 .ThenInclude(p => p.AcceptanceCriteria)
             .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
             .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
-            .Include(w => w.LinkedIssue)
-            .Include(w => w.LinkedFeatureRequest)
+            .Include(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
+            .Include(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
             .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
 
         return wp is null ? null : ToResponse(wp);
@@ -83,8 +86,6 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 EstimatedComplexity = request.EstimatedComplexity,
                 EstimationRationale = request.EstimationRationale,
                 State = request.State,
-                LinkedIssueId = request.LinkedIssueId,
-                LinkedFeatureRequestId = request.LinkedFeatureRequestId,
                 Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
@@ -107,10 +108,12 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             AuditHelper.AddCreateEntry(auditEntries, createAudit, "EstimatedComplexity", wp.EstimatedComplexity?.ToString());
             AuditHelper.AddCreateEntry(auditEntries, createAudit, "EstimationRationale", wp.EstimationRationale);
             AuditHelper.AddCreateEntry(auditEntries, createAudit, "State", wp.State.ToString());
-            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedIssueId", wp.LinkedIssueId?.ToString());
-            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
             if (wp.Attachments.Count > 0)
                 AuditHelper.AddCreateEntry(auditEntries, createAudit, "Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
+
+            // Create entity links (many-to-many)
+            await CreateEntityLinksAsync(wp, request.LinkedIssueIds, request.LinkedFeatureRequestIds, auditEntries, createAudit, cancellation);
+
             db.WorkPackageAuditLogs.AddRange(auditEntries);
 
             await db.SaveChangesAsync(cancellation);
@@ -145,8 +148,8 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 .ThenInclude(p => p.AcceptanceCriteria)
             .Include(w => w.BlockedBy).ThenInclude(d => d.DependsOnWorkPackage)
             .Include(w => w.Blocking).ThenInclude(d => d.DependentWorkPackage)
-            .Include(w => w.LinkedIssue)
-            .Include(w => w.LinkedFeatureRequest)
+            .Include(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
+            .Include(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
             .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
 
         if (wp is null)
@@ -183,11 +186,60 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         if (request.State is not null)
             AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", wp.State, request.State.Value, v => wp.State = v);
 
-        if (request.LinkedIssueId is not null)
-            AuditHelper.AuditAndSetNullable(auditEntries, audit, "LinkedIssueId", wp.LinkedIssueId, request.LinkedIssueId, v => wp.LinkedIssueId = v);
+        // Set-based link replacement: null = don't change, empty = clear all, non-empty = replace all
+        if (request.LinkedIssueIds is not null)
+        {
+            var oldIds = wp.LinkedIssueLinks.Select(l => l.IssueId).OrderBy(x => x).ToList();
+            var newIds = request.LinkedIssueIds.Distinct().OrderBy(x => x).ToList();
 
-        if (request.LinkedFeatureRequestId is not null)
-            AuditHelper.AuditAndSetNullable(auditEntries, audit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId, request.LinkedFeatureRequestId, v => wp.LinkedFeatureRequestId = v);
+            if (!oldIds.SequenceEqual(newIds))
+            {
+                auditEntries.Add(new WorkPackageAuditLog
+                {
+                    WorkPackageId = wp.Id, FieldName = "LinkedIssueIds",
+                    OldValue = oldIds.Count > 0 ? string.Join(",", oldIds) : null,
+                    NewValue = newIds.Count > 0 ? string.Join(",", newIds) : null,
+                    ChangedBy = changedBy, ChangedAt = now
+                });
+
+                db.WorkPackageIssueLinks.RemoveRange(wp.LinkedIssueLinks);
+                wp.LinkedIssueLinks.Clear();
+
+                if (newIds.Count > 0)
+                {
+                    var issues = await db.Issues.Where(i => newIds.Contains(i.Id)).ToListAsync(ct);
+                    foreach (var issue in issues)
+                        wp.LinkedIssueLinks.Add(new WorkPackageIssueLink { WorkPackageId = wp.Id, Issue = issue });
+                }
+            }
+        }
+
+        if (request.LinkedFeatureRequestIds is not null)
+        {
+            var oldIds = wp.LinkedFeatureRequestLinks.Select(l => l.FeatureRequestId).OrderBy(x => x).ToList();
+            var newIds = request.LinkedFeatureRequestIds.Distinct().OrderBy(x => x).ToList();
+
+            if (!oldIds.SequenceEqual(newIds))
+            {
+                auditEntries.Add(new WorkPackageAuditLog
+                {
+                    WorkPackageId = wp.Id, FieldName = "LinkedFeatureRequestIds",
+                    OldValue = oldIds.Count > 0 ? string.Join(",", oldIds) : null,
+                    NewValue = newIds.Count > 0 ? string.Join(",", newIds) : null,
+                    ChangedBy = changedBy, ChangedAt = now
+                });
+
+                db.WorkPackageFeatureRequestLinks.RemoveRange(wp.LinkedFeatureRequestLinks);
+                wp.LinkedFeatureRequestLinks.Clear();
+
+                if (newIds.Count > 0)
+                {
+                    var frs = await db.FeatureRequests.Where(fr => newIds.Contains(fr.Id)).ToListAsync(ct);
+                    foreach (var fr in frs)
+                        wp.LinkedFeatureRequestLinks.Add(new WorkPackageFeatureRequestLink { WorkPackageId = wp.Id, FeatureRequest = fr });
+                }
+            }
+        }
 
         if (request.Attachments is not null)
         {
@@ -484,8 +536,6 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 EstimatedComplexity = request.EstimatedComplexity,
                 EstimationRationale = request.EstimationRationale,
                 State = request.State,
-                LinkedIssueId = request.LinkedIssueId,
-                LinkedFeatureRequestId = request.LinkedFeatureRequestId,
                 Attachments = StateTransitionHelper.MapFileReferences(request.Attachments)
             };
 
@@ -504,10 +554,12 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "EstimatedComplexity", wp.EstimatedComplexity?.ToString());
                 AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "EstimationRationale", wp.EstimationRationale);
                 AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "State", wp.State.ToString());
-                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "LinkedIssueId", wp.LinkedIssueId?.ToString());
-                AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "LinkedFeatureRequestId", wp.LinkedFeatureRequestId?.ToString());
                 if (wp.Attachments.Count > 0)
                     AuditHelper.AddCreateEntry(wpAuditEntries, wpCreateAudit, "Attachments", JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description })));
+
+                // Create entity links (many-to-many)
+                await CreateEntityLinksAsync(wp, request.LinkedIssueIds, request.LinkedFeatureRequestIds, wpAuditEntries, wpCreateAudit, cancellation);
+
                 db.WorkPackageAuditLogs.AddRange(wpAuditEntries);
             }
 
@@ -798,8 +850,8 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         EstimationRationale = w.EstimationRationale,
         State = w.State.ToString(),
         PreviousActiveState = w.PreviousActiveState?.ToString(),
-        LinkedIssueId = w.LinkedIssueId is not null ? $"proj-{w.ProjectId}-issue-{w.LinkedIssueId}" : null,
-        LinkedFeatureRequestId = w.LinkedFeatureRequestId is not null ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequestId}" : null,
+        LinkedIssueIds = MapLinkedIssueIds(w),
+        LinkedFeatureRequestIds = MapLinkedFrIds(w),
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,
@@ -823,12 +875,8 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         EstimationRationale = w.EstimationRationale,
         State = w.State.ToString(),
         PreviousActiveState = w.PreviousActiveState?.ToString(),
-        LinkedIssueId = w.LinkedIssue is not null
-            ? $"proj-{w.ProjectId}-issue-{w.LinkedIssue.IssueNumber}"
-            : (w.LinkedIssueId is not null ? w.LinkedIssueId.ToString() : null),
-        LinkedFeatureRequestId = w.LinkedFeatureRequest is not null
-            ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequest.FeatureRequestNumber}"
-            : (w.LinkedFeatureRequestId is not null ? $"proj-{w.ProjectId}-fr-{w.LinkedFeatureRequestId}" : null),
+        LinkedIssueIds = MapLinkedIssueIds(w),
+        LinkedFeatureRequestIds = MapLinkedFrIds(w),
         StartedAt = w.StartedAt,
         CompletedAt = w.CompletedAt,
         ResolvedAt = w.ResolvedAt,
@@ -851,4 +899,35 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         CreatedAt = w.CreatedAt,
         UpdatedAt = w.UpdatedAt
     };
+
+    private static List<string> MapLinkedIssueIds(WorkPackage w) =>
+        w.LinkedIssueLinks.Select(l => $"proj-{w.ProjectId}-issue-{l.Issue.IssueNumber}").ToList();
+
+    private static List<string> MapLinkedFrIds(WorkPackage w) =>
+        w.LinkedFeatureRequestLinks.Select(l => $"proj-{w.ProjectId}-fr-{l.FeatureRequest.FeatureRequestNumber}").ToList();
+
+    private async Task CreateEntityLinksAsync(
+        WorkPackage wp, List<long>? issueIds, List<long>? frIds,
+        List<WorkPackageAuditLog> auditEntries, Func<WorkPackageAuditLog> createAudit, CancellationToken ct)
+    {
+        if (issueIds is { Count: > 0 })
+        {
+            var issues = await db.Issues.Where(i => issueIds.Contains(i.Id)).ToListAsync(ct);
+            foreach (var issue in issues)
+                wp.LinkedIssueLinks.Add(new WorkPackageIssueLink { WorkPackage = wp, Issue = issue });
+
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedIssueIds",
+                string.Join(",", issues.Select(i => i.Id)));
+        }
+
+        if (frIds is { Count: > 0 })
+        {
+            var frs = await db.FeatureRequests.Where(fr => frIds.Contains(fr.Id)).ToListAsync(ct);
+            foreach (var fr in frs)
+                wp.LinkedFeatureRequestLinks.Add(new WorkPackageFeatureRequestLink { WorkPackage = wp, FeatureRequest = fr });
+
+            AuditHelper.AddCreateEntry(auditEntries, createAudit, "LinkedFeatureRequestIds",
+                string.Join(",", frs.Select(fr => fr.Id)));
+        }
+    }
 }

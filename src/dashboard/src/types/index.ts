@@ -99,8 +99,8 @@ export interface WorkPackage {
   estimationRationale: string | null;
   state: string;
   previousActiveState: string | null;
-  linkedIssueId: string | null;
-  linkedFeatureRequestId: string | null;
+  linkedIssueIds: string[];
+  linkedFeatureRequestIds: string[];
   startedAt: string | null;
   completedAt: string | null;
   resolvedAt: string | null;

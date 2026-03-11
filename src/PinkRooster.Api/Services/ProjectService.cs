@@ -171,28 +171,14 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         if (entityType is null or "task")
         {
             var tasks = await db.WorkPackageTasks
-                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedIssue)
-                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedFeatureRequest)
+                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
+                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
                 .Where(t => t.WorkPackage.ProjectId == projectId)
                 .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State))
                 .Where(t => t.State != CompletionState.Blocked)
                 .Where(t => CompletionStateConstants.ActiveStates.Contains(t.State)
                     || t.State == CompletionState.NotStarted)
-                .Select(t => new
-                {
-                    t.WorkPackage.ProjectId,
-                    t.WorkPackage.WorkPackageNumber,
-                    t.TaskNumber,
-                    t.Name,
-                    t.State,
-                    t.SortOrder,
-                    t.WorkPackage.Priority,
-                    t.WorkPackage.Type,
-                    t.WorkPackage.EstimatedComplexity,
-                    LinkedIssueName = t.WorkPackage.LinkedIssue != null ? t.WorkPackage.LinkedIssue.Name : null,
-                    LinkedFrName = t.WorkPackage.LinkedFeatureRequest != null ? t.WorkPackage.LinkedFeatureRequest.Name : null
-                })
-                .OrderBy(t => t.Priority)
+                .OrderBy(t => t.WorkPackage.Priority)
                 .ThenBy(t => t.Name)
                 .Take(limit)
                 .ToListAsync(ct);
@@ -200,15 +186,17 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
             items.AddRange(tasks.Select(t => new NextActionItem
             {
                 Type = "Task",
-                Id = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}-task-{t.TaskNumber}",
+                Id = $"proj-{t.WorkPackage.ProjectId}-wp-{t.WorkPackage.WorkPackageNumber}-task-{t.TaskNumber}",
                 Name = t.Name,
-                Priority = t.Priority.ToString(),
+                Priority = t.WorkPackage.Priority.ToString(),
                 State = t.State.ToString(),
-                ParentId = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}",
-                WorkPackageType = t.Type.ToString(),
-                EstimatedComplexity = t.EstimatedComplexity,
-                LinkedIssueName = t.LinkedIssueName,
-                LinkedFrName = t.LinkedFrName
+                ParentId = $"proj-{t.WorkPackage.ProjectId}-wp-{t.WorkPackage.WorkPackageNumber}",
+                WorkPackageType = t.WorkPackage.Type.ToString(),
+                EstimatedComplexity = t.WorkPackage.EstimatedComplexity,
+                LinkedIssueNames = t.WorkPackage.LinkedIssueLinks.Count > 0
+                    ? t.WorkPackage.LinkedIssueLinks.Select(l => l.Issue.Name).ToList() : null,
+                LinkedFrNames = t.WorkPackage.LinkedFeatureRequestLinks.Count > 0
+                    ? t.WorkPackage.LinkedFeatureRequestLinks.Select(l => l.FeatureRequest.Name).ToList() : null
             }));
         }
 
@@ -216,24 +204,12 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         if (entityType is null or "wp")
         {
             var wps = await db.WorkPackages
-                .Include(w => w.LinkedIssue)
-                .Include(w => w.LinkedFeatureRequest)
+                .Include(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
+                .Include(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
                 .Where(w => w.ProjectId == projectId)
                 .Where(w => !CompletionStateConstants.TerminalStates.Contains(w.State))
                 .Where(w => w.State != CompletionState.Blocked)
                 .Where(w => !db.WorkPackagePhases.Any(p => p.WorkPackage.Id == w.Id))
-                .Select(w => new
-                {
-                    w.ProjectId,
-                    w.WorkPackageNumber,
-                    w.Name,
-                    w.State,
-                    w.Priority,
-                    w.Type,
-                    w.EstimatedComplexity,
-                    LinkedIssueName = w.LinkedIssue != null ? w.LinkedIssue.Name : null,
-                    LinkedFrName = w.LinkedFeatureRequest != null ? w.LinkedFeatureRequest.Name : null
-                })
                 .OrderBy(w => w.Priority)
                 .ThenBy(w => w.Name)
                 .Take(limit)
@@ -249,17 +225,19 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 ParentId = $"proj-{w.ProjectId}",
                 WorkPackageType = w.Type.ToString(),
                 EstimatedComplexity = w.EstimatedComplexity,
-                LinkedIssueName = w.LinkedIssueName,
-                LinkedFrName = w.LinkedFrName
+                LinkedIssueNames = w.LinkedIssueLinks.Count > 0
+                    ? w.LinkedIssueLinks.Select(l => l.Issue.Name).ToList() : null,
+                LinkedFrNames = w.LinkedFeatureRequestLinks.Count > 0
+                    ? w.LinkedFeatureRequestLinks.Select(l => l.FeatureRequest.Name).ToList() : null
             }));
         }
 
         // Query 3: Actionable issues — active/NotStarted, not Blocked, no linked WPs
         if (entityType is null or "issue")
         {
-            var linkedIssueIds = db.WorkPackages
-                .Where(w => w.ProjectId == projectId && w.LinkedIssueId != null)
-                .Select(w => w.LinkedIssueId!.Value);
+            var linkedIssueIds = db.WorkPackageIssueLinks
+                .Where(l => l.WorkPackage.ProjectId == projectId)
+                .Select(l => l.IssueId);
 
             var issues = await db.Issues
                 .Where(i => i.ProjectId == projectId)

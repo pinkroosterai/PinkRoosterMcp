@@ -343,7 +343,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         {
             Name = "Fix WP",
             Description = "Fixes the issue",
-            LinkedIssueId = issue!.Id,
+            LinkedIssueIds = [issue!.Id],
             Phases = [new ScaffoldPhaseRequest { Name = "Phase 1" }]
         };
 
@@ -351,7 +351,7 @@ public sealed class ScaffoldEndpointTests(PostgresFixture postgres) : Integratio
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var wp = await GetJson<WorkPackageResponse>(WpDetailPath(projectId, 1), ct);
-        Assert.NotNull(wp.LinkedIssueId);
+        Assert.NotEmpty(wp.LinkedIssueIds);
     }
 
     // ── Atomicity ──

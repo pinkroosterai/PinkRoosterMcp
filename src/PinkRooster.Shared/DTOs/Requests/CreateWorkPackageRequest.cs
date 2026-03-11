@@ -12,7 +12,7 @@ public sealed class CreateWorkPackageRequest
     public int? EstimatedComplexity { get; set; }
     public string? EstimationRationale { get; set; }
     public CompletionState State { get; set; } = CompletionState.NotStarted;
-    public long? LinkedIssueId { get; set; }
-    public long? LinkedFeatureRequestId { get; set; }
+    public List<long>? LinkedIssueIds { get; set; }
+    public List<long>? LinkedFeatureRequestIds { get; set; }
     public List<FileReferenceDto>? Attachments { get; set; }
 }

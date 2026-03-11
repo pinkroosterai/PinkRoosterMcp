@@ -471,34 +471,42 @@ export function WorkPackageDetailPage() {
         </Card>
       )}
 
-      {/* Linked Issue Card */}
-      {wp.linkedIssueId && (
+      {/* Linked Issues Card */}
+      {wp.linkedIssueIds && wp.linkedIssueIds.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Linked Issue</CardTitle>
+            <CardTitle className="text-base">Linked Issues</CardTitle>
           </CardHeader>
           <CardContent>
-            <Link to={`/projects/${id}/issues/${wp.linkedIssueId.split("-issue-")[1]}`}>
-              <Badge variant="outline" className="cursor-pointer hover:bg-muted">
-                {wp.linkedIssueId}
-              </Badge>
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {wp.linkedIssueIds.map((issueId) => (
+                <Link key={issueId} to={`/projects/${id}/issues/${issueId.split("-issue-")[1]}`}>
+                  <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                    {issueId}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Linked Feature Request Card */}
-      {wp.linkedFeatureRequestId && (
+      {/* Linked Feature Requests Card */}
+      {wp.linkedFeatureRequestIds && wp.linkedFeatureRequestIds.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Linked Feature Request</CardTitle>
+            <CardTitle className="text-base">Linked Feature Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            <Link to={`/projects/${id}/feature-requests/${wp.linkedFeatureRequestId.split("-fr-")[1]}`}>
-              <Badge variant="outline" className="cursor-pointer hover:bg-muted">
-                {wp.linkedFeatureRequestId}
-              </Badge>
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {wp.linkedFeatureRequestIds.map((frId) => (
+                <Link key={frId} to={`/projects/${id}/feature-requests/${frId.split("-fr-")[1]}`}>
+                  <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                    {frId}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

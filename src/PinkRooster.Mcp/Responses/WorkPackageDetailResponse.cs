@@ -15,8 +15,8 @@ public sealed class WorkPackageDetailResponse
     public string? EstimationRationale { get; init; }
     public required string State { get; init; }
     public string? PreviousActiveState { get; init; }
-    public string? LinkedIssueId { get; init; }
-    public string? LinkedFeatureRequestId { get; init; }
+    public List<string>? LinkedIssueIds { get; init; }
+    public List<string>? LinkedFeatureRequestIds { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }

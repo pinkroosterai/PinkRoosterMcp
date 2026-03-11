@@ -385,7 +385,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         {
             Name = "Implementation WP",
             Description = "Implements the feature",
-            LinkedFeatureRequestId = fr!.Id
+            LinkedFeatureRequestIds = [fr!.Id]
         }, ct);
         Assert.Equal(HttpStatusCode.Created, wpResponse.StatusCode);
 
@@ -427,13 +427,13 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         {
             Name = "WP-1",
             Description = "First WP",
-            LinkedFeatureRequestId = fr!.Id
+            LinkedFeatureRequestIds = [fr!.Id]
         }, ct);
         await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
         {
             Name = "WP-2",
             Description = "Second WP",
-            LinkedFeatureRequestId = fr.Id
+            LinkedFeatureRequestIds = [fr.Id]
         }, ct);
 
         var frs = await GetJson<List<FeatureRequestResponse>>(FrPath(projectId), ct);
@@ -458,7 +458,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         {
             Name = "Linked WP",
             Description = "Linked to FR",
-            LinkedFeatureRequestId = fr!.Id
+            LinkedFeatureRequestIds = [fr!.Id]
         }, ct);
 
         // Delete the FR
@@ -468,7 +468,7 @@ public sealed class FeatureRequestEndpointTests(PostgresFixture postgres) : Inte
         // WP should still exist but LinkedFeatureRequestId should be null
         var wp = await GetJson<WorkPackageResponse>($"{WpPath(projectId)}/1", ct);
         Assert.NotNull(wp);
-        Assert.Null(wp.LinkedFeatureRequestId);
+        Assert.Empty(wp.LinkedFeatureRequestIds);
     }
 
     // ── Per-project isolation ──

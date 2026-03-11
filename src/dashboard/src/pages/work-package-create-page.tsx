@@ -60,10 +60,10 @@ export function WorkPackageCreatePage() {
       Object.entries(data).filter(([, v]) => v !== "" && v !== undefined),
     );
     if (linkedIssueId) {
-      payload.linkedIssueId = Number(linkedIssueId);
+      payload.linkedIssueIds = [Number(linkedIssueId)];
     }
     if (linkedFrId) {
-      payload.linkedFeatureRequestId = Number(linkedFrId);
+      payload.linkedFeatureRequestIds = [Number(linkedFrId)];
     }
 
     createWp.mutate(
