@@ -51,7 +51,34 @@ Analyze `$ARGUMENTS` to determine if this is a bug/defect or a feature/enhanceme
 - would be nice, eventually → `Low`
 - default → `Medium`
 
-## Step 2: Confirm Classification
+## Step 2: Clarify Ambiguities
+
+Before classifying, check if the description is missing critical information. Ask the user to clarify if any of these apply:
+
+**Scope ambiguity** — the description could mean very different things:
+- "Improve the dashboard" → Which part? Performance? UI? New features?
+- "Fix the login" → What's broken? Error message? Redirect? Credentials?
+
+**Boundary ambiguity** — unclear what's in/out of scope:
+- "Add export functionality" → Which entities? What formats? Where in the UI?
+- "Support notifications" → Email? In-app? Push? What triggers them?
+
+**Audience ambiguity** — unclear who the work is for:
+- "Make it easier to use" → For whom? End users? Developers? Admins?
+
+**Priority signals conflict** — description mixes urgency levels:
+- "Nice to have but also kind of urgent" → Clarify actual priority
+
+**Ask concisely** — combine related questions into a single prompt rather than asking one at a time. Example:
+```
+A few clarifications before I create this:
+1. Which dashboard pages should this cover? (all, or specific ones)
+2. Should this include API changes or frontend only?
+```
+
+**If the description is clear and specific**, skip this step — do not ask unnecessary questions.
+
+## Step 3: Confirm Classification
 
 Present the classification to the user before creating:
 
@@ -66,14 +93,14 @@ Present the classification to the user before creating:
 Proceed with creation? (y/n, or adjust)
 ```
 
-## Step 3: Resolve Project
+## Step 4: Resolve Project
 
 - Current directory: !`pwd`
 - Call `mcp__pinkrooster__get_project_status` with `projectPath` set to the directory above
 - Extract the `projectId`
 - If no project found, offer to register it first
 
-## Step 4: Create Entity
+## Step 5: Create Entity
 
 **For Issues**:
 Call `mcp__pinkrooster__create_or_update_issue` with:
@@ -97,7 +124,7 @@ Call `mcp__pinkrooster__create_or_update_feature_request` with:
 - `userStories`: array of structured user stories extracted from the description, each with `role`, `goal`, `benefit` (e.g., `[{ "role": "developer", "goal": "export data as CSV", "benefit": "offline analysis in spreadsheets" }]`). Derive multiple stories if the description implies distinct user roles or capabilities.
 - `requester`: "Claude Code" (or user name if known)
 
-## Step 5: Report and Offer Scaffolding
+## Step 6: Report and Offer Scaffolding
 
 ```
 ## Created
@@ -110,7 +137,7 @@ Call `mcp__pinkrooster__create_or_update_feature_request` with:
 Scaffold a work package with implementation tasks? (y/n)
 ```
 
-## Step 6: Optional Scaffolding
+## Step 7: Optional Scaffolding
 
 If the user accepts scaffolding:
 - Delegate to `/pm-scaffold {entityId}` — it handles codebase analysis, phase/task design, and linked entity transitions.
