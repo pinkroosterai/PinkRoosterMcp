@@ -3,6 +3,8 @@ import {
   getWorkPackages,
   getWorkPackage,
   getWorkPackageSummary,
+  updateWorkPackage,
+  updateTask,
   deleteWorkPackage,
   deletePhase,
   deleteTask,
@@ -28,6 +30,50 @@ export function useWorkPackageSummary(projectId: number | undefined) {
     queryKey: ["work-package-summary", projectId],
     queryFn: () => getWorkPackageSummary(projectId!),
     enabled: projectId !== undefined,
+  });
+}
+
+export function useUpdateWorkPackage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      wpNumber,
+      data,
+    }: {
+      projectId: number;
+      wpNumber: number;
+      data: Record<string, unknown>;
+    }) => updateWorkPackage(projectId, wpNumber, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["work-package", variables.projectId, variables.wpNumber] });
+      queryClient.invalidateQueries({ queryKey: ["work-packages"] });
+      queryClient.invalidateQueries({ queryKey: ["work-package-summary"] });
+    },
+  });
+}
+
+export function useUpdateTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      wpNumber,
+      taskNumber,
+      data,
+    }: {
+      projectId: number;
+      wpNumber: number;
+      taskNumber: number;
+      data: Record<string, unknown>;
+    }) => updateTask(projectId, wpNumber, taskNumber, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["work-package", variables.projectId, variables.wpNumber] });
+      queryClient.invalidateQueries({ queryKey: ["work-packages"] });
+      queryClient.invalidateQueries({ queryKey: ["work-package-summary"] });
+    },
   });
 }
 

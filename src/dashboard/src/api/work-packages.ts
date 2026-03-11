@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { WorkPackage, WorkPackageSummary } from "@/types";
+import type { WorkPackage, WorkPackageSummary, WpTask } from "@/types";
 
 export function getWorkPackages(
   projectId: number,
@@ -41,6 +41,29 @@ export function deletePhase(
   return apiFetch(
     `/projects/${projectId}/work-packages/${wpNumber}/phases/${phaseNumber}`,
     { method: "DELETE" },
+  );
+}
+
+export function updateWorkPackage(
+  projectId: number,
+  wpNumber: number,
+  data: Record<string, unknown>,
+): Promise<WorkPackage> {
+  return apiFetch<WorkPackage>(
+    `/projects/${projectId}/work-packages/${wpNumber}`,
+    { method: "PATCH", body: JSON.stringify(data) },
+  );
+}
+
+export function updateTask(
+  projectId: number,
+  wpNumber: number,
+  taskNumber: number,
+  data: Record<string, unknown>,
+): Promise<WpTask> {
+  return apiFetch<WpTask>(
+    `/projects/${projectId}/work-packages/${wpNumber}/tasks/${taskNumber}`,
+    { method: "PATCH", body: JSON.stringify(data) },
   );
 }
 

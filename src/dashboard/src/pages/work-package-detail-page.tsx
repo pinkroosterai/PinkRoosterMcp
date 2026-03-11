@@ -1,12 +1,25 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock } from "lucide-react";
-import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask } from "@/hooks/use-work-packages";
-import type { TaskDep, Phase as PhaseType, WpTask } from "@/types";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock, Pencil, X, Save } from "lucide-react";
+import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask, useUpdateWorkPackage, useUpdateTask } from "@/hooks/use-work-packages";
+import { updateWorkPackageSchema, type UpdateWorkPackageInput, workPackageTypes, priorities, completionStates } from "@/lib/schemas";
+import type { TaskDep, Phase as PhaseType, WpTask, WorkPackage, StateChangeDto } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { stateColorClass } from "@/lib/state-colors";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +59,38 @@ function formatDate(value: string | null | undefined): string {
   return new Date(value).toLocaleString();
 }
 
+function showCascadeToasts(stateChanges?: StateChangeDto[] | null) {
+  if (!stateChanges?.length) return;
+  for (const sc of stateChanges) {
+    toast.info(`${sc.entityId}: ${sc.oldState} \u2192 ${sc.newState} \u2014 ${sc.reason}`);
+  }
+}
+
+function wpToFormValues(wp: WorkPackage): UpdateWorkPackageInput {
+  return {
+    name: wp.name,
+    description: wp.description,
+    type: wp.type as UpdateWorkPackageInput["type"],
+    priority: wp.priority as UpdateWorkPackageInput["priority"],
+    plan: wp.plan ?? "",
+    estimatedComplexity: wp.estimatedComplexity ?? undefined,
+    estimationRationale: wp.estimationRationale ?? "",
+  };
+}
+
+function computeDiff(original: UpdateWorkPackageInput, current: UpdateWorkPackageInput): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+  for (const key of Object.keys(current) as (keyof UpdateWorkPackageInput)[]) {
+    const curr = current[key];
+    const orig = original[key];
+    if (curr !== orig && curr !== undefined) {
+      if (curr === "" && (orig === "" || orig === undefined)) continue;
+      diff[key] = curr === "" ? null : curr;
+    }
+  }
+  return diff;
+}
+
 export function WorkPackageDetailPage() {
   const { id, wpNumber: wpNumParam } = useParams<{ id: string; wpNumber: string }>();
   const projectId = Number(id);
@@ -56,11 +101,57 @@ export function WorkPackageDetailPage() {
   const deleteWorkPackage = useDeleteWorkPackage();
   const deletePhase = useDeletePhase();
   const deleteTask = useDeleteTask();
+  const updateWp = useUpdateWorkPackage();
+  const updateTaskMutation = useUpdateTask();
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [phaseToDelete, setPhaseToDelete] = useState<PhaseType | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<WpTask | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [isEditing, setIsEditing] = useState(false);
+  const [stateToChange, setStateToChange] = useState<string | null>(null);
+
+  const form = useForm<UpdateWorkPackageInput>({
+    resolver: zodResolver(updateWorkPackageSchema),
+  });
+
+  const handleEdit = () => {
+    if (!wp) return;
+    form.reset(wpToFormValues(wp));
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    form.reset();
+    setIsEditing(false);
+  };
+
+  const handleSave = () => {
+    if (!wp) return;
+    const current = form.getValues();
+    const original = wpToFormValues(wp);
+    const diff = computeDiff(original, current);
+
+    if (Object.keys(diff).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    updateWp.mutate(
+      { projectId, wpNumber, data: diff },
+      {
+        onSuccess: (data) => {
+          toast.success("Work package updated");
+          showCascadeToasts(data.stateChanges);
+          setIsEditing(false);
+        },
+        onError: (error) => {
+          toast.error(`Failed to update: ${error.message}`);
+        },
+      },
+    );
+  };
 
   const handleDelete = () => {
     deleteWorkPackage.mutate(
@@ -82,6 +173,39 @@ export function WorkPackageDetailPage() {
     deleteTask.mutate(
       { projectId, wpNumber, taskNumber: taskToDelete.taskNumber },
       { onSettled: () => setTaskToDelete(null) },
+    );
+  };
+
+  const handleStateChange = () => {
+    if (!stateToChange) return;
+    updateWp.mutate(
+      { projectId, wpNumber, data: { state: stateToChange } },
+      {
+        onSuccess: (data) => {
+          toast.success(`State changed to ${stateToChange}`);
+          showCascadeToasts(data.stateChanges);
+          setStateToChange(null);
+        },
+        onError: (error) => {
+          toast.error(`Failed to change state: ${error.message}`);
+          setStateToChange(null);
+        },
+      },
+    );
+  };
+
+  const handleTaskStateChange = (task: WpTask, newState: string) => {
+    updateTaskMutation.mutate(
+      { projectId, wpNumber, taskNumber: task.taskNumber, data: { state: newState } },
+      {
+        onSuccess: (data) => {
+          toast.success(`Task state changed to ${newState}`);
+          showCascadeToasts(data.stateChanges);
+        },
+        onError: (error) => {
+          toast.error(`Failed to change task state: ${error.message}`);
+        },
+      },
     );
   };
 
@@ -141,30 +265,98 @@ export function WorkPackageDetailPage() {
             <ArrowLeft className="size-4" />
           </Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">{wp.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isEditing ? (
+                <Input
+                  className="text-2xl font-bold h-auto py-0 px-1 max-w-md"
+                  {...form.register("name")}
+                />
+              ) : (
+                <h1 className="text-2xl font-bold">{wp.name}</h1>
+              )}
               <Badge variant="outline">{wp.workPackageId}</Badge>
-              <Badge variant={typeVariant[wp.type] ?? "outline"}>{wp.type}</Badge>
-              <Badge variant={priorityVariant[wp.priority] ?? "outline"}>{wp.priority}</Badge>
-              <span
-                className={stateColorClass(wp.state)}
+              {isEditing ? (
+                <Select
+                  onValueChange={(v) => form.setValue("type", v as UpdateWorkPackageInput["type"])}
+                  value={form.watch("type") ?? wp.type}
+                >
+                  <SelectTrigger className="w-auto h-auto py-0.5 px-2 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workPackageTypes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant={typeVariant[wp.type] ?? "outline"}>{wp.type}</Badge>
+              )}
+              {isEditing ? (
+                <Select
+                  onValueChange={(v) => form.setValue("priority", v as UpdateWorkPackageInput["priority"])}
+                  value={form.watch("priority") ?? wp.priority}
+                >
+                  <SelectTrigger className="w-auto h-auto py-0.5 px-2 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priorities.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant={priorityVariant[wp.priority] ?? "outline"}>{wp.priority}</Badge>
+              )}
+              {/* State quick-action */}
+              <Select
+                value={wp.state}
+                onValueChange={(v) => {
+                  if (v !== wp.state) setStateToChange(v);
+                }}
               >
-                {wp.state}
-              </span>
+                <SelectTrigger className={`w-auto h-auto py-0.5 px-2 text-xs border-0 ${stateColorClass(wp.state)}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {completionStates.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {wp.state === "Blocked" && wp.previousActiveState && (
                 <span className="text-xs text-muted-foreground">(was: {wp.previousActiveState})</span>
               )}
             </div>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive"
-          onClick={() => setShowDeleteDialog(true)}
-        >
-          <Trash2 className="size-4 mr-1" /> Delete
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {isEditing ? (
+            <>
+              <Button size="sm" onClick={handleSave} disabled={updateWp.isPending}>
+                <Save className="size-4 mr-1" /> {updateWp.isPending ? "Saving..." : "Save"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                <X className="size-4 mr-1" /> Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Pencil className="size-4 mr-1" /> Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="size-4 mr-1" /> Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Definition Card */}
@@ -177,38 +369,60 @@ export function WorkPackageDetailPage() {
         <CardContent className="space-y-4">
           <div>
             <div className="text-sm font-medium text-muted-foreground mb-1">Description</div>
-            <p className="text-sm whitespace-pre-wrap">{wp.description}</p>
+            {isEditing ? (
+              <Textarea rows={3} {...form.register("description")} />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{wp.description}</p>
+            )}
           </div>
-          {wp.plan && (
+          {(wp.plan || isEditing) && (
             <div>
               <div className="text-sm font-medium text-muted-foreground mb-1">Plan</div>
-              <pre className="whitespace-pre-wrap text-sm bg-muted p-3 rounded-md">{wp.plan}</pre>
+              {isEditing ? (
+                <Textarea rows={4} {...form.register("plan")} />
+              ) : (
+                <pre className="whitespace-pre-wrap text-sm bg-muted p-3 rounded-md">{wp.plan}</pre>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Estimation Card */}
-      {hasEstimation && (
+      {(hasEstimation || isEditing) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Estimation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {wp.estimatedComplexity != null && (
-              <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">
-                  Complexity (1-5)
-                </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground mb-1">
+                Complexity (1-10)
+              </div>
+              {isEditing ? (
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  className="w-24"
+                  {...form.register("estimatedComplexity")}
+                />
+              ) : wp.estimatedComplexity != null ? (
                 <div className="text-sm font-medium">{wp.estimatedComplexity}</div>
-              </div>
-            )}
-            {wp.estimationRationale && (
-              <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">Rationale</div>
+              ) : (
+                <div className="text-sm text-muted-foreground">{"\u2014"}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground mb-1">Rationale</div>
+              {isEditing ? (
+                <Textarea rows={2} {...form.register("estimationRationale")} />
+              ) : wp.estimationRationale ? (
                 <p className="text-sm whitespace-pre-wrap">{wp.estimationRationale}</p>
-              </div>
-            )}
+              ) : (
+                <div className="text-sm text-muted-foreground">{"\u2014"}</div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -468,11 +682,25 @@ export function WorkPackageDetailPage() {
                                     <ChevronRight className="size-4" />
                                   )}
                                   <span className="text-sm font-medium">{task.name}</span>
-                                  <span
-                                    className={stateColorClass(task.state)}
+                                  {/* Task state select */}
+                                  <Select
+                                    value={task.state}
+                                    onValueChange={(v) => {
+                                      if (v !== task.state) handleTaskStateChange(task, v);
+                                    }}
                                   >
-                                    {task.state}
-                                  </span>
+                                    <SelectTrigger
+                                      className={`w-auto h-auto py-0.5 px-2 text-xs border-0 ${stateColorClass(task.state)}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {completionStates.map((s) => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                   {task.state === "Blocked" && task.previousActiveState && (
                                     <span className="text-xs text-muted-foreground">(was: {task.previousActiveState})</span>
                                   )}
@@ -607,6 +835,23 @@ export function WorkPackageDetailPage() {
           })
         )}
       </div>
+
+      {/* State change confirmation dialog */}
+      <AlertDialog open={!!stateToChange} onOpenChange={(open) => !open && setStateToChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change work package state?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Transition from <strong>{wp.state}</strong> to <strong>{stateToChange}</strong>.
+              State-driven timestamps will be updated automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStateChange}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Phase Delete Dialog */}
       <AlertDialog
