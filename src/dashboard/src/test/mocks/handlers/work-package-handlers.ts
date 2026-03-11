@@ -16,6 +16,20 @@ export const workPackageHandlers = [
     );
   }),
 
+  http.post("/api/projects/:projectId/work-packages", async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json(
+      createWorkPackage({
+        workPackageNumber: 99,
+        name: body.name as string,
+        description: body.description as string,
+        ...(body.type ? { type: body.type } : {}),
+        ...(body.priority ? { priority: body.priority } : {}),
+      } as Partial<import("@/types").WorkPackage>),
+      { status: 201 },
+    );
+  }),
+
   http.patch("/api/projects/:projectId/work-packages/:wpNumber", async ({ params, request }) => {
     const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json(

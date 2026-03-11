@@ -67,6 +67,16 @@ export function updateTask(
   );
 }
 
+export function createWorkPackage(
+  projectId: number,
+  data: Record<string, unknown>,
+): Promise<WorkPackage> {
+  return apiFetch<WorkPackage>(`/projects/${projectId}/work-packages`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function deleteTask(
   projectId: number,
   wpNumber: number,

@@ -79,6 +79,18 @@ export type UpdateFeatureRequestInput = z.infer<typeof updateFeatureRequestSchem
 // Work package schemas
 export const workPackageTypes = ["Feature", "BugFix", "Refactor", "Spike", "Chore"] as const;
 
+export const createWorkPackageSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().min(1, "Description is required"),
+  type: z.enum(workPackageTypes).optional(),
+  priority: z.enum(priorities).optional(),
+  plan: z.string().optional(),
+  estimatedComplexity: z.coerce.number().min(1).max(10).optional(),
+  estimationRationale: z.string().optional(),
+});
+
+export type CreateWorkPackageInput = z.infer<typeof createWorkPackageSchema>;
+
 export const updateWorkPackageSchema = z.object({
   name: z.string().min(1, "Name is required").optional(),
   description: z.string().min(1, "Description is required").optional(),

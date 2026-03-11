@@ -3,6 +3,7 @@ import {
   getWorkPackages,
   getWorkPackage,
   getWorkPackageSummary,
+  createWorkPackage,
   updateWorkPackage,
   updateTask,
   deleteWorkPackage,
@@ -30,6 +31,19 @@ export function useWorkPackageSummary(projectId: number | undefined) {
     queryKey: ["work-package-summary", projectId],
     queryFn: () => getWorkPackageSummary(projectId!),
     enabled: projectId !== undefined,
+  });
+}
+
+export function useCreateWorkPackage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, unknown> }) =>
+      createWorkPackage(projectId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["work-packages"] });
+      queryClient.invalidateQueries({ queryKey: ["work-package-summary"] });
+    },
   });
 }
 

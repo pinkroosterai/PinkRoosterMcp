@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Trash2, Layers } from "lucide-react";
+import { Trash2, Layers, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
 import { Badge } from "@/components/ui/badge";
@@ -217,9 +217,16 @@ export function WorkPackagesListPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
-        <Layers className="size-6" /> Work Packages
-      </h1>
+      <div className="flex items-center justify-between animate-in-right">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Layers className="size-6" /> Work Packages
+        </h1>
+        <Button asChild>
+          <Link to={`/projects/${projectId}/work-packages/new`}>
+            <Plus className="size-4 mr-1.5" /> Create Work Package
+          </Link>
+        </Button>
+      </div>
 
       {summary && (() => {
         const total = summary.activeCount + summary.inactiveCount + summary.terminalCount;
@@ -285,9 +292,14 @@ export function WorkPackagesListPage() {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Layers className="size-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold">No work packages found</h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Work packages are created by AI agents via MCP tools.
+            <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
+              No work packages yet. Create one to start planning.
             </p>
+            <Button asChild>
+              <Link to={`/projects/${projectId}/work-packages/new`}>
+                <Plus className="size-4 mr-1.5" /> Create Work Package
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (

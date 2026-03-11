@@ -18,6 +18,7 @@ import { FeatureRequestCreatePage } from "@/pages/feature-request-create-page";
 import { IssueDetailPage } from "@/pages/issue-detail-page";
 import { WorkPackageDetailPage } from "@/pages/work-package-detail-page";
 import { FeatureRequestDetailPage } from "@/pages/feature-request-detail-page";
+import { WorkPackageCreatePage } from "@/pages/work-package-create-page";
 import { SkillsHelpPage } from "@/pages/skills-help-page";
 
 const queryClient = new QueryClient({
@@ -68,6 +69,7 @@ function App() {
                       <Route path="projects/:id/feature-requests/new" element={<FeatureRequestCreatePage />} />
                       <Route path="projects/:id/feature-requests/:featureNumber" element={<FeatureRequestDetailPage />} />
                       <Route path="projects/:id/work-packages" element={<WorkPackagesListPage />} />
+                      <Route path="projects/:id/work-packages/new" element={<WorkPackageCreatePage />} />
                       <Route path="projects/:id/work-packages/:wpNumber" element={<WorkPackageDetailPage />} />
                       <Route path="activity" element={<ActivityLogPage />} />
                       <Route path="help" element={<SkillsHelpPage />} />

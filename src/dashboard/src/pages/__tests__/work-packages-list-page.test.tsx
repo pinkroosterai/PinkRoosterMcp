@@ -58,6 +58,32 @@ describe("WorkPackagesListPage", () => {
     });
   });
 
+  it("shows Create Work Package button", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Work Package")).toBeInTheDocument();
+    });
+
+    const createButton = screen.getByRole("link", { name: /create work package/i });
+    expect(createButton).toBeInTheDocument();
+    expect(createButton).toHaveAttribute("href", "/projects/1/work-packages/new");
+  });
+
+  it("shows Create button in empty state", async () => {
+    server.use(
+      http.get("/api/projects/:id/work-packages", () => HttpResponse.json([])),
+    );
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/no work packages found/i)).toBeInTheDocument();
+    });
+
+    const createLinks = screen.getAllByRole("link", { name: /create work package/i });
+    expect(createLinks.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("shows delete confirmation dialog", async () => {
     const user = userEvent.setup();
     renderPage();
