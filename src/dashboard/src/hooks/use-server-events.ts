@@ -52,7 +52,7 @@ export function useServerEvents(projectId: number | undefined) {
       }, DEBOUNCE_MS);
     }
 
-    function enqueueKeys(keys: string[][]) {
+    function enqueueKeys(keys: (string | number)[][]) {
       for (const key of keys) {
         pendingKeys.add(JSON.stringify(key));
       }
