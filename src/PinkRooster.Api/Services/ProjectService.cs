@@ -192,6 +192,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     LinkedIssueName = t.WorkPackage.LinkedIssue != null ? t.WorkPackage.LinkedIssue.Name : null,
                     LinkedFrName = t.WorkPackage.LinkedFeatureRequest != null ? t.WorkPackage.LinkedFeatureRequest.Name : null
                 })
+                .OrderBy(t => t.Priority)
+                .ThenBy(t => t.Name)
+                .Take(limit)
                 .ToListAsync(ct);
 
             items.AddRange(tasks.Select(t => new NextActionItem
@@ -231,6 +234,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     LinkedIssueName = w.LinkedIssue != null ? w.LinkedIssue.Name : null,
                     LinkedFrName = w.LinkedFeatureRequest != null ? w.LinkedFeatureRequest.Name : null
                 })
+                .OrderBy(w => w.Priority)
+                .ThenBy(w => w.Name)
+                .Take(limit)
                 .ToListAsync(ct);
 
             items.AddRange(wps.Select(w => new NextActionItem
@@ -270,6 +276,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     i.IssueType,
                     i.Severity
                 })
+                .OrderBy(i => i.Priority)
+                .ThenBy(i => i.Name)
+                .Take(limit)
                 .ToListAsync(ct);
 
             items.AddRange(issues.Select(i => new NextActionItem
@@ -302,6 +311,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     fr.Priority,
                     fr.Category
                 })
+                .OrderBy(fr => fr.Priority)
+                .ThenBy(fr => fr.Name)
+                .Take(limit)
                 .ToListAsync(ct);
 
             items.AddRange(frs.Select(fr => new NextActionItem
