@@ -13,10 +13,3 @@ public sealed class UserStoryInput
     [Description("Why the user wants this (the benefit).")]
     public required string Benefit { get; init; }
 }
-
-public enum UserStoryAction
-{
-    Add,
-    Update,
-    Remove
-}

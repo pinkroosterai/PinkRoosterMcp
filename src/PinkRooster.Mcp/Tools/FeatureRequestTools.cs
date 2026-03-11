@@ -167,7 +167,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         {
             var request = new ManageUserStoriesRequest
             {
-                Action = action.ToString(),
+                Action = action,
                 Index = index,
                 Role = role,
                 Goal = goal,

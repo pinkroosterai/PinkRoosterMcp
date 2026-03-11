@@ -93,7 +93,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Add", Role = "tester", Goal = "run tests", Benefit = "quality" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Add, Role = "tester", Goal = "run tests", Benefit = "quality" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
@@ -114,7 +114,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Add", Role = "tester" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Add, Role = "tester" }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -135,7 +135,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Update", Index = 0, Role = "new", Goal = "new goal", Benefit = "new benefit" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Update, Index = 0, Role = "new", Goal = "new goal", Benefit = "new benefit" }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
@@ -157,7 +157,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Update", Index = 5, Role = "x", Goal = "x", Benefit = "x" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Update, Index = 5, Role = "x", Goal = "x", Benefit = "x" }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -182,7 +182,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Remove", Index = 0 }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Remove, Index = 0 }, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var fr = await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
@@ -203,7 +203,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         }, ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Remove", Index = 0 }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Remove, Index = 0 }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -217,7 +217,7 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
         var projectId = await CreateProjectAsync(ct);
 
         var response = await Client.PostAsJsonAsync(ManagePath(projectId, 999),
-            new ManageUserStoriesRequest { Action = "Add", Role = "x", Goal = "x", Benefit = "x" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Add, Role = "x", Goal = "x", Benefit = "x" }, ct);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -238,9 +238,9 @@ public sealed class FeatureRequestUserStoryTests(PostgresFixture postgres) : Int
 
         // Add two stories
         await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Add", Role = "a", Goal = "ga", Benefit = "ba" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Add, Role = "a", Goal = "ga", Benefit = "ba" }, ct);
         await Client.PostAsJsonAsync(ManagePath(projectId, 1),
-            new ManageUserStoriesRequest { Action = "Add", Role = "b", Goal = "gb", Benefit = "bb" }, ct);
+            new ManageUserStoriesRequest { Action = UserStoryAction.Add, Role = "b", Goal = "gb", Benefit = "bb" }, ct);
 
         // Read back
         var fr = await GetJson<FeatureRequestResponse>($"{FrPath(projectId)}/1", ct);

@@ -218,9 +218,9 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
         var now = DateTimeOffset.UtcNow;
         var oldJson = JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit }));
 
-        switch (request.Action.ToLowerInvariant())
+        switch (request.Action)
         {
-            case "add":
+            case UserStoryAction.Add:
                 if (string.IsNullOrWhiteSpace(request.Role) || string.IsNullOrWhiteSpace(request.Goal) || string.IsNullOrWhiteSpace(request.Benefit))
                     throw new ArgumentException("Role, Goal, and Benefit are required for Add action.");
                 fr.UserStories.Add(new UserStory
@@ -231,7 +231,7 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
                 });
                 break;
 
-            case "update":
+            case UserStoryAction.Update:
                 if (request.Index is null || request.Index < 0 || request.Index >= fr.UserStories.Count)
                     throw new ArgumentOutOfRangeException(nameof(request.Index),
                         $"Index must be between 0 and {fr.UserStories.Count - 1}.");
@@ -245,7 +245,7 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
                 };
                 break;
 
-            case "remove":
+            case UserStoryAction.Remove:
                 if (request.Index is null || request.Index < 0 || request.Index >= fr.UserStories.Count)
                     throw new ArgumentOutOfRangeException(nameof(request.Index),
                         $"Index must be between 0 and {fr.UserStories.Count - 1}.");
@@ -253,7 +253,7 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
                 break;
 
             default:
-                throw new ArgumentException($"Invalid action '{request.Action}'. Must be Add, Update, or Remove.");
+                throw new ArgumentOutOfRangeException(nameof(request.Action), request.Action, "Unsupported user story action.");
         }
 
         var newJson = JsonSerializer.Serialize(fr.UserStories.Select(us => new { us.Role, us.Goal, us.Benefit }));
