@@ -17,25 +17,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const TOKEN_KEY = "pinkrooster-auth-token";
-
-function getStoredToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
-}
-
-function storeToken(token: string) {
-  sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-function clearToken() {
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-
-function authHeaders(): HeadersInit {
-  const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isProtected, setIsProtected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -43,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      const res = await fetch("/auth/config", { headers: authHeaders() });
+      const res = await fetch("/auth/config", { credentials: "include" });
       if (!res.ok) {
         // Auth endpoint not available — treat as unprotected
         setIsProtected(false);
@@ -72,13 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch("/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ username, password }),
         });
         const data = await res.json();
         if (!res.ok) {
           return data.error || "Login failed";
         }
-        storeToken(data.token);
         setIsAuthenticated(true);
         return null;
       } catch {
@@ -92,12 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch("/auth/logout", {
         method: "POST",
-        headers: authHeaders(),
+        credentials: "include",
       });
     } catch {
       // Ignore logout errors
     }
-    clearToken();
     setIsAuthenticated(false);
   }, []);
 

@@ -2,6 +2,8 @@ import type { Plugin } from "vite";
 import { randomUUID, timingSafeEqual, createHmac } from "crypto";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_TTL_S = 24 * 60 * 60; // 24 hours in seconds
+const COOKIE_NAME = "pinkrooster_session";
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
@@ -49,9 +51,15 @@ export function authPlugin(): Plugin {
     return !!(process.env.DASHBOARD_USER && process.env.DASHBOARD_PASSWORD);
   }
 
-  function isValidToken(authHeader: string | undefined): boolean {
-    if (!authHeader?.startsWith("Bearer ")) return false;
-    const token = authHeader.slice(7);
+  function parseCookie(cookieHeader: string | undefined, name: string): string | null {
+    if (!cookieHeader) return null;
+    const match = cookieHeader.split(";").map((c) => c.trim()).find((c) => c.startsWith(`${name}=`));
+    return match ? match.slice(name.length + 1) : null;
+  }
+
+  function isValidTokenFromCookie(cookieHeader: string | undefined): boolean {
+    const token = parseCookie(cookieHeader, COOKIE_NAME);
+    if (!token) return false;
     const entry = tokens.get(token);
     if (!entry) return false;
     if (Date.now() > entry.expiresAt) {
@@ -82,7 +90,7 @@ export function authPlugin(): Plugin {
 
         const prot = isProtected();
         const authenticated = prot
-          ? isValidToken(req.headers.authorization)
+          ? isValidTokenFromCookie(req.headers.cookie)
           : false;
 
         res.setHeader("Content-Type", "application/json");
@@ -122,8 +130,9 @@ export function authPlugin(): Plugin {
           ) {
             const token = randomUUID();
             tokens.set(token, { expiresAt: Date.now() + TOKEN_TTL_MS });
+            res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/auth; Max-Age=${TOKEN_TTL_S}`);
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ token }));
+            res.end(JSON.stringify({ success: true }));
           } else {
             res.statusCode = 401;
             res.setHeader("Content-Type", "application/json");
@@ -143,11 +152,10 @@ export function authPlugin(): Plugin {
           return;
         }
 
-        const authHeader = req.headers.authorization;
-        if (authHeader?.startsWith("Bearer ")) {
-          tokens.delete(authHeader.slice(7));
-        }
+        const token = parseCookie(req.headers.cookie, COOKIE_NAME);
+        if (token) tokens.delete(token);
 
+        res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/auth; Max-Age=0`);
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ success: true }));
       });

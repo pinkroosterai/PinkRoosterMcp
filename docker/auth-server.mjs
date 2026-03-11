@@ -3,6 +3,8 @@ import { randomUUID, timingSafeEqual, createHmac } from "crypto";
 
 const PORT = 3001;
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_TTL_S = 24 * 60 * 60; // 24 hours in seconds
+const COOKIE_NAME = "pinkrooster_session";
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 const tokens = new Map();
@@ -39,9 +41,15 @@ function isProtected() {
   return !!(process.env.DASHBOARD_USER && process.env.DASHBOARD_PASSWORD);
 }
 
-function isValidToken(authHeader) {
-  if (!authHeader?.startsWith("Bearer ")) return false;
-  const token = authHeader.slice(7);
+function parseCookie(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.split(";").map((c) => c.trim()).find((c) => c.startsWith(`${name}=`));
+  return match ? match.slice(name.length + 1) : null;
+}
+
+function isValidTokenFromCookie(cookieHeader) {
+  const token = parseCookie(cookieHeader, COOKIE_NAME);
+  if (!token) return false;
   const entry = tokens.get(token);
   if (!entry) return false;
   if (Date.now() > entry.expiresAt) {
@@ -71,7 +79,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/auth/config" && req.method === "GET") {
     const prot = isProtected();
     const authenticated = prot
-      ? isValidToken(req.headers.authorization)
+      ? isValidTokenFromCookie(req.headers.cookie)
       : false;
     json(res, 200, { protected: prot, authenticated });
     return;
@@ -104,7 +112,11 @@ const server = createServer(async (req, res) => {
       ) {
         const token = randomUUID();
         tokens.set(token, { expiresAt: Date.now() + TOKEN_TTL_MS });
-        json(res, 200, { token });
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/auth; Max-Age=${TOKEN_TTL_S}`,
+        });
+        res.end(JSON.stringify({ success: true }));
       } else {
         json(res, 401, { error: "Invalid credentials" });
       }
@@ -115,11 +127,13 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === "/auth/logout" && req.method === "POST") {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      tokens.delete(authHeader.slice(7));
-    }
-    json(res, 200, { success: true });
+    const token = parseCookie(req.headers.cookie, COOKIE_NAME);
+    if (token) tokens.delete(token);
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Set-Cookie": `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/auth; Max-Age=0`,
+    });
+    res.end(JSON.stringify({ success: true }));
     return;
   }
 
