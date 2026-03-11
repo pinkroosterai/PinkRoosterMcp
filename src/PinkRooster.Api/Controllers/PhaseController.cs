@@ -35,6 +35,22 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
         return phase is null ? NotFound() : Ok(phase);
     }
 
+    [HttpPost("{phaseNumber:int}/verify")]
+    public async Task<ActionResult<PhaseResponse>> VerifyAcceptanceCriteria(
+        long projectId, int wpNumber, int phaseNumber, VerifyAcceptanceCriteriaRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var changedBy = HttpContext.GetCallerIdentity();
+            var phase = await phaseService.VerifyAcceptanceCriteriaAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
+            return phase is null ? NotFound() : Ok(phase);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpDelete("{phaseNumber:int}")]
     public async Task<ActionResult> Delete(
         long projectId, int wpNumber, int phaseNumber, CancellationToken ct)

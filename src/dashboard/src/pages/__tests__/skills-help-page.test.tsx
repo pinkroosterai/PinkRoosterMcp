@@ -8,7 +8,7 @@ describe("SkillsHelpPage", () => {
     expect(screen.getByText("PM Workflow Skills")).toBeInTheDocument();
   });
 
-  it("renders all 8 skill names", () => {
+  it("renders all 9 skill names", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     // Skills whose usage differs from the title have unique title text
@@ -18,6 +18,7 @@ describe("SkillsHelpPage", () => {
       "/pm-implement",
       "/pm-scaffold",
       "/pm-plan",
+      "/pm-verify",
       "/pm-explore",
     ];
 
@@ -53,6 +54,9 @@ describe("SkillsHelpPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Review and prioritize open issues/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Verify acceptance criteria for a phase/),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Analyze the codebase from a product manager/),

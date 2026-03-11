@@ -9,6 +9,7 @@ import {
   ListFilter,
   Sparkles,
   Lightbulb,
+  ShieldCheck,
   ArrowRight,
   Terminal,
   Zap,
@@ -117,6 +118,15 @@ const skills: SkillInfo[] = [
       "Refine a feature request by analyzing its current state, rewriting the description with full detail, filling in missing fields (business value, acceptance summary), and adding structured user stories.",
     usage: "/pm-refine-fr <fr-id>",
     args: "Feature request ID (e.g., proj-1-fr-3). If omitted, lists inactive FRs to choose from",
+    stateChanges: [],
+  },
+  {
+    name: "pm-verify",
+    icon: ShieldCheck,
+    description:
+      "Verify acceptance criteria for a phase or entire work package. Runs verification based on each criterion's method (AutomatedTest, Manual, AgentReview) and records results.",
+    usage: "/pm-verify <phase-id | wp-id> [--dry-run]",
+    args: "Phase ID or WP ID. Add --dry-run to preview without recording results",
     stateChanges: [],
   },
   {

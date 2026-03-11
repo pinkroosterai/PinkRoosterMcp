@@ -41,6 +41,43 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
             acceptanceCriteria, tasks, ct);
     }
 
+    [McpServerTool(Name = "verify_acceptance_criteria",
+        Title = "Verify Acceptance Criteria", Idempotent = true, Destructive = false, OpenWorld = false)]
+    [Description(
+        "Records verification results for acceptance criteria on a phase. " +
+        "Matches criteria by name (case-insensitive) and sets VerificationResult + VerifiedAt timestamp. " +
+        "Safe to call multiple times — re-verification updates the result and timestamp.")]
+    public async Task<string> VerifyAcceptanceCriteria(
+        [Description("Phase ID (e.g. 'proj-1-wp-1-phase-2').")] string phaseId,
+        [Description("List of criteria to verify, each with name and verification result.")] List<VerifyCriterionInput> criteria,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParsePhaseId(phaseId, out var projId, out var wpNumber, out var phaseNumber))
+            return OperationResult.Error($"Invalid phase ID format: '{phaseId}'. Expected 'proj-{{number}}-wp-{{number}}-phase-{{number}}'.");
+
+        if (criteria is not { Count: > 0 })
+            return OperationResult.Error("At least one criterion is required.");
+
+        try
+        {
+            var request = new VerifyAcceptanceCriteriaRequest
+            {
+                Criteria = criteria.Select(c => new VerifyCriterionItem
+                {
+                    Name = c.Name,
+                    VerificationResult = c.VerificationResult
+                }).ToList()
+            };
+
+            var response = await apiClient.VerifyAcceptanceCriteriaAsync(projId, wpNumber, phaseNumber, request, ct);
+            return OperationResult.Success(phaseId, $"Verified {criteria.Count} acceptance criteria on phase '{phaseId}'.");
+        }
+        catch (HttpRequestException ex)
+        {
+            return OperationResult.Error($"API error: {ex.Message}");
+        }
+    }
+
     private async Task<string> CreateNewPhase(
         long projId, int wpNumber, string? name, string? description, int? sortOrder,
         List<AcceptanceCriterionInput>? acceptanceCriteria, List<PhaseTaskInput>? tasks, CancellationToken ct)

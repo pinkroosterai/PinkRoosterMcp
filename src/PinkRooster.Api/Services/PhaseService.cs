@@ -387,6 +387,79 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         return true;
     }
 
+    public async Task<PhaseResponse?> VerifyAcceptanceCriteriaAsync(
+        long projectId, int wpNumber, int phaseNumber, VerifyAcceptanceCriteriaRequest request, string changedBy, CancellationToken ct = default)
+    {
+        var phase = await db.WorkPackagePhases
+            .Include(p => p.WorkPackage)
+            .Include(p => p.AcceptanceCriteria)
+            .Include(p => p.Tasks.OrderBy(t => t.SortOrder))
+                .ThenInclude(t => t.BlockedBy).ThenInclude(d => d.DependsOnTask)
+            .Include(p => p.Tasks)
+                .ThenInclude(t => t.Blocking).ThenInclude(d => d.DependentTask)
+            .FirstOrDefaultAsync(p =>
+                p.WorkPackage.ProjectId == projectId &&
+                p.WorkPackage.WorkPackageNumber == wpNumber &&
+                p.PhaseNumber == phaseNumber, ct);
+
+        if (phase is null)
+            return null;
+
+        var now = DateTimeOffset.UtcNow;
+        var auditEntries = new List<PhaseAuditLog>();
+        var matchedCount = 0;
+
+        foreach (var item in request.Criteria)
+        {
+            var criterion = phase.AcceptanceCriteria
+                .FirstOrDefault(ac => string.Equals(ac.Name, item.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (criterion is null)
+                throw new InvalidOperationException($"Acceptance criterion '{item.Name}' not found on phase {phaseNumber}.");
+
+            var oldResult = criterion.VerificationResult;
+            var oldVerifiedAt = criterion.VerifiedAt;
+
+            criterion.VerificationResult = item.VerificationResult;
+            criterion.VerifiedAt = now;
+
+            if (oldResult != item.VerificationResult)
+            {
+                auditEntries.Add(new PhaseAuditLog
+                {
+                    PhaseId = phase.Id,
+                    FieldName = $"AcceptanceCriteria[{criterion.Name}].VerificationResult",
+                    OldValue = oldResult,
+                    NewValue = item.VerificationResult,
+                    ChangedBy = changedBy,
+                    ChangedAt = now
+                });
+            }
+
+            if (oldVerifiedAt != now)
+            {
+                auditEntries.Add(new PhaseAuditLog
+                {
+                    PhaseId = phase.Id,
+                    FieldName = $"AcceptanceCriteria[{criterion.Name}].VerifiedAt",
+                    OldValue = oldVerifiedAt?.ToString("o"),
+                    NewValue = now.ToString("o"),
+                    ChangedBy = changedBy,
+                    ChangedAt = now
+                });
+            }
+
+            matchedCount++;
+        }
+
+        if (auditEntries.Count > 0)
+            db.PhaseAuditLogs.AddRange(auditEntries);
+
+        await db.SaveChangesAsync(ct);
+
+        return ToResponse(phase);
+    }
+
     // ── Private helpers ──
 
     private static List<PhaseAuditLog> BuildPhaseCreateAuditEntries(WorkPackagePhase phase, string changedBy)

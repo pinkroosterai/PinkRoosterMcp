@@ -122,6 +122,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `create_or_update_feature_request` | Write | Create (omit featureRequestId) or update (provide featureRequestId) a feature request |
 | `get_feature_request_details` | Read | Full feature request data by composite ID |
 | `get_feature_requests` | Read | List feature requests for a project, filterable by state category |
+| `verify_acceptance_criteria` | Write | Record verification results for acceptance criteria on a phase |
 
 **Testing flow for MCP tools (E2E):**
 
@@ -366,6 +367,7 @@ Claude Code skills in `.claude/skills/` provide AI-driven project management wor
 | `/pm-plan <description>` | Create issue or FR from natural language, optionally scaffold | Confirms classification before creation |
 | `/pm-triage` | Read-only priority analysis of open items (runs in Explore agent) | None (read-only) |
 | `/pm-refine-fr <fr-id>` | Refine FR: rewrite description, fill gaps, add user stories | None (content-only, no status change) |
+| `/pm-verify <phase-id \| wp-id> [--dry-run]` | Verify acceptance criteria for a phase or WP | None (records verification results only) |
 | `/pm-explore [--limit N]` | Analyze codebase as a PM, suggest user-facing features, create selected as FRs | None (created FRs start as Proposed) |
 
 **Auto-state propagation rules** (no user confirmation needed):

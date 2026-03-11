@@ -279,6 +279,16 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
     }
 
+    public async Task<PhaseResponse> VerifyAcceptanceCriteriaAsync(
+        long projectId, int wpNumber, int phaseNumber, VerifyAcceptanceCriteriaRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/projects/{projectId}/work-packages/{wpNumber}/phases/{phaseNumber}/verify", request, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct)
+            ?? throw new InvalidOperationException("Failed to deserialize phase response.");
+    }
+
     // ── Task endpoints ──
 
     public async Task<TaskResponse> CreateTaskAsync(
