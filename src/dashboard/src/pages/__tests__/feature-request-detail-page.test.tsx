@@ -20,7 +20,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
     expect(screen.getByText("proj-1-fr-1")).toBeInTheDocument();
     expect(screen.getByText("Approved")).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /delete/i }));
@@ -154,7 +154,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     expect(screen.getByRole("button", { name: /edit/i })).toBeInTheDocument();
@@ -174,7 +174,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /edit/i }));
@@ -204,7 +204,7 @@ describe("FeatureRequestDetailPage", () => {
           featureRequestNumber: 1,
           projectId: "proj-1",
           name: "Updated FR",
-          description: "Add dark mode support to the dashboard",
+          description: "Add **dark mode** support to the dashboard",
           category: "Feature",
           priority: "High",
           status: "Approved",
@@ -226,7 +226,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /edit/i }));
@@ -235,7 +235,7 @@ describe("FeatureRequestDetailPage", () => {
       expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByDisplayValue("Dashboard Dark Mode");
+    const nameInput = screen.getByDisplayValue(/Dashboard Dark Mode/);
     await user.clear(nameInput);
     await user.type(nameInput, "Updated FR");
 
@@ -262,7 +262,7 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /edit/i }));
@@ -283,13 +283,25 @@ describe("FeatureRequestDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Dashboard Dark Mode")).toBeInTheDocument();
+      expect(screen.getByText(/Dashboard Dark Mode/)).toBeInTheDocument();
     });
 
     const statusCombobox = screen.getAllByRole("combobox").find(
       (el) => el.textContent?.includes("Approved"),
     );
     expect(statusCombobox).toBeTruthy();
+  });
+
+  it("renders description with markdown formatting in a Description card", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Description")).toBeInTheDocument();
+    });
+    // The mock description contains "Add **dark mode** support" — bold should render as <strong>
+    const strong = document.querySelector(".prose strong");
+    expect(strong).toBeInTheDocument();
+    expect(strong?.textContent).toBe("dark mode");
   });
 
   it("hides optional sections when data is null", async () => {

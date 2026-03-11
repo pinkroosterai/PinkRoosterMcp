@@ -7,7 +7,7 @@ export function createIssue(overrides?: Partial<Issue>): Issue {
     issueNumber: 1,
     projectId: "proj-1",
     name: "Test Bug",
-    description: "Something is broken",
+    description: "Something is **broken** in the app",
     issueType: "Bug",
     severity: "Major",
     priority: "High",

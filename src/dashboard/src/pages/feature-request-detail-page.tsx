@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserStoryCard } from "@/components/user-story-card";
 import { AddUserStoryForm } from "@/components/add-user-story-form";
+import { MarkdownContent } from "@/components/markdown-content";
 import type { FeatureRequest, UserStory } from "@/types";
 
 const categoryVariant: Record<string, "default" | "secondary" | "outline"> = {
@@ -243,15 +244,6 @@ export function FeatureRequestDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            {isEditing ? (
-              <Textarea
-                className="mt-1 text-sm"
-                rows={2}
-                {...form.register("description")}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground mt-1">{fr.description}</p>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -281,6 +273,20 @@ export function FeatureRequestDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Description Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isEditing ? (
+            <Textarea rows={4} {...form.register("description")} />
+          ) : (
+            <MarkdownContent content={fr.description} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Definition Card */}
       <Card>
@@ -365,7 +371,7 @@ export function FeatureRequestDetailPage() {
             {isEditing ? (
               <Textarea rows={2} {...form.register("businessValue")} />
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{fr.businessValue}</p>
+              <MarkdownContent content={fr.businessValue} />
             )}
           </CardContent>
         </Card>
@@ -381,7 +387,7 @@ export function FeatureRequestDetailPage() {
             {isEditing ? (
               <Textarea rows={3} {...form.register("acceptanceSummary")} />
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{fr.acceptanceSummary}</p>
+              <MarkdownContent content={fr.acceptanceSummary} />
             )}
           </CardContent>
         </Card>

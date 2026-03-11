@@ -7,6 +7,7 @@ import { AnimatedCount } from "@/components/animated-count";
 import { useProjectContext } from "@/hooks/use-project-context";
 import { useProjectStatus, useNextActions } from "@/hooks/use-projects";
 import { stateColorClass, priorityAccent } from "@/lib/state-colors";
+import { MarkdownContent } from "@/components/markdown-content";
 import { FolderOpen, Bug, Layers, Lightbulb, ArrowRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
@@ -99,10 +100,18 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div className="animate-in-right">
         <h1 className="text-2xl font-bold">{selectedProject.name}</h1>
-        {selectedProject.description && (
-          <p className="text-sm text-muted-foreground mt-1">{selectedProject.description}</p>
-        )}
       </div>
+
+      {selectedProject.description && (
+        <Card className="glass-card animate-in-up">
+          <CardHeader>
+            <CardTitle className="text-base">Description</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MarkdownContent content={selectedProject.description} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Entity summary cards with progress — staggered entrance */}
       {projectStatus && (

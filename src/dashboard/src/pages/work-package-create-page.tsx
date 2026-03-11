@@ -52,6 +52,10 @@ export function WorkPackageCreatePage() {
   });
 
   const onSubmit = (data: CreateWorkPackageInput) => {
+    // valueAsNumber returns NaN for empty inputs — treat as undefined
+    if (data.estimatedComplexity !== undefined && isNaN(data.estimatedComplexity)) {
+      data.estimatedComplexity = undefined;
+    }
     const payload: Record<string, unknown> = Object.fromEntries(
       Object.entries(data).filter(([, v]) => v !== "" && v !== undefined),
     );
@@ -189,26 +193,20 @@ export function WorkPackageCreatePage() {
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="estimatedComplexity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Estimated Complexity (1-10)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={10}
-                          placeholder="e.g. 5"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-2">
+                  <label htmlFor="estimatedComplexity" className="text-sm font-medium leading-none">Estimated Complexity (1-10)</label>
+                  <Input
+                    id="estimatedComplexity"
+                    type="number"
+                    min={1}
+                    max={10}
+                    placeholder="e.g. 5"
+                    {...form.register("estimatedComplexity", { valueAsNumber: true })}
+                  />
+                  {form.formState.errors.estimatedComplexity && (
+                    <p className="text-xs font-medium text-destructive">{form.formState.errors.estimatedComplexity.message}</p>
                   )}
-                />
+                </div>
 
                 <FormField
                   control={form.control}

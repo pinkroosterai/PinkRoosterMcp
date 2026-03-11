@@ -262,13 +262,14 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
             }));
         }
 
-        // Query 4: Actionable feature requests — active (UnderReview, Approved), not terminal/deferred
+        // Query 4: Actionable feature requests — active + Proposed, not terminal/deferred/InProgress
         if (entityType is null or "featurerequest")
         {
             var frs = await db.FeatureRequests
                 .Where(fr => fr.ProjectId == projectId)
-                .Where(fr => FeatureStatusConstants.ActiveStates.Contains(fr.Status)
+                .Where(fr => (FeatureStatusConstants.ActiveStates.Contains(fr.Status)
                     && fr.Status != FeatureStatus.InProgress) // InProgress = WPs handle it
+                    || fr.Status == FeatureStatus.Proposed) // Proposed FRs need attention
                 .Select(fr => new
                 {
                     fr.ProjectId,

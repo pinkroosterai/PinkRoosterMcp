@@ -85,7 +85,7 @@ export const createWorkPackageSchema = z.object({
   type: z.enum(workPackageTypes).optional(),
   priority: z.enum(priorities).optional(),
   plan: z.string().optional(),
-  estimatedComplexity: z.coerce.number().min(1).max(10).optional(),
+  estimatedComplexity: z.union([z.number().min(1).max(10), z.nan()]).optional(),
   estimationRationale: z.string().optional(),
 });
 

@@ -7,7 +7,7 @@ export function createFeatureRequest(overrides?: Partial<FeatureRequest>): Featu
     featureRequestNumber: 1,
     projectId: "proj-1",
     name: "Dashboard Dark Mode",
-    description: "Add dark mode support to the dashboard",
+    description: "Add **dark mode** support to the dashboard",
     category: "Feature",
     priority: "High",
     status: "Approved",

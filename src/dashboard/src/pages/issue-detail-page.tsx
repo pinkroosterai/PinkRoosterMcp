@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { stateColorClass } from "@/lib/state-colors";
+import { MarkdownContent } from "@/components/markdown-content";
 import type { Issue } from "@/types";
 
 const severityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
@@ -217,15 +218,6 @@ export function IssueDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            {isEditing ? (
-              <Textarea
-                className="mt-1 text-sm"
-                rows={2}
-                {...form.register("description")}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground mt-1">{issue.description}</p>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -255,6 +247,20 @@ export function IssueDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Description Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isEditing ? (
+            <Textarea rows={4} {...form.register("description")} />
+          ) : (
+            <MarkdownContent content={issue.description} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Definition Card */}
       <Card>
@@ -347,19 +353,19 @@ export function IssueDetailPage() {
                 {issue.stepsToReproduce && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Steps to Reproduce</div>
-                    <p className="text-sm whitespace-pre-wrap">{issue.stepsToReproduce}</p>
+                    <MarkdownContent content={issue.stepsToReproduce} />
                   </div>
                 )}
                 {issue.expectedBehavior && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Expected Behavior</div>
-                    <p className="text-sm whitespace-pre-wrap">{issue.expectedBehavior}</p>
+                    <MarkdownContent content={issue.expectedBehavior} />
                   </div>
                 )}
                 {issue.actualBehavior && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Actual Behavior</div>
-                    <p className="text-sm whitespace-pre-wrap">{issue.actualBehavior}</p>
+                    <MarkdownContent content={issue.actualBehavior} />
                   </div>
                 )}
                 {issue.affectedComponent && (
@@ -403,13 +409,13 @@ export function IssueDetailPage() {
                 {issue.rootCause && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Root Cause</div>
-                    <p className="text-sm whitespace-pre-wrap">{issue.rootCause}</p>
+                    <MarkdownContent content={issue.rootCause} />
                   </div>
                 )}
                 {issue.resolution && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Resolution</div>
-                    <p className="text-sm whitespace-pre-wrap">{issue.resolution}</p>
+                    <MarkdownContent content={issue.resolution} />
                   </div>
                 )}
               </>

@@ -34,6 +34,7 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
 
     private string WpPath(long projectId) => $"{BasePath}/{projectId}/work-packages";
     private string IssuePath(long projectId) => $"{BasePath}/{projectId}/issues";
+    private string FrPath(long projectId) => $"{BasePath}/{projectId}/feature-requests";
 
     // ── Basic ──
 
@@ -347,5 +348,124 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         // Only the blocker should appear (leaf WPs, not blocked)
         Assert.Single(items);
         Assert.Equal("Blocker", items[0].Name);
+    }
+
+    // ── Feature Request inclusion ──
+
+    [Fact]
+    public async Task GetNextActions_IncludesProposedFeatureRequests()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "New Feature Idea",
+            Description = "A proposed feature",
+            Category = FeatureCategory.Feature,
+            Priority = Priority.High,
+            Status = FeatureStatus.Proposed
+        }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "featurerequest"), ct);
+
+        Assert.Single(items);
+        Assert.Equal("FeatureRequest", items[0].Type);
+        Assert.Equal("New Feature Idea", items[0].Name);
+        Assert.Equal("Proposed", items[0].State);
+    }
+
+    [Fact]
+    public async Task GetNextActions_ExcludesDeferredFeatureRequests()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Proposed FR — should appear
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "Active FR",
+            Description = "d",
+            Category = FeatureCategory.Feature,
+            Status = FeatureStatus.Proposed
+        }, ct);
+
+        // Deferred FR — should NOT appear
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "Deferred FR",
+            Description = "d",
+            Category = FeatureCategory.Feature,
+            Status = FeatureStatus.Deferred
+        }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "featurerequest"), ct);
+
+        Assert.Single(items);
+        Assert.Equal("Active FR", items[0].Name);
+    }
+
+    [Fact]
+    public async Task GetNextActions_IncludesActiveFrsButExcludesInProgress()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Approved FR — should appear
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "Approved FR",
+            Description = "d",
+            Category = FeatureCategory.Feature,
+            Status = FeatureStatus.Approved
+        }, ct);
+
+        // InProgress FR — should NOT appear (WPs handle it)
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "InProgress FR",
+            Description = "d",
+            Category = FeatureCategory.Feature,
+            Status = FeatureStatus.InProgress
+        }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "featurerequest"), ct);
+
+        Assert.Single(items);
+        Assert.Equal("Approved FR", items[0].Name);
+    }
+
+    [Fact]
+    public async Task GetNextActions_EntityTypeFilter_ReturnsOnlyFrs()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Create an issue
+        await Client.PostAsJsonAsync(IssuePath(projectId), new CreateIssueRequest
+        {
+            Name = "Bug",
+            Description = "d",
+            IssueType = IssueType.Bug,
+            Severity = IssueSeverity.Minor,
+            State = CompletionState.Implementing
+        }, ct);
+
+        // Create a FR
+        await Client.PostAsJsonAsync(FrPath(projectId), new CreateFeatureRequestRequest
+        {
+            Name = "Feature Idea",
+            Description = "d",
+            Category = FeatureCategory.Enhancement,
+            Status = FeatureStatus.Proposed
+        }, ct);
+
+        var frOnly = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "featurerequest"), ct);
+        Assert.Single(frOnly);
+        Assert.Equal("FeatureRequest", frOnly[0].Type);
+
+        var issueOnly = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "issue"), ct);
+        Assert.Single(issueOnly);
+        Assert.Equal("Issue", issueOnly[0].Type);
     }
 }

@@ -162,7 +162,7 @@ describe("IssueDetailPage", () => {
             issueNumber: 1,
             projectId: "proj-1",
             name: "Updated Bug",
-            description: "Something is broken",
+            description: "Something is **broken** in the app",
             issueType: "Bug",
             severity: "Major",
             priority: "High",
@@ -253,6 +253,18 @@ describe("IssueDetailPage", () => {
       (el) => el.textContent?.includes("Implementing"),
     );
     expect(stateCombobox).toBeTruthy();
+  });
+
+  it("renders description with markdown formatting in a Description card", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Description")).toBeInTheDocument();
+    });
+    // The mock description contains "Something is **broken** in the app" — bold should render as <strong>
+    const strong = document.querySelector(".prose strong");
+    expect(strong).toBeInTheDocument();
+    expect(strong?.textContent).toBe("broken");
   });
 
   it("hides reproduction section when no reproduction data", async () => {
