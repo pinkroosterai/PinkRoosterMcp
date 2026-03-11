@@ -15,33 +15,54 @@ public sealed class EventsController(IEventBroadcaster broadcaster) : Controller
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private static readonly TimeSpan MaxConnectionLifetime = TimeSpan.FromHours(1);
+
     [HttpGet]
     public async Task Stream(long projectId, CancellationToken ct)
     {
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
-        Response.Headers.Connection = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no";
-
-        await Response.Body.FlushAsync(ct);
-
-        var heartbeatInterval = TimeSpan.FromSeconds(30);
-        using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var heartbeatTask = SendHeartbeatsAsync(heartbeatInterval, heartbeatCts.Token);
+        if (!broadcaster.TryAcquireConnection(projectId))
+        {
+            Response.StatusCode = 429;
+            Response.ContentType = "application/json";
+            await Response.WriteAsync("""{"error":"Too many SSE connections for this project."}""", ct);
+            return;
+        }
 
         try
         {
-            await foreach (var evt in broadcaster.Subscribe(projectId, ct))
+            Response.ContentType = "text/event-stream";
+            Response.Headers.CacheControl = "no-cache";
+            Response.Headers.Connection = "keep-alive";
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            await Response.Body.FlushAsync(ct);
+
+            using var lifetimeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lifetimeCts.CancelAfter(MaxConnectionLifetime);
+            var linkedCt = lifetimeCts.Token;
+
+            var heartbeatInterval = TimeSpan.FromSeconds(30);
+            using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(linkedCt);
+            var heartbeatTask = SendHeartbeatsAsync(heartbeatInterval, heartbeatCts.Token);
+
+            try
             {
-                var data = JsonSerializer.Serialize(evt, JsonOptions);
-                await Response.WriteAsync($"event: {evt.EventType}\ndata: {data}\n\n", ct);
-                await Response.Body.FlushAsync(ct);
+                await foreach (var evt in broadcaster.Subscribe(projectId, linkedCt))
+                {
+                    var data = JsonSerializer.Serialize(evt, JsonOptions);
+                    await Response.WriteAsync($"event: {evt.EventType}\ndata: {data}\n\n", linkedCt);
+                    await Response.Body.FlushAsync(linkedCt);
+                }
+            }
+            finally
+            {
+                await heartbeatCts.CancelAsync();
+                try { await heartbeatTask; } catch (OperationCanceledException) { }
             }
         }
         finally
         {
-            await heartbeatCts.CancelAsync();
-            try { await heartbeatTask; } catch (OperationCanceledException) { }
+            broadcaster.ReleaseConnection(projectId);
         }
     }
 

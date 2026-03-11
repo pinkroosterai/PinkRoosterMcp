@@ -7,7 +7,22 @@ namespace PinkRooster.Api.Services;
 
 public sealed class EventBroadcaster : IEventBroadcaster
 {
+    private const int MaxConnectionsPerProject = 10;
+
     private readonly ConcurrentDictionary<long, ConcurrentDictionary<Channel<ServerEvent>, byte>> _subscribers = new();
+    private readonly ConcurrentDictionary<long, SemaphoreSlim> _connectionLimits = new();
+
+    public bool TryAcquireConnection(long projectId)
+    {
+        var semaphore = _connectionLimits.GetOrAdd(projectId, _ => new SemaphoreSlim(MaxConnectionsPerProject, MaxConnectionsPerProject));
+        return semaphore.Wait(0);
+    }
+
+    public void ReleaseConnection(long projectId)
+    {
+        if (_connectionLimits.TryGetValue(projectId, out var semaphore))
+            semaphore.Release();
+    }
 
     public async IAsyncEnumerable<ServerEvent> Subscribe(
         long projectId, [EnumeratorCancellation] CancellationToken ct)
