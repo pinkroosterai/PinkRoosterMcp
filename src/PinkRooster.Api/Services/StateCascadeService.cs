@@ -225,6 +225,72 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
         }
     }
 
+    public void AutoBlockWpIfNeeded(WorkPackage dependentWp, WorkPackage blockerWp, List<StateChangeDto>? stateChanges)
+    {
+        if (CompletionStateConstants.TerminalStates.Contains(blockerWp.State)
+            || dependentWp.State == CompletionState.Blocked
+            || CompletionStateConstants.TerminalStates.Contains(dependentWp.State)
+            || CompletionStateConstants.InactiveStates.Contains(dependentWp.State))
+            return;
+
+        var oldState = dependentWp.State;
+        dependentWp.PreviousActiveState = oldState;
+        dependentWp.State = CompletionState.Blocked;
+        StateTransitionHelper.ApplyStateTimestamps(dependentWp, oldState, CompletionState.Blocked);
+
+        db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
+        {
+            WorkPackage = dependentWp,
+            FieldName = "State",
+            OldValue = oldState.ToString(),
+            NewValue = CompletionState.Blocked.ToString(),
+            ChangedBy = "system",
+            ChangedAt = DateTimeOffset.UtcNow
+        });
+
+        stateChanges?.Add(new StateChangeDto
+        {
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{dependentWp.ProjectId}-wp-{dependentWp.WorkPackageNumber}",
+            OldState = oldState.ToString(),
+            NewState = CompletionState.Blocked.ToString(),
+            Reason = $"Auto-blocked: dependency on 'proj-{blockerWp.ProjectId}-wp-{blockerWp.WorkPackageNumber}' added"
+        });
+    }
+
+    public void AutoBlockTaskIfNeeded(WorkPackageTask dependentTask, WorkPackageTask blockerTask, WorkPackage wp, List<StateChangeDto>? stateChanges)
+    {
+        if (CompletionStateConstants.TerminalStates.Contains(blockerTask.State)
+            || dependentTask.State == CompletionState.Blocked
+            || CompletionStateConstants.TerminalStates.Contains(dependentTask.State)
+            || CompletionStateConstants.InactiveStates.Contains(dependentTask.State))
+            return;
+
+        var oldState = dependentTask.State;
+        dependentTask.PreviousActiveState = oldState;
+        dependentTask.State = CompletionState.Blocked;
+        StateTransitionHelper.ApplyStateTimestamps(dependentTask, oldState, CompletionState.Blocked);
+
+        db.TaskAuditLogs.Add(new TaskAuditLog
+        {
+            Task = dependentTask,
+            FieldName = "State",
+            OldValue = oldState.ToString(),
+            NewValue = CompletionState.Blocked.ToString(),
+            ChangedBy = "system",
+            ChangedAt = DateTimeOffset.UtcNow
+        });
+
+        stateChanges?.Add(new StateChangeDto
+        {
+            EntityType = "Task",
+            EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{dependentTask.TaskNumber}",
+            OldState = oldState.ToString(),
+            NewState = CompletionState.Blocked.ToString(),
+            Reason = $"Auto-blocked: dependency on 'proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{blockerTask.TaskNumber}' added"
+        });
+    }
+
     public async Task<bool> HasCircularWpDependencyAsync(long dependentId, long dependsOnId, CancellationToken ct)
     {
         return await HasCircularDependencyAsync(

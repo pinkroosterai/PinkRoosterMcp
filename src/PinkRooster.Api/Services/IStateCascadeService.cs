@@ -26,6 +26,16 @@ public interface IStateCascadeService
     Task AutoUnblockDependentTasksAsync(WorkPackageTask completedTask, WorkPackage wp, List<StateChangeDto>? stateChanges, CancellationToken ct);
 
     /// <summary>
+    /// If the blocker WP is non-terminal and the dependent WP is active, transitions dependent to Blocked.
+    /// </summary>
+    void AutoBlockWpIfNeeded(WorkPackage dependentWp, WorkPackage blockerWp, List<StateChangeDto>? stateChanges);
+
+    /// <summary>
+    /// If the blocker task is non-terminal and the dependent task is active, transitions dependent to Blocked.
+    /// </summary>
+    void AutoBlockTaskIfNeeded(WorkPackageTask dependentTask, WorkPackageTask blockerTask, WorkPackage wp, List<StateChangeDto>? stateChanges);
+
+    /// <summary>
     /// BFS cycle detection for work package dependencies.
     /// </summary>
     Task<bool> HasCircularWpDependencyAsync(long dependentId, long dependsOnId, CancellationToken ct);

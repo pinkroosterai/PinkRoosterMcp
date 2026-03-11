@@ -442,37 +442,7 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
         db.WorkPackageTaskDependencies.Add(dependency);
 
-        // Auto-block: if dependent task is in an active state and depends-on is non-terminal, transition to Blocked
-        if (!CompletionStateConstants.TerminalStates.Contains(dependsOnTask.State)
-            && dependentTask.State != CompletionState.Blocked
-            && !CompletionStateConstants.TerminalStates.Contains(dependentTask.State)
-            && !CompletionStateConstants.InactiveStates.Contains(dependentTask.State))
-        {
-            var oldState = dependentTask.State;
-            dependentTask.PreviousActiveState = oldState;
-            dependentTask.State = CompletionState.Blocked;
-            StateTransitionHelper.ApplyStateTimestamps(dependentTask, oldState, CompletionState.Blocked);
-
-            var now = DateTimeOffset.UtcNow;
-            db.TaskAuditLogs.Add(new TaskAuditLog
-            {
-                Task = dependentTask,
-                FieldName = "State",
-                OldValue = oldState.ToString(),
-                NewValue = CompletionState.Blocked.ToString(),
-                ChangedBy = "system",
-                ChangedAt = now
-            });
-
-            stateChanges?.Add(new StateChangeDto
-            {
-                EntityType = "Task",
-                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{dependentTask.TaskNumber}",
-                OldState = oldState.ToString(),
-                NewState = CompletionState.Blocked.ToString(),
-                Reason = $"Auto-blocked: dependency on 'proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{dependsOnTask.TaskNumber}' added"
-            });
-        }
+        cascadeService.AutoBlockTaskIfNeeded(dependentTask, dependsOnTask, wp, stateChanges);
 
         await db.SaveChangesAsync(ct);
 

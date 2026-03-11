@@ -327,37 +327,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         db.WorkPackageDependencies.Add(dependency);
 
-        // Auto-block: if dependent WP is in an active state and depends-on is non-terminal, transition to Blocked
-        if (!CompletionStateConstants.TerminalStates.Contains(dependsOnWp.State)
-            && dependentWp.State != CompletionState.Blocked
-            && !CompletionStateConstants.TerminalStates.Contains(dependentWp.State)
-            && !CompletionStateConstants.InactiveStates.Contains(dependentWp.State))
-        {
-            var oldState = dependentWp.State;
-            dependentWp.PreviousActiveState = oldState;
-            dependentWp.State = CompletionState.Blocked;
-            StateTransitionHelper.ApplyStateTimestamps(dependentWp, oldState, CompletionState.Blocked);
-
-            var now = DateTimeOffset.UtcNow;
-            db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
-            {
-                WorkPackage = dependentWp,
-                FieldName = "State",
-                OldValue = oldState.ToString(),
-                NewValue = CompletionState.Blocked.ToString(),
-                ChangedBy = "system",
-                ChangedAt = now
-            });
-
-            stateChanges?.Add(new StateChangeDto
-            {
-                EntityType = "WorkPackage",
-                EntityId = $"proj-{dependentWp.ProjectId}-wp-{dependentWp.WorkPackageNumber}",
-                OldState = oldState.ToString(),
-                NewState = CompletionState.Blocked.ToString(),
-                Reason = $"Auto-blocked: dependency on 'proj-{dependsOnWp.ProjectId}-wp-{dependsOnWp.WorkPackageNumber}' added"
-            });
-        }
+        cascadeService.AutoBlockWpIfNeeded(dependentWp, dependsOnWp, stateChanges);
 
         await db.SaveChangesAsync(ct);
 
@@ -671,17 +641,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                             Reason = $"Scaffold dependency: {dependsOnTask.Name} → {dependentTask.Name}"
                         });
 
-                        // Auto-block if blocker is non-terminal and dependent is active
-                        if (!CompletionStateConstants.TerminalStates.Contains(dependsOnTask.State)
-                            && dependentTask.State != CompletionState.Blocked
-                            && !CompletionStateConstants.TerminalStates.Contains(dependentTask.State)
-                            && !CompletionStateConstants.InactiveStates.Contains(dependentTask.State))
-                        {
-                            var oldState = dependentTask.State;
-                            dependentTask.PreviousActiveState = oldState;
-                            dependentTask.State = CompletionState.Blocked;
-                            StateTransitionHelper.ApplyStateTimestamps(dependentTask, oldState, CompletionState.Blocked);
-                        }
+                        cascadeService.AutoBlockTaskIfNeeded(dependentTask, dependsOnTask, wp, stateChanges);
 
                         totalDependencies++;
                     }
@@ -715,26 +675,7 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                         Reason = "Scaffold dependency"
                     });
 
-                    // Auto-block the new WP if blocker is non-terminal
-                    if (!CompletionStateConstants.TerminalStates.Contains(blockerWp.State)
-                        && wp.State != CompletionState.Blocked
-                        && !CompletionStateConstants.TerminalStates.Contains(wp.State)
-                        && !CompletionStateConstants.InactiveStates.Contains(wp.State))
-                    {
-                        var oldState = wp.State;
-                        wp.PreviousActiveState = oldState;
-                        wp.State = CompletionState.Blocked;
-                        StateTransitionHelper.ApplyStateTimestamps(wp, oldState, CompletionState.Blocked);
-
-                        stateChanges.Add(new StateChangeDto
-                        {
-                            EntityType = "WorkPackage",
-                            EntityId = $"proj-{projectId}-wp-{nextWpNumber}",
-                            OldState = oldState.ToString(),
-                            NewState = CompletionState.Blocked.ToString(),
-                            Reason = $"Auto-blocked: dependency on 'proj-{blockerWp.ProjectId}-wp-{blockerWp.WorkPackageNumber}' added"
-                        });
-                    }
+                    cascadeService.AutoBlockWpIfNeeded(wp, blockerWp, stateChanges);
 
                     totalDependencies++;
                 }
