@@ -1,8 +1,3 @@
 {
-  "mcpServers": {
-    "pinkrooster": {
-      "type": "http",
-      "url": "http://localhost:5200"
-    }
-  }
+  "mcpServers": {}
 }

@@ -1,7 +1,6 @@
 import type { Plugin } from "vite";
 import { randomUUID } from "crypto";
 
-const AUTH_TOKEN_KEY = "pinkrooster-auth";
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface TokenEntry {

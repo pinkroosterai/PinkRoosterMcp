@@ -359,7 +359,7 @@ Claude Code skills in `.claude/skills/` provide AI-driven project management wor
 | Skill | Purpose | Auto-State Propagation |
 |-------|---------|----------------------|
 | `/pm-status` | Read-only project dashboard (counts, blocked items, next actions) | None (read-only) |
-| `/pm-next [entityType]` | Pick highest-priority item, load context, start implementing | Task→Implementing; WP→Implementing; linked Issue→Implementing; linked FR→InProgress |
+| `/pm-next [entityType] [--auto]` | Pick highest-priority WP (default), load context, delegate to /pm-implement. `--auto` loops until all work is done (no prompts, auto-commit per WP) | WP→Implementing; linked Issue→Implementing; linked FR→InProgress |
 | `/pm-done <id>` | Mark entity completed, report cascades | On WP auto-complete: linked Issue→Completed, linked FR→Completed |
 | `/pm-implement <id> [--dry-run]` | Execute task/phase/WP with full implementation loop | Same as pm-next on start; same as pm-done on finish |
 | `/pm-scaffold <desc\|id>` | Scaffold WP with phases/tasks from codebase analysis | linked Issue→Designing; linked FR→Scheduled |
