@@ -210,7 +210,7 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
             if (CompletionStateConstants.ActiveStates.Contains(newState))
             {
                 var activeBlockerCount = task.BlockedBy
-                    .Count(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnTask!.State));
+                    .Count(d => d.DependsOnTask is null || !CompletionStateConstants.TerminalStates.Contains(d.DependsOnTask.State));
 
                 if (activeBlockerCount > 0)
                 {
