@@ -46,15 +46,13 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
     public async Task<WorkPackageSummaryResponse> GetSummaryAsync(long projectId, CancellationToken ct = default)
     {
-        var workPackages = await db.WorkPackages
-            .Where(w => w.ProjectId == projectId)
-            .ToListAsync(ct);
+        var query = db.WorkPackages.Where(w => w.ProjectId == projectId);
 
         return new WorkPackageSummaryResponse
         {
-            ActiveCount = workPackages.Count(w => CompletionStateConstants.ActiveStates.Contains(w.State)),
-            InactiveCount = workPackages.Count(w => CompletionStateConstants.InactiveStates.Contains(w.State)),
-            TerminalCount = workPackages.Count(w => CompletionStateConstants.TerminalStates.Contains(w.State))
+            ActiveCount = await query.CountAsync(w => CompletionStateConstants.ActiveStates.Contains(w.State), ct),
+            InactiveCount = await query.CountAsync(w => CompletionStateConstants.InactiveStates.Contains(w.State), ct),
+            TerminalCount = await query.CountAsync(w => CompletionStateConstants.TerminalStates.Contains(w.State), ct)
         };
     }
 

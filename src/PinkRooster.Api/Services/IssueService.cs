@@ -42,20 +42,18 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
 
     public async Task<IssueSummaryResponse> GetSummaryAsync(long projectId, CancellationToken ct = default)
     {
-        var issues = await db.Issues
-            .Where(i => i.ProjectId == projectId)
-            .ToListAsync(ct);
+        var query = db.Issues.Where(i => i.ProjectId == projectId);
 
-        var activeCount = issues.Count(i => CompletionStateConstants.ActiveStates.Contains(i.State));
-        var inactiveCount = issues.Count(i => CompletionStateConstants.InactiveStates.Contains(i.State));
-        var terminalCount = issues.Count(i => CompletionStateConstants.TerminalStates.Contains(i.State));
+        var activeCount = await query.CountAsync(i => CompletionStateConstants.ActiveStates.Contains(i.State), ct);
+        var inactiveCount = await query.CountAsync(i => CompletionStateConstants.InactiveStates.Contains(i.State), ct);
+        var terminalCount = await query.CountAsync(i => CompletionStateConstants.TerminalStates.Contains(i.State), ct);
 
-        var latestTerminal = issues
+        var latestTerminal = await query
             .Where(i => CompletionStateConstants.TerminalStates.Contains(i.State))
             .OrderByDescending(i => i.ResolvedAt ?? i.UpdatedAt)
             .Take(10)
             .Select(i => ToResponse(i))
-            .ToList();
+            .ToListAsync(ct);
 
         return new IssueSummaryResponse
         {
