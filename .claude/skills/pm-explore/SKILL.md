@@ -173,3 +173,4 @@ If "none" was selected:
 - The `--limit` flag controls suggestion count (default 5, max 10)
 - If the codebase is small or all obvious features are already tracked, it's OK to suggest fewer than the limit
 - Include specific next-step commands with FR IDs so the user can act immediately
+- For ambiguous suggestions (could be a bug or feature), note: "Unsure if bug or feature? Use `/pm-plan <description>` for guided classification"

@@ -171,7 +171,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         if (entityType is null or "task")
         {
             var tasks = await db.WorkPackageTasks
-                .Include(t => t.WorkPackage)
+                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedIssue)
+                .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedFeatureRequest)
                 .Where(t => t.WorkPackage.ProjectId == projectId)
                 .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State))
                 .Where(t => t.State != CompletionState.Blocked)
@@ -185,7 +186,11 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     t.Name,
                     t.State,
                     t.SortOrder,
-                    t.WorkPackage.Priority
+                    t.WorkPackage.Priority,
+                    t.WorkPackage.Type,
+                    t.WorkPackage.EstimatedComplexity,
+                    LinkedIssueName = t.WorkPackage.LinkedIssue != null ? t.WorkPackage.LinkedIssue.Name : null,
+                    LinkedFrName = t.WorkPackage.LinkedFeatureRequest != null ? t.WorkPackage.LinkedFeatureRequest.Name : null
                 })
                 .ToListAsync(ct);
 
@@ -196,7 +201,11 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 Name = t.Name,
                 Priority = t.Priority.ToString(),
                 State = t.State.ToString(),
-                ParentId = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}"
+                ParentId = $"proj-{t.ProjectId}-wp-{t.WorkPackageNumber}",
+                WorkPackageType = t.Type.ToString(),
+                EstimatedComplexity = t.EstimatedComplexity,
+                LinkedIssueName = t.LinkedIssueName,
+                LinkedFrName = t.LinkedFrName
             }));
         }
 
@@ -204,6 +213,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         if (entityType is null or "wp")
         {
             var wps = await db.WorkPackages
+                .Include(w => w.LinkedIssue)
+                .Include(w => w.LinkedFeatureRequest)
                 .Where(w => w.ProjectId == projectId)
                 .Where(w => !CompletionStateConstants.TerminalStates.Contains(w.State))
                 .Where(w => w.State != CompletionState.Blocked)
@@ -214,7 +225,11 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     w.WorkPackageNumber,
                     w.Name,
                     w.State,
-                    w.Priority
+                    w.Priority,
+                    w.Type,
+                    w.EstimatedComplexity,
+                    LinkedIssueName = w.LinkedIssue != null ? w.LinkedIssue.Name : null,
+                    LinkedFrName = w.LinkedFeatureRequest != null ? w.LinkedFeatureRequest.Name : null
                 })
                 .ToListAsync(ct);
 
@@ -225,7 +240,11 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 Name = w.Name,
                 Priority = w.Priority.ToString(),
                 State = w.State.ToString(),
-                ParentId = $"proj-{w.ProjectId}"
+                ParentId = $"proj-{w.ProjectId}",
+                WorkPackageType = w.Type.ToString(),
+                EstimatedComplexity = w.EstimatedComplexity,
+                LinkedIssueName = w.LinkedIssueName,
+                LinkedFrName = w.LinkedFrName
             }));
         }
 
@@ -247,7 +266,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     i.IssueNumber,
                     i.Name,
                     i.State,
-                    i.Priority
+                    i.Priority,
+                    i.IssueType,
+                    i.Severity
                 })
                 .ToListAsync(ct);
 
@@ -258,7 +279,9 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 Name = i.Name,
                 Priority = i.Priority.ToString(),
                 State = i.State.ToString(),
-                ParentId = $"proj-{i.ProjectId}"
+                ParentId = $"proj-{i.ProjectId}",
+                IssueType = i.IssueType.ToString(),
+                Severity = i.Severity.ToString()
             }));
         }
 
@@ -276,7 +299,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     fr.FeatureRequestNumber,
                     fr.Name,
                     fr.Status,
-                    fr.Priority
+                    fr.Priority,
+                    fr.Category
                 })
                 .ToListAsync(ct);
 
@@ -287,7 +311,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 Name = fr.Name,
                 Priority = fr.Priority.ToString(),
                 State = fr.Status.ToString(),
-                ParentId = $"proj-{fr.ProjectId}"
+                ParentId = $"proj-{fr.ProjectId}",
+                Category = fr.Category.ToString()
             }));
         }
 

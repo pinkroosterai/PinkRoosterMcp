@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PinkRooster.Shared.DTOs.Responses;
 
 public sealed class NextActionItem
@@ -8,4 +10,31 @@ public sealed class NextActionItem
     public required string Priority { get; init; }
     public required string State { get; init; }
     public required string ParentId { get; init; }
+
+    // ── Enrichment: WP/Task context ──
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LinkedIssueName { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LinkedFrName { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? WorkPackageType { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EstimatedComplexity { get; init; }
+
+    // ── Enrichment: Issue context ──
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IssueType { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Severity { get; init; }
+
+    // ── Enrichment: FR context ──
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Category { get; init; }
 }

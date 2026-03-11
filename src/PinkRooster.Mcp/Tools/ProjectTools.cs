@@ -15,10 +15,11 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "get_project_status", ReadOnly = true,
         Title = "Get Project Status", OpenWorld = false)]
     [Description(
-        "Call first when starting work on a project. " +
-        "Resolves a project by its filesystem path and returns its ID (for use with all other tools) " +
-        "plus a compact status summary with issue counts and work package breakdown. " +
-        "Does not include individual entity details — use get_issue_details or get_work_package_details to drill in.")]
+        "CALL THIS FIRST — resolves a project by filesystem path and returns projectId " +
+        "(required by all other tools). Also returns a compact status summary: " +
+        "issue/FR/WP counts by state, active items, blocked items, and priority overview. " +
+        "Does not include individual entity details — use get_issue_details, " +
+        "get_feature_request_details, or get_work_package_details to drill in.")]
     public async Task<string> GetProjectStatus(
         [Description("Absolute path to the project root directory.")] string projectPath,
         CancellationToken ct = default)
@@ -51,10 +52,11 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "get_next_actions", ReadOnly = true,
         Title = "Get Next Actions", OpenWorld = false)]
     [Description(
-        "Returns a priority-ordered list of actionable work items (tasks, work packages, issues) " +
-        "that need attention. Items are sorted by priority then entity type (tasks first). " +
-        "Use after get_project_status to decide what to work on next. " +
-        "Does not include blocked or terminal items.")]
+        "Returns a priority-ordered list of actionable work items (tasks, WPs, issues, feature requests) " +
+        "that need attention. Sorted by priority, then entity type (tasks first, then WPs, issues, FRs). " +
+        "Each item includes enriched context: WP/task items show linkedIssueName, linkedFrName, " +
+        "workPackageType, estimatedComplexity; issues show issueType, severity; FRs show category. " +
+        "Excludes blocked and terminal items. Use after get_project_status to decide what to work on next.")]
     public async Task<string> GetNextActions(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Maximum number of items to return. Default 10.")] int limit = 10,

@@ -135,31 +135,6 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         return JsonSerializer.Serialize(items, JsonDefaults.Indented);
     }
 
-    [McpServerTool(Name = "delete_issue",
-        Title = "Delete Issue", Destructive = true, OpenWorld = false)]
-    [Description(
-        "Permanently deletes an issue. Linked work packages will have their issue link cleared (not deleted). " +
-        "This action cannot be undone.")]
-    public async Task<string> DeleteIssue(
-        [Description("Issue ID (e.g. 'proj-1-issue-3').")] string issueId,
-        CancellationToken ct = default)
-    {
-        if (!IdParser.TryParseIssueId(issueId, out var projId, out var issueNumber))
-            return OperationResult.Error($"Invalid issue ID format: '{issueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
-
-        try
-        {
-            var deleted = await apiClient.DeleteIssueAsync(projId, issueNumber, ct);
-            return deleted
-                ? OperationResult.Success(issueId, $"Deleted issue '{issueId}'.")
-                : OperationResult.Warning($"Issue '{issueId}' not found.");
-        }
-        catch (HttpRequestException ex)
-        {
-            return OperationResult.Error($"API error: {ex.Message}");
-        }
-    }
-
     // ── Private helpers ──
 
     private async Task<string> CreateNewIssue(

@@ -122,7 +122,10 @@ Show the user what changed:
 | 1 | {role} | {goal} | {benefit} |
 | ... | | | |
 
-Next steps: `/pm-scaffold {frId}` to create a work package
+### Next Steps
+- Scaffold a work package: `/pm-scaffold {frId}`
+- View project status: `/pm-status`
+- Triage and prioritize: `/pm-triage`
 ```
 
 ## Constraints

@@ -18,7 +18,7 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 
 PinkRoosterMcp is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
 
-It exposes an [MCP server](https://modelcontextprotocol.io/) with 18 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
+It exposes an [MCP server](https://modelcontextprotocol.io/) with 20 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
 
 ### Why not Jira / Linear / GitHub Issues?
 
@@ -128,22 +128,25 @@ Every API request is logged with method, path, status, duration, and caller iden
 
 ## MCP Tools
 
-PinkRoosterMcp exposes 18 MCP tools organized by entity:
+PinkRoosterMcp exposes 20 MCP tools organized by entity:
 
 | Tool | Description |
 |------|-------------|
 | `get_project_status` | Compact status dashboard — counts, active/blocked items |
-| `get_next_actions` | Priority-ordered actionable items across all entity types |
+| `get_next_actions` | Priority-ordered actionable items with enriched context (linked entity names, complexity) |
 | `create_or_update_issue` | Create or update issues with full field support |
 | `get_issue_details` / `get_issue_overview` | Read issue data |
 | `create_or_update_feature_request` | Create or update feature requests |
 | `get_feature_request_details` / `get_feature_requests` | Read feature request data |
+| `manage_user_stories` | Add, update, or remove structured user stories on feature requests |
 | `create_or_update_work_package` | Create or update work packages |
 | `get_work_package_details` / `get_work_packages` | Read work package trees |
 | `scaffold_work_package` | One-call creation of WP + phases + tasks + dependencies |
-| `create_or_update_phase` / `create_or_update_task` | Manage phases and tasks |
-| `batch_update_task_states` | Update multiple task states in one call |
-| `manage_work_package_dependency` / `manage_task_dependency` | Add/remove dependencies with auto-block |
+| `create_or_update_phase` / `create_or_update_task` | Manage phases and tasks (phase supports batch task creation) |
+| `batch_update_task_states` | Update multiple task states in one call with consolidated cascades |
+| `verify_acceptance_criteria` | Record verification results for phase acceptance criteria |
+| `manage_dependency` | Add/remove WP or task dependencies with auto-block (auto-detects from ID format) |
+| `delete_entity` | Permanently delete an entity by type with cascade handling |
 
 All write operations return structured `OperationResult` JSON with state change cascades, so the agent always knows what happened downstream.
 
@@ -151,17 +154,21 @@ All write operations return structured `OperationResult` JSON with state change 
 
 ## PM Workflow Skills
 
-Seven Claude Code slash commands provide high-level project management workflows on top of the MCP tools:
+Eleven Claude Code slash commands provide high-level project management workflows on top of the MCP tools:
 
 | Command | What it does |
 |---------|-------------|
 | `/pm-status` | Show project dashboard with counts, blocked items, and next actions |
-| `/pm-next` | Pick the highest-priority item and start implementing |
+| `/pm-next [--auto]` | Pick the highest-priority item and start implementing. `--auto` loops until done |
 | `/pm-done <id>` | Mark entity completed, report all cascades |
 | `/pm-implement <id>` | Full implementation loop — read context, write code, run tests, update state |
-| `/pm-scaffold <desc>` | Scaffold a work package from a description or linked issue/FR |
+| `/pm-scaffold <desc\|id>` | Scaffold a work package from a description or linked issue/FR |
 | `/pm-plan <desc>` | Create an issue or FR from natural language, optionally scaffold |
 | `/pm-triage` | Analyze and prioritize open items |
+| `/pm-refine-fr <fr-id>` | Refine a feature request — rewrite description, add user stories, fill gaps |
+| `/pm-explore [--limit N]` | Analyze codebase as a PM and suggest user-facing features |
+| `/pm-verify <id>` | Verify acceptance criteria for a phase or work package |
+| `/pm-cleanup [--dry-run]` | Find and remove stale, cancelled, or rejected items |
 
 Skills automatically propagate state to related entities. Starting a task activates its work package and linked issue/FR. Completing all tasks cascades completion upward through phases, work packages, and linked entities.
 
@@ -253,7 +260,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-The test suite includes 126 API/MCP integration tests and 101 dashboard frontend tests.
+The test suite includes 154 API/MCP integration tests and 119 dashboard frontend tests.
 
 ---
 

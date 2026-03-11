@@ -118,9 +118,11 @@ If no cascading changes occurred, show: "No cascading state changes."
 
 ## Suggest Next Steps
 
-Choose the most relevant suggestion based on what happened:
+Choose the most relevant suggestions based on what happened:
 
-- If an auto-unblock occurred: "**{entityId}** was unblocked. Start it: `/pm-implement {entityId}`" or "Pick up next priority: `/pm-next`"
-- If a WP was auto-completed: "Work package complete. Pick up next priority: `/pm-next`" or "Check progress: `/pm-status`"
-- If a single task was completed and the WP has remaining non-terminal tasks: "Continue implementing: `/pm-implement {wpId}`"
-- If nothing was unblocked and no remaining tasks: "Run `/pm-status` to see updated project progress."
+- If completing a **phase or WP** and it has **unverified acceptance criteria**: "Verify criteria first? `/pm-verify {phaseId or wpId}` — then re-run `/pm-done`"
+- If an **auto-unblock** occurred: "**{entityId}** was unblocked. Start it: `/pm-implement {entityId}`" or "Pick up next priority: `/pm-next`"
+- If a **WP was auto-completed**: "Work package complete. Pick up next priority: `/pm-next`" or "Check progress: `/pm-status`"
+- If the completed WP had **cancelled or replaced tasks**: "WP had cancelled/replaced items. Run `/pm-cleanup` to remove them."
+- If a **single task** was completed and the WP has remaining non-terminal tasks: "Continue implementing: `/pm-implement {wpId}`"
+- **Always** after any completion: "Pick up next work: `/pm-next`" or "Check progress: `/pm-status`"

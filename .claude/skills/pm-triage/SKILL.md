@@ -95,7 +95,9 @@ If the item has an `affectedComponent` (issues), use Grep to check code health i
 - Items with linked WPs ready for work → `/pm-next` or `/pm-implement {wpId}`
 - Items needing work packages → `/pm-scaffold {entityId}`
 - Items that appear done but aren't marked → `/pm-done {entityId}`
+- FRs lacking detail (no user stories, vague description) → `/pm-refine-fr {frId}`
 - New work to track → `/pm-plan <description>`
+- Stale/cancelled items accumulating → `/pm-cleanup` to remove them
 - Stale items to close → cancel via dashboard (http://localhost:3000)
 ```
 

@@ -116,18 +116,13 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `create_or_update_phase` | Write | Create or update phase, optional batch task creation |
 | `create_or_update_task` | Write | Create or update task (returns state changes on cascades) |
 | `batch_update_task_states` | Write | Update state of multiple tasks in one call (consolidated cascades) |
-| `manage_work_package_dependency` | Write | Add/remove WP dependency (returns auto-block state changes) |
-| `manage_task_dependency` | Write | Add/remove task dependency (returns auto-block state changes) |
+| `manage_dependency` | Write | Add/remove WP or task dependency, auto-detected from ID format (returns auto-block state changes) |
 | `scaffold_work_package` | Write | One-call WP creation with phases, tasks, dependencies, and WP blockers |
 | `create_or_update_feature_request` | Write | Create (omit featureRequestId) or update (provide featureRequestId) a feature request |
 | `get_feature_request_details` | Read | Full feature request data by composite ID |
 | `get_feature_requests` | Read | List feature requests for a project, filterable by state category |
 | `verify_acceptance_criteria` | Write | Record verification results for acceptance criteria on a phase |
-| `delete_issue` | Write | Permanently delete an issue (clears WP links) |
-| `delete_feature_request` | Write | Permanently delete a feature request (clears WP links) |
-| `delete_work_package` | Write | Permanently delete a work package and all its phases/tasks |
-| `delete_phase` | Write | Permanently delete a phase and all its tasks |
-| `delete_task` | Write | Permanently delete a task |
+| `delete_entity` | Write | Permanently delete an entity by type (Issue, FeatureRequest, WorkPackage, Phase, Task). WP cascades to phases/tasks. Issue/FR clears WP links. |
 
 **Testing flow for MCP tools (E2E):**
 
@@ -147,7 +142,7 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
    - `create_or_update_task` with `phaseId` + name/description — creates task
    - Update via `taskId` or `phaseId` + fields to change
 5. **Dependencies & State Change Cascades**:
-   - `manage_work_package_dependency` / `manage_task_dependency` with action `add` — verify `stateChanges` array shows auto-block
+   - `manage_dependency` with WP or task IDs + action `add` — verify `stateChanges` array shows auto-block
    - Update blocker to `Completed` — verify `stateChanges` shows auto-unblock of dependents
    - Complete all tasks in a phase — verify `stateChanges` shows Phase auto-complete + WP auto-complete cascade
 6. **State timestamp verification** (applies to Issues, WPs, and Tasks):
@@ -308,8 +303,8 @@ Domain logic shared across services is centralized in:
 - **`McpInputParser`** (internal static in `Helpers/`) — `MapFileReferences()`, `MapAcceptanceCriteria()`, `MapCreateTasks()`, `MapUpsertTasks()`, `MapScaffoldPhases()`, `NullIfEmpty()`, `IsTerminalState()`. Shared by all MCP tool classes.
 - **MCP-specific enums** (in `Inputs/`) — `DependencyAction` (Add/Remove), `StateFilterCategory` (Active/Inactive/Terminal), `EntityTypeFilter` (Task/Wp/Issue/FeatureRequest). Provide schema-level validation for constrained string parameters.
 - **MCP input types** (in `Inputs/`) — `FileReferenceInput`, `AcceptanceCriterionInput`, `PhaseTaskInput`, `ScaffoldPhaseInput`/`ScaffoldTaskInput`, `BatchTaskStateInput`. Map to shared DTOs via `McpInputParser`.
-- **MCP tool annotations** — All 18 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_*_dependency`): `Idempotent = true`.
-- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `FeatureRequestTools`.
+- **MCP tool annotations** — All 20 tools have `Title` and `OpenWorld = false`. Read tools: `ReadOnly = true`. Write tools: `Destructive = false`. Destructive tools (`delete_entity`): `Destructive = true`. Idempotent tools (`create_or_update_project`, `batch_update_task_states`, `manage_dependency`, `verify_acceptance_criteria`): `Idempotent = true`.
+- **MCP tool classes** are split by entity domain: `ProjectTools`, `IssueTools`, `WorkPackageTools`, `PhaseTools`, `TaskTools`, `FeatureRequestTools`, `DeleteTools`, `DependencyTools`.
 
 ### State Change Cascade Notifications
 When automatic state transitions occur (auto-block, auto-unblock, upward propagation), the API response includes a `StateChanges` list so MCP tools can report them to AI agents. The cascade flows:

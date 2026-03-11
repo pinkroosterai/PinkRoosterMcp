@@ -134,10 +134,17 @@ Summarize the context loaded and hand off to `/pm-implement` for task-level exec
 
 Then delegate task execution by invoking `/pm-implement {wpId}` to execute all tasks across phases.
 
-## Step 7: After Implementation
+## Step 7: Verify & Complete
 
-When `/pm-implement` completes, mark the WP done:
-- Call `/pm-done {wpId}` to finalize completion and report cascades.
+When `/pm-implement` completes:
+
+1. **Verify acceptance criteria**: If the WP has phases with acceptance criteria, run `/pm-verify {wpId}` to check all criteria.
+   - If all criteria pass (or no criteria exist): proceed to completion.
+   - If any criteria fail:
+     - **In auto mode**: pause the loop and report failures. The user must fix issues before continuing.
+     - **In interactive mode**: report failures and suggest: "Fix issues and re-run `/pm-verify {wpId}`, then `/pm-done {wpId}`"
+
+2. **Mark the WP done**: Call `/pm-done {wpId}` to finalize completion and report cascades.
 
 **If `--auto` is set**: proceed to Auto-Loop Mode. Otherwise:
 

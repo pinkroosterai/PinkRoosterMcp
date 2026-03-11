@@ -28,6 +28,10 @@ Parse `$ARGUMENTS` to determine the source:
 - Extract: name, description, priority, state/status, userStories (array of role/goal/benefit), businessValue, acceptanceSummary, and any other detailed fields
 - Use user stories to inform task design — each story may map to one or more tasks across phases
 
+**Quality check for Feature Requests**: If the FR is missing key fields (no user stories, no business value, vague description <100 chars), warn:
+"FR {frId} is sparse — missing {fields}. Refine first for better scaffolding: `/pm-refine-fr {frId}`"
+Ask the user to proceed anyway or refine first. If they choose to refine, stop and let them run pm-refine-fr.
+
 **If free-text description**:
 - Use `$ARGUMENTS` directly as the feature description
 - Derive a concise WP name from the description
@@ -143,6 +147,7 @@ Automatically update the source entity state to reflect that planning/scaffoldin
 
 ### Next Steps
 - Start implementing: `/pm-implement {wpId}` or `/pm-next`
+- Verify after implementation: `/pm-verify {wpId}`
 - View project status: `/pm-status`
 - Review backlog priorities: `/pm-triage`
 ```

@@ -124,7 +124,20 @@ Call `mcp__pinkrooster__create_or_update_feature_request` with:
 - `userStories`: array of structured user stories extracted from the description, each with `role`, `goal`, `benefit` (e.g., `[{ "role": "developer", "goal": "export data as CSV", "benefit": "offline analysis in spreadsheets" }]`). Derive multiple stories if the description implies distinct user roles or capabilities.
 - `requester`: "Claude Code" (or user name if known)
 
-## Step 6: Report and Offer Scaffolding
+## Step 5.5: Check for Duplicates
+
+Before creating, cross-reference existing items to avoid duplicates:
+
+1. Call `mcp__pinkrooster__get_issue_overview` with `projectId` and `stateFilter: "Active"` + `"Inactive"`
+2. Call `mcp__pinkrooster__get_feature_requests` with `projectId` and `stateFilter: "Active"` + `"Inactive"`
+3. Compare the derived name and description against existing items
+4. If a potential duplicate is found, warn the user:
+   "Similar item found: **{existingId}** '{existingName}' ({state}). Create anyway? (y/n/view)"
+5. If the user selects "view", show the existing item details so they can decide
+
+If no duplicates, proceed silently.
+
+## Step 6: Report and Offer Next Steps
 
 ```
 ## Created
@@ -134,16 +147,19 @@ Call `mcp__pinkrooster__create_or_update_feature_request` with:
 - State: NotStarted / Proposed
 - View at: http://localhost:3000/projects/{projNum}/issues/{num} (or feature-requests)
 
-Scaffold a work package with implementation tasks? (y/n)
+### Next Steps
+- **Refine** (if Feature Request): Add user stories and business value: `/pm-refine-fr {entityId}`
+- **Scaffold**: Create a work package with implementation tasks: `/pm-scaffold {entityId}`
+- **Triage**: Review priorities across all items: `/pm-triage`
 ```
 
-## Step 7: Optional Scaffolding
+## Step 7: Optional Scaffolding or Refinement
 
-If the user accepts scaffolding:
-- Delegate to `/pm-scaffold {entityId}` — it handles codebase analysis, phase/task design, and linked entity transitions.
+Ask the user: "What would you like to do next? (scaffold / refine / skip)"
 
-If the user declines:
-"Entity created. You can scaffold later with `/pm-scaffold {entityId}`."
+**If scaffold**: Delegate to `/pm-scaffold {entityId}`
+**If refine** (FR only): Delegate to `/pm-refine-fr {entityId}` — enriches the FR with user stories, business value, and acceptance criteria before scaffolding
+**If skip**: "Entity created. You can refine with `/pm-refine-fr {entityId}` or scaffold with `/pm-scaffold {entityId}` later."
 
 ## Constraints
 
@@ -152,3 +168,4 @@ If the user declines:
 - Derive as much structured data as possible from the natural language description
 - Report the entity ID prominently so the user can reference it
 - After creation, suggest `/pm-triage` if the project has many open items to help the user prioritize
+- Always check for duplicates before creating — prevent redundant tracking items

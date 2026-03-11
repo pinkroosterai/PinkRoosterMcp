@@ -195,31 +195,6 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         }
     }
 
-    [McpServerTool(Name = "delete_feature_request",
-        Title = "Delete Feature Request", Destructive = true, OpenWorld = false)]
-    [Description(
-        "Permanently deletes a feature request. Linked work packages will have their FR link cleared (not deleted). " +
-        "This action cannot be undone.")]
-    public async Task<string> DeleteFeatureRequest(
-        [Description("Feature request ID (e.g. 'proj-1-fr-3').")] string featureRequestId,
-        CancellationToken ct = default)
-    {
-        if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var projId, out var frNumber))
-            return OperationResult.Error($"Invalid feature request ID format: '{featureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
-
-        try
-        {
-            var deleted = await apiClient.DeleteFeatureRequestAsync(projId, frNumber, ct);
-            return deleted
-                ? OperationResult.Success(featureRequestId, $"Deleted feature request '{featureRequestId}'.")
-                : OperationResult.Warning($"Feature request '{featureRequestId}' not found.");
-        }
-        catch (HttpRequestException ex)
-        {
-            return OperationResult.Error($"API error: {ex.Message}");
-        }
-    }
-
     // ── Private helpers ──
 
     private async Task<string> CreateNew(

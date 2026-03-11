@@ -84,8 +84,9 @@ If `--dry-run`, skip this step and show what would be recorded.
 - ...
 
 ### Next Steps
-- All passed? → `/pm-done {phaseId}` to complete the phase
-- Failures? → Fix the issues, then re-run `/pm-verify {targetId}`
+- All passed? → Complete the work: `/pm-done {phaseId or wpId}`
+- Failures? → Fix failing criteria: `/pm-implement {relevant-task-or-phase-id}`, then re-verify: `/pm-verify {targetId}`
+- Check project progress: `/pm-status`
 ```
 
 If `--dry-run`:

@@ -89,10 +89,9 @@ If `--dry-run`:
 
 ## Step 5: Delete Selected Items
 
-For each selected item, call the appropriate delete tool:
-- Issues: `mcp__pinkrooster__delete_issue` with `issueId`
-- Feature Requests: `mcp__pinkrooster__delete_feature_request` with `featureRequestId`
-- Work Packages: `mcp__pinkrooster__delete_work_package` with `workPackageId`
+For each selected item, call `mcp__pinkrooster__delete_entity` with:
+- `entityType`: `Issue`, `FeatureRequest`, or `WorkPackage` (matching the item type)
+- `entityId`: the item's ID (e.g., `proj-1-issue-3`, `proj-1-fr-2`, `proj-1-wp-1`)
 
 Collect results (success/failure) for each deletion.
 
@@ -115,6 +114,8 @@ Collect results (success/failure) for each deletion.
 ### Next Steps
 - View project status: `/pm-status`
 - Triage remaining items: `/pm-triage`
+- Discover new feature opportunities: `/pm-explore`
+- Start next work item: `/pm-next`
 ```
 
 If "none" was selected:

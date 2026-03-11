@@ -60,8 +60,10 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "get_work_package_details", ReadOnly = true,
         Title = "Get Work Package Details", OpenWorld = false)]
     [Description(
-        "Returns all fields for a single work package including phases, tasks, acceptance criteria, " +
-        "and dependencies. Use get_work_packages for a compact list first.")]
+        "Returns the full work package tree: phases with acceptance criteria, tasks with target files " +
+        "and implementation notes, WP-level and task-level dependencies, " +
+        "linked issue ID (linkedIssueId) and linked FR ID (linkedFeatureRequestId). " +
+        "Use get_work_packages for a compact list first, then drill into specific WPs with this tool.")]
     public async Task<string> GetWorkPackageDetails(
         [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
         CancellationToken ct = default)
@@ -138,74 +140,18 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             estimatedComplexity, estimationRationale, state, linkedIssueId, linkedFeatureRequestId, attachments, ct);
     }
 
-    // ── 4. manage_work_package_dependency ──
-
-    [McpServerTool(Name = "manage_work_package_dependency",
-        Title = "Manage Work Package Dependency", Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description(
-        "Adds or removes a dependency between work packages. " +
-        "When adding: if the blocker is non-terminal, the dependent auto-transitions to Blocked. " +
-        "When the blocker completes, dependents auto-unblock. " +
-        "Returns stateChanges showing any automatic state transitions.")]
-    public async Task<string> ManageWorkPackageDependency(
-        [Description("Dependent work package ID (e.g. 'proj-1-wp-3').")] string workPackageId,
-        [Description("Blocker work package ID (e.g. 'proj-1-wp-1').")] string dependsOnWorkPackageId,
-        [Description("Whether to add or remove the dependency.")] DependencyAction action,
-        [Description("Reason for the dependency.")] string? reason = null,
-        CancellationToken ct = default)
-    {
-        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
-            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
-
-        if (!IdParser.TryParseWorkPackageId(dependsOnWorkPackageId, out var depProjId, out var depWpNumber))
-            return OperationResult.Error($"Invalid work package ID format: '{dependsOnWorkPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
-
-        var dependsOnWp = await apiClient.GetWorkPackageAsync(depProjId, depWpNumber, ct);
-        if (dependsOnWp is null)
-            return OperationResult.Warning($"Depends-on work package '{dependsOnWorkPackageId}' not found.");
-
-        switch (action)
-        {
-            case DependencyAction.Add:
-                var request = new ManageDependencyRequest
-                {
-                    DependsOnId = dependsOnWp.Id,
-                    Reason = reason
-                };
-                DependencyResponse depResponse;
-                try
-                {
-                    depResponse = await apiClient.AddWorkPackageDependencyAsync(projId, wpNumber, request, ct);
-                }
-                catch (HttpRequestException ex)
-                {
-                    return OperationResult.Error($"Failed to add dependency: {ex.Message}");
-                }
-                return OperationResult.Success(workPackageId,
-                    $"Dependency added: '{workPackageId}' is now blocked by '{dependsOnWorkPackageId}'.",
-                    stateChanges: depResponse.StateChanges);
-
-            case DependencyAction.Remove:
-                var removed = await apiClient.RemoveWorkPackageDependencyAsync(projId, wpNumber, dependsOnWp.Id, ct);
-                return removed
-                    ? OperationResult.Success(workPackageId, $"Dependency removed: '{workPackageId}' is no longer blocked by '{dependsOnWorkPackageId}'.")
-                    : OperationResult.Warning($"Dependency between '{workPackageId}' and '{dependsOnWorkPackageId}' not found.");
-
-            default:
-                return OperationResult.Error($"Invalid action: '{action}'.");
-        }
-    }
-
-    // ── 5. scaffold_work_package ──
+    // ── 4. scaffold_work_package ──
 
     [McpServerTool(Name = "scaffold_work_package",
         Title = "Scaffold Work Package", Destructive = false, OpenWorld = false)]
     [Description(
-        "Creates a complete work package with phases, tasks, acceptance criteria, and task dependencies in a single call. " +
+        "Creates a complete work package with phases, tasks, acceptance criteria, and dependencies in ONE call. " +
+        "This is the most efficient way to create structured work. " +
         "Tasks require name + description; all other fields are optional. " +
-        "Task dependencies use 0-based indices within the same phase's task array via dependsOnTaskIndices. " +
-        "Returns a compact ID map of all created entities. " +
-        "For creating/updating a WP without phases or tasks, use create_or_update_work_package instead.")]
+        "Task dependencies use 0-based indices within the same phase's task array (dependsOnTaskIndices). " +
+        "Supports WP-level blockers via blockedByWorkPackageIds and linked issue/FR via linkedIssueId/linkedFeatureRequestId. " +
+        "Returns a compact ID map of all created entities (WP, phases, tasks). " +
+        "For creating/updating a WP without phases, use create_or_update_work_package instead.")]
     public async Task<string> ScaffoldWorkPackage(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Work package name/title.")] string name,
@@ -457,32 +403,6 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         BlockedBy = McpInputParser.NullIfEmpty(task.BlockedBy.Select(MapTaskDependency).ToList()),
         Blocking = McpInputParser.NullIfEmpty(task.Blocking.Select(MapTaskDependency).ToList())
     };
-
-    [McpServerTool(Name = "delete_work_package",
-        Title = "Delete Work Package", Destructive = true, OpenWorld = false)]
-    [Description(
-        "Permanently deletes a work package and all its phases and tasks. " +
-        "Linked issues and FRs will have their WP link cleared (not deleted). " +
-        "This action cannot be undone.")]
-    public async Task<string> DeleteWorkPackage(
-        [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
-        CancellationToken ct = default)
-    {
-        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
-            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
-
-        try
-        {
-            var deleted = await apiClient.DeleteWorkPackageAsync(projId, wpNumber, ct);
-            return deleted
-                ? OperationResult.Success(workPackageId, $"Deleted work package '{workPackageId}' and all its phases and tasks.")
-                : OperationResult.Warning($"Work package '{workPackageId}' not found.");
-        }
-        catch (HttpRequestException ex)
-        {
-            return OperationResult.Error($"API error: {ex.Message}");
-        }
-    }
 
     private static DependencyItem MapWpDependency(DependencyResponse dep) => new()
     {

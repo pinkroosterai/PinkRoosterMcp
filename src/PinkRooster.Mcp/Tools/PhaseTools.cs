@@ -16,7 +16,9 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "create_or_update_phase",
         Title = "Create or Update Phase", Destructive = false, OpenWorld = false)]
     [Description(
-        "Creates a new phase or updates an existing one. Can include tasks for batch creation/update. " +
+        "Creates a new phase or updates an existing one. " +
+        "PREFERRED for batch task operations: pass the 'tasks' parameter to create or update multiple tasks " +
+        "in one call instead of calling create_or_update_task repeatedly. " +
         "To create: provide workPackageId and name. To update: provide phaseId plus fields to change. " +
         "For creating a full WP with phases and tasks at once, use scaffold_work_package instead.")]
     public async Task<string> CreateOrUpdatePhase(
@@ -127,28 +129,4 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
             stateChanges: updated.StateChanges);
     }
 
-    [McpServerTool(Name = "delete_phase",
-        Title = "Delete Phase", Destructive = true, OpenWorld = false)]
-    [Description(
-        "Permanently deletes a phase and all its tasks. " +
-        "This action cannot be undone.")]
-    public async Task<string> DeletePhase(
-        [Description("Phase ID (e.g. 'proj-1-wp-2-phase-1').")] string phaseId,
-        CancellationToken ct = default)
-    {
-        if (!IdParser.TryParsePhaseId(phaseId, out var projId, out var wpNumber, out var phaseNumber))
-            return OperationResult.Error($"Invalid phase ID format: '{phaseId}'. Expected 'proj-{{number}}-wp-{{number}}-phase-{{number}}'.");
-
-        try
-        {
-            var deleted = await apiClient.DeletePhaseAsync(projId, wpNumber, phaseNumber, ct);
-            return deleted
-                ? OperationResult.Success(phaseId, $"Deleted phase '{phaseId}' and all its tasks.")
-                : OperationResult.Warning($"Phase '{phaseId}' not found.");
-        }
-        catch (HttpRequestException ex)
-        {
-            return OperationResult.Error($"API error: {ex.Message}");
-        }
-    }
 }

@@ -209,6 +209,27 @@ Call `mcp__pinkrooster__create_or_update_task` with:
 
 **Update local state**: Mark this task as completed in the in-memory queue so subsequent dependency checks reflect the new state.
 
+### Step 5h: Phase Verification Gate (Phase/WP Mode Only)
+
+When `stateChanges` from Step 5g contains a **phase auto-complete**, run verification before proceeding to the next phase's tasks:
+
+1. Check `stateChanges` for any entry where `entityType` is `Phase` and `newState` is `Completed`
+2. For each auto-completed phase that has acceptance criteria:
+   - Invoke `/pm-verify {phaseId}` to verify all criteria
+   - If **all criteria pass**: report "Phase {phaseId} verified — proceeding to next phase" and continue
+   - If **any criteria fail**: pause execution and report:
+     ```
+     Phase {phaseId} verification failed:
+     - {criterionName}: {failureReason}
+
+     Fix the issues and re-run: `/pm-implement {remaining-phase-or-wp-id}`
+     Or skip verification and complete: `/pm-done {phaseId}`
+     ```
+     **Stop processing** the queue — do not proceed to subsequent phases.
+3. If the auto-completed phase has **no acceptance criteria**, skip verification and continue.
+
+This gate ensures each phase's acceptance criteria are met before moving on. In **task mode**, this step is skipped entirely (single-task execution doesn't trigger phase completion).
+
 ---
 
 ## Step 6: Final Summary
@@ -245,7 +266,9 @@ After all tasks in the queue have been processed:
 
 ### Next Steps
 - **Task mode only**: Mark complete: `/pm-done {taskId}`
-- **Phase/WP mode**: Continue with next priority: `/pm-next`
+- **Phase/WP mode**: Verify criteria: `/pm-verify {wpId}` → then `/pm-done {wpId}`
+- **Standalone WP completion**: If WP auto-completed, finalize linked entities: `/pm-done {wpId}`
+- Continue with next priority: `/pm-next`
 - Check overall progress: `/pm-status`
 ```
 

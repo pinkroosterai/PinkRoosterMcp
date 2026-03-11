@@ -57,6 +57,16 @@ Start working: `/pm-next` | Implement specific item: `/pm-implement {topEntityId
 (Feature requests that are Approved/Scheduled but have no linked work package)
 - **{frId}** "{name}" — {status}, no linked WP → `/pm-scaffold {frId}`
 (If none, show "None — all tracked items have work packages.")
+
+### Suggested Actions
+(Generate contextual suggestions based on project state. Show the most relevant 3-5.)
+- If blocked items exist → "Analyze blockers and priorities: `/pm-triage`"
+- If Proposed FRs exist without user stories → "Refine FR for better scaffolding: `/pm-refine-fr {frId}`"
+- If Approved/Scheduled FRs have no WP → "Scaffold a work package: `/pm-scaffold {frId}`"
+- If scaffolded WPs are ready (NotStarted) → "Start implementing: `/pm-next`"
+- If terminal/cancelled items are accumulating → "Clean up stale items: `/pm-cleanup`"
+- If no open FRs or issues exist → "Discover new feature opportunities: `/pm-explore`"
+- If the project has no data yet → "Create work items with `/pm-plan <description>`"
 ```
 
 ## Constraints
