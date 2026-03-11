@@ -219,6 +219,8 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
     public async Task<bool> DeleteAsync(long projectId, int wpNumber, CancellationToken ct = default)
     {
         var wp = await db.WorkPackages
+            .Include(w => w.Phases)
+                .ThenInclude(p => p.Tasks)
             .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, ct);
 
         if (wp is null)

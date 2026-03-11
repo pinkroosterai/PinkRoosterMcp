@@ -211,4 +211,29 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         return OperationResult.Success(taskId, $"Task '{taskId}' updated.",
             stateChanges: updated.StateChanges);
     }
+
+    [McpServerTool(Name = "delete_task",
+        Title = "Delete Task", Destructive = true, OpenWorld = false)]
+    [Description(
+        "Permanently deletes a task. " +
+        "This action cannot be undone.")]
+    public async Task<string> DeleteTask(
+        [Description("Task ID (e.g. 'proj-1-wp-2-task-3').")] string taskId,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParseTaskId(taskId, out var projId, out var wpNumber, out var taskNumber))
+            return OperationResult.Error($"Invalid task ID format: '{taskId}'. Expected 'proj-{{number}}-wp-{{number}}-task-{{number}}'.");
+
+        try
+        {
+            var deleted = await apiClient.DeleteTaskAsync(projId, wpNumber, taskNumber, ct);
+            return deleted
+                ? OperationResult.Success(taskId, $"Deleted task '{taskId}'.")
+                : OperationResult.Warning($"Task '{taskId}' not found.");
+        }
+        catch (HttpRequestException ex)
+        {
+            return OperationResult.Error($"API error: {ex.Message}");
+        }
+    }
 }

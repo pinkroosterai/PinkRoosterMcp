@@ -10,6 +10,7 @@ import {
   Sparkles,
   Lightbulb,
   ShieldCheck,
+  Trash2,
   ArrowRight,
   Terminal,
   Zap,
@@ -127,6 +128,15 @@ const skills: SkillInfo[] = [
       "Verify acceptance criteria for a phase or entire work package. Runs verification based on each criterion's method (AutomatedTest, Manual, AgentReview) and records results.",
     usage: "/pm-verify <phase-id | wp-id> [--dry-run]",
     args: "Phase ID or WP ID. Add --dry-run to preview without recording results",
+    stateChanges: [],
+  },
+  {
+    name: "pm-cleanup",
+    icon: Trash2,
+    description:
+      "Identify and remove stale, cancelled, or rejected items from a project. Scans for cleanup candidates, presents them for confirmation, and safely deletes selected items.",
+    usage: "/pm-cleanup [--dry-run]",
+    args: "Optional: --dry-run to preview candidates without deleting",
     stateChanges: [],
   },
   {

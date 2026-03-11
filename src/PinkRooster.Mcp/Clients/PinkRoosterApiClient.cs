@@ -350,6 +350,68 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return response.StatusCode == HttpStatusCode.NoContent;
     }
 
+    // ── Delete endpoints ──
+
+    public async Task<bool> DeleteIssueAsync(long projectId, int issueNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/issues/{issueNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
+    public async Task<bool> DeleteFeatureRequestAsync(long projectId, int frNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/feature-requests/{frNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
+    public async Task<bool> DeleteWorkPackageAsync(long projectId, int wpNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/work-packages/{wpNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
+    public async Task<bool> DeletePhaseAsync(long projectId, int wpNumber, int phaseNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/work-packages/{wpNumber}/phases/{phaseNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
+    public async Task<bool> DeleteTaskAsync(long projectId, int wpNumber, int taskNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks/{taskNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)

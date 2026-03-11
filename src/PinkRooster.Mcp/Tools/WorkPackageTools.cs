@@ -458,6 +458,32 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         Blocking = McpInputParser.NullIfEmpty(task.Blocking.Select(MapTaskDependency).ToList())
     };
 
+    [McpServerTool(Name = "delete_work_package",
+        Title = "Delete Work Package", Destructive = true, OpenWorld = false)]
+    [Description(
+        "Permanently deletes a work package and all its phases and tasks. " +
+        "Linked issues and FRs will have their WP link cleared (not deleted). " +
+        "This action cannot be undone.")]
+    public async Task<string> DeleteWorkPackage(
+        [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
+        CancellationToken ct = default)
+    {
+        if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
+            return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
+
+        try
+        {
+            var deleted = await apiClient.DeleteWorkPackageAsync(projId, wpNumber, ct);
+            return deleted
+                ? OperationResult.Success(workPackageId, $"Deleted work package '{workPackageId}' and all its phases and tasks.")
+                : OperationResult.Warning($"Work package '{workPackageId}' not found.");
+        }
+        catch (HttpRequestException ex)
+        {
+            return OperationResult.Error($"API error: {ex.Message}");
+        }
+    }
+
     private static DependencyItem MapWpDependency(DependencyResponse dep) => new()
     {
         EntityId = dep.WorkPackageId, Name = dep.Name, State = dep.State, Reason = dep.Reason

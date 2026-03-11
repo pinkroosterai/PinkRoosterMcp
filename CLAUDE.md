@@ -123,6 +123,11 @@ Wait for health checks to pass (~10-15s) before testing. The MCP server depends 
 | `get_feature_request_details` | Read | Full feature request data by composite ID |
 | `get_feature_requests` | Read | List feature requests for a project, filterable by state category |
 | `verify_acceptance_criteria` | Write | Record verification results for acceptance criteria on a phase |
+| `delete_issue` | Write | Permanently delete an issue (clears WP links) |
+| `delete_feature_request` | Write | Permanently delete a feature request (clears WP links) |
+| `delete_work_package` | Write | Permanently delete a work package and all its phases/tasks |
+| `delete_phase` | Write | Permanently delete a phase and all its tasks |
+| `delete_task` | Write | Permanently delete a task |
 
 **Testing flow for MCP tools (E2E):**
 
@@ -368,6 +373,7 @@ Claude Code skills in `.claude/skills/` provide AI-driven project management wor
 | `/pm-triage` | Read-only priority analysis of open items (runs in Explore agent) | None (read-only) |
 | `/pm-refine-fr <fr-id>` | Refine FR: rewrite description, fill gaps, add user stories | None (content-only, no status change) |
 | `/pm-verify <phase-id \| wp-id> [--dry-run]` | Verify acceptance criteria for a phase or WP | None (records verification results only) |
+| `/pm-cleanup [--dry-run]` | Identify and remove stale/cancelled/rejected items | None (deletes entities) |
 | `/pm-explore [--limit N]` | Analyze codebase as a PM, suggest user-facing features, create selected as FRs | None (created FRs start as Proposed) |
 
 **Auto-state propagation rules** (no user confirmation needed):
