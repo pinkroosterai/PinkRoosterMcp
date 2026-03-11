@@ -47,11 +47,52 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
             }
         }
 
-        // Check if all phases in WP are terminal
+        // Auto-complete empty phases (no tasks = nothing left to do)
+        // Single query to get all phase IDs that have tasks, avoiding N+1 per-phase AnyAsync calls
         var allPhases = await db.WorkPackagePhases
             .Where(p => p.WorkPackageId == wp.Id)
             .ToListAsync(ct);
 
+        var nonTerminalPhaseIds = allPhases
+            .Where(p => !CompletionStateConstants.TerminalStates.Contains(p.State))
+            .Select(p => p.Id)
+            .ToList();
+
+        var phaseIdsWithTasks = nonTerminalPhaseIds.Count > 0
+            ? (await db.WorkPackageTasks
+                .Where(t => nonTerminalPhaseIds.Contains(t.PhaseId))
+                .Select(t => t.PhaseId)
+                .Distinct()
+                .ToListAsync(ct))
+                .ToHashSet()
+            : [];
+
+        foreach (var emptyPhase in allPhases.Where(p => nonTerminalPhaseIds.Contains(p.Id) && !phaseIdsWithTasks.Contains(p.Id)))
+        {
+            var oldEmptyPhaseState = emptyPhase.State;
+            emptyPhase.State = CompletionState.Completed;
+
+            db.PhaseAuditLogs.Add(new PhaseAuditLog
+            {
+                PhaseId = emptyPhase.Id,
+                FieldName = "State",
+                OldValue = oldEmptyPhaseState.ToString(),
+                NewValue = CompletionState.Completed.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "Phase",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{emptyPhase.PhaseNumber}",
+                OldState = oldEmptyPhaseState.ToString(),
+                NewState = CompletionState.Completed.ToString(),
+                Reason = "Auto-completed: phase has no tasks"
+            });
+        }
+
+        // Check if all phases in WP are terminal
         if (allPhases.Count > 0 && allPhases.All(p => CompletionStateConstants.TerminalStates.Contains(p.State)))
         {
             if (!CompletionStateConstants.TerminalStates.Contains(wp.State))
