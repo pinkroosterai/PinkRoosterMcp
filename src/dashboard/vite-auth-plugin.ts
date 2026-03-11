@@ -2,13 +2,42 @@ import type { Plugin } from "vite";
 import { randomUUID } from "crypto";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
 interface TokenEntry {
   expiresAt: number;
 }
 
+interface RateLimitEntry {
+  attempts: number;
+  windowStart: number;
+}
+
 export function authPlugin(): Plugin {
   const tokens = new Map<string, TokenEntry>();
+  const loginAttempts = new Map<string, RateLimitEntry>();
+
+  function getClientIp(req: import("http").IncomingMessage): string {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+    return req.socket.remoteAddress ?? "unknown";
+  }
+
+  function checkRateLimit(ip: string): { allowed: boolean; retryAfter: number } {
+    const now = Date.now();
+    const entry = loginAttempts.get(ip);
+    if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+      loginAttempts.set(ip, { attempts: 1, windowStart: now });
+      return { allowed: true, retryAfter: 0 };
+    }
+    entry.attempts++;
+    if (entry.attempts > RATE_LIMIT_MAX_ATTEMPTS) {
+      const retryAfter = Math.ceil((entry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000);
+      return { allowed: false, retryAfter };
+    }
+    return { allowed: true, retryAfter: 0 };
+  }
 
   function isProtected(): boolean {
     return !!(process.env.DASHBOARD_USER && process.env.DASHBOARD_PASSWORD);
@@ -64,6 +93,16 @@ export function authPlugin(): Plugin {
         if (!isProtected()) {
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify({ error: "Authentication is not enabled" }));
+          return;
+        }
+
+        const ip = getClientIp(req);
+        const { allowed, retryAfter } = checkRateLimit(ip);
+        if (!allowed) {
+          res.statusCode = 429;
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Retry-After", String(retryAfter));
+          res.end(JSON.stringify({ error: "Too many login attempts. Try again later." }));
           return;
         }
 

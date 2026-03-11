@@ -3,7 +3,31 @@ import { randomUUID } from "crypto";
 
 const PORT = 3001;
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_ATTEMPTS = 5;
 const tokens = new Map();
+const loginAttempts = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    loginAttempts.set(ip, { attempts: 1, windowStart: now });
+    return { allowed: true, retryAfter: 0 };
+  }
+  entry.attempts++;
+  if (entry.attempts > RATE_LIMIT_MAX_ATTEMPTS) {
+    const retryAfter = Math.ceil((entry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  return { allowed: true, retryAfter: 0 };
+}
 
 function isProtected() {
   return !!(process.env.DASHBOARD_USER && process.env.DASHBOARD_PASSWORD);
@@ -50,6 +74,17 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/auth/login" && req.method === "POST") {
     if (!isProtected()) {
       json(res, 200, { error: "Authentication is not enabled" });
+      return;
+    }
+
+    const ip = getClientIp(req);
+    const { allowed, retryAfter } = checkRateLimit(ip);
+    if (!allowed) {
+      res.writeHead(429, {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter),
+      });
+      res.end(JSON.stringify({ error: "Too many login attempts. Try again later." }));
       return;
     }
 
