@@ -75,6 +75,9 @@ function createWrapper() {
 }
 
 describe("useServerEvents", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it("starts disconnected when no projectId", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useServerEvents(undefined), { wrapper });
@@ -114,7 +117,7 @@ describe("useServerEvents", () => {
     expect(result.current.connectionState).toBe("reconnecting");
   });
 
-  it("invalidates queries on entity:changed event", () => {
+  it("invalidates queries on entity:changed event after debounce", () => {
     const { wrapper, queryClient } = createWrapper();
     const spy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -131,9 +134,13 @@ describe("useServerEvents", () => {
       });
     });
 
-    // Should invalidate issue keys + always-invalidate keys
-    const calls = spy.mock.calls.map((c) => c[0]);
-    const keys = calls.map((c) => (c as { queryKey: string[] }).queryKey);
+    // Not yet flushed
+    expect(spy).not.toHaveBeenCalled();
+
+    // Advance past debounce window (150ms)
+    act(() => { vi.advanceTimersByTime(200); });
+
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey);
     expect(keys).toEqual(
       expect.arrayContaining([
         ["issues"],
@@ -145,7 +152,40 @@ describe("useServerEvents", () => {
     );
   });
 
-  it("invalidates activity-logs on activity:logged event", () => {
+  it("deduplicates keys when multiple events arrive within debounce window", () => {
+    const { wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+    renderHook(() => useServerEvents(1), { wrapper });
+
+    act(() => {
+      MockEventSource.instances[0].simulateOpen();
+      // Two Issue events in rapid succession
+      MockEventSource.instances[0].simulateEvent("entity:changed", {
+        eventType: "entity:changed",
+        entityType: "Issue",
+        entityId: "proj-1-issue-1",
+        action: "updated",
+        projectId: 1,
+      });
+      MockEventSource.instances[0].simulateEvent("entity:changed", {
+        eventType: "entity:changed",
+        entityType: "Issue",
+        entityId: "proj-1-issue-2",
+        action: "created",
+        projectId: 1,
+      });
+    });
+
+    act(() => { vi.advanceTimersByTime(200); });
+
+    // Should only invalidate each key once despite two events
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey);
+    const issueKeyCount = keys.filter((k) => JSON.stringify(k) === '["issues"]').length;
+    expect(issueKeyCount).toBe(1);
+  });
+
+  it("invalidates activity-logs on activity:logged event after debounce", () => {
     const { wrapper, queryClient } = createWrapper();
     const spy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -162,8 +202,9 @@ describe("useServerEvents", () => {
       });
     });
 
-    const calls = spy.mock.calls.map((c) => c[0]);
-    const keys = calls.map((c) => (c as { queryKey: string[] }).queryKey);
+    act(() => { vi.advanceTimersByTime(200); });
+
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey);
     expect(keys).toEqual(expect.arrayContaining([["activity-logs"]]));
   });
 

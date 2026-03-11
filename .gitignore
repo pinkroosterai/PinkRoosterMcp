@@ -56,5 +56,8 @@ Thumbs.db
 logs/
 *.log
 
+# Core dumps
+core.*
+
 # Serena
 .serena/

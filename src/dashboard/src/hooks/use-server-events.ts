@@ -23,6 +23,9 @@ const ENTITY_QUERY_KEYS: Record<string, string[][]> = {
 
 const ALWAYS_INVALIDATE = [["project-status"], ["next-actions"]];
 
+/** Debounce window (ms) — batches rapid SSE events into a single invalidation pass */
+const DEBOUNCE_MS = 150;
+
 export function useServerEvents(projectId: number | undefined) {
   const queryClient = useQueryClient();
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
@@ -32,6 +35,28 @@ export function useServerEvents(projectId: number | undefined) {
     if (!projectId) {
       setConnectionState("disconnected");
       return;
+    }
+
+    // Debounce: collect query keys, flush once after DEBOUNCE_MS of quiet
+    const pendingKeys = new Set<string>();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleFlush() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        for (const serialized of pendingKeys) {
+          queryClient.invalidateQueries({ queryKey: JSON.parse(serialized) });
+        }
+        pendingKeys.clear();
+        debounceTimer = null;
+      }, DEBOUNCE_MS);
+    }
+
+    function enqueueKeys(keys: string[][]) {
+      for (const key of keys) {
+        pendingKeys.add(JSON.stringify(key));
+      }
+      scheduleFlush();
     }
 
     const url = `/api/projects/${projectId}/events`;
@@ -51,9 +76,7 @@ export function useServerEvents(projectId: number | undefined) {
       try {
         const data: ServerEvent = JSON.parse(e.data);
         const keys = ENTITY_QUERY_KEYS[data.entityType] ?? [];
-        for (const key of [...keys, ...ALWAYS_INVALIDATE]) {
-          queryClient.invalidateQueries({ queryKey: key });
-        }
+        enqueueKeys([...keys, ...ALWAYS_INVALIDATE]);
 
         if (data.stateChanges?.length) {
           for (const sc of data.stateChanges) {
@@ -66,12 +89,13 @@ export function useServerEvents(projectId: number | undefined) {
     });
 
     es.addEventListener("activity:logged", () => {
-      queryClient.invalidateQueries({ queryKey: ["activity-logs"] });
+      enqueueKeys([["activity-logs"]]);
     });
 
     return () => {
       es.close();
       eventSourceRef.current = null;
+      if (debounceTimer) clearTimeout(debounceTimer);
       setConnectionState("disconnected");
     };
   }, [projectId, queryClient]);
