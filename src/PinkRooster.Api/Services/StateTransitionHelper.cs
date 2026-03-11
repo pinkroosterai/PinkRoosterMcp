@@ -94,11 +94,35 @@ public static class StateTransitionHelper
         if (dtos is null or { Count: 0 })
             return [];
 
-        return dtos.Select(d => new FileReference
+        return dtos.Select(d =>
         {
-            FileName = d.FileName,
-            RelativePath = d.RelativePath,
-            Description = d.Description
+            ValidatePathSegment(d.FileName, nameof(d.FileName));
+            ValidatePathSegment(d.RelativePath, nameof(d.RelativePath));
+            return new FileReference
+            {
+                FileName = d.FileName,
+                RelativePath = d.RelativePath,
+                Description = d.Description
+            };
         }).ToList();
+    }
+
+    private static void ValidatePathSegment(string value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        if (value.Contains('\0'))
+            throw new ArgumentException($"{fieldName} contains null bytes.");
+
+        if (value.Contains("..", StringComparison.Ordinal))
+            throw new ArgumentException($"{fieldName} must not contain path traversal sequences (..).");
+
+        if (value.StartsWith('/') || value.StartsWith('\\'))
+            throw new ArgumentException($"{fieldName} must be a relative path, not absolute.");
+
+        // Reject Windows drive letters (e.g. C:\)
+        if (value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':')
+            throw new ArgumentException($"{fieldName} must be a relative path, not absolute.");
     }
 }
