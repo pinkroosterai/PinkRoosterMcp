@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from "react";
+import { useState, useEffect, type ComponentProps } from "react";
 import { Badge } from "@/components/ui/badge";
 import { usePreviousValue } from "@/hooks/use-previous-value";
 import { cn } from "@/lib/utils";
@@ -17,12 +17,11 @@ export function AnimatedBadge({
   const previousValue = usePreviousValue(value);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const shouldAnimate =
-    previousValue !== undefined && previousValue !== value && !isAnimating;
-
-  if (shouldAnimate) {
-    setIsAnimating(true);
-  }
+  useEffect(() => {
+    if (previousValue !== undefined && previousValue !== value) {
+      setIsAnimating(true);
+    }
+  }, [value, previousValue]);
 
   return (
     <Badge

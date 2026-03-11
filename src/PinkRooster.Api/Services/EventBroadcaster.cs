@@ -7,7 +7,7 @@ namespace PinkRooster.Api.Services;
 
 public sealed class EventBroadcaster : IEventBroadcaster
 {
-    private readonly ConcurrentDictionary<long, ConcurrentBag<Channel<ServerEvent>>> _subscribers = new();
+    private readonly ConcurrentDictionary<long, ConcurrentDictionary<Channel<ServerEvent>, byte>> _subscribers = new();
 
     public async IAsyncEnumerable<ServerEvent> Subscribe(
         long projectId, [EnumeratorCancellation] CancellationToken ct)
@@ -19,8 +19,8 @@ public sealed class EventBroadcaster : IEventBroadcaster
             SingleWriter = false
         });
 
-        var bag = _subscribers.GetOrAdd(projectId, _ => []);
-        bag.Add(channel);
+        var set = _subscribers.GetOrAdd(projectId, _ => new());
+        set.TryAdd(channel, 0);
 
         try
         {
@@ -31,12 +31,10 @@ public sealed class EventBroadcaster : IEventBroadcaster
         }
         finally
         {
-            // Remove this channel from the subscriber list
-            if (_subscribers.TryGetValue(projectId, out var currentBag))
+            // Atomic O(1) removal — no snapshot or compare-and-swap needed
+            if (_subscribers.TryGetValue(projectId, out var currentSet))
             {
-                var remaining = new ConcurrentBag<Channel<ServerEvent>>(
-                    currentBag.Where(c => c != channel));
-                _subscribers.TryUpdate(projectId, remaining, currentBag);
+                currentSet.TryRemove(channel, out _);
             }
 
             channel.Writer.TryComplete();
@@ -45,10 +43,10 @@ public sealed class EventBroadcaster : IEventBroadcaster
 
     public void Publish(ServerEvent serverEvent)
     {
-        if (!_subscribers.TryGetValue(serverEvent.ProjectId, out var bag))
+        if (!_subscribers.TryGetValue(serverEvent.ProjectId, out var set))
             return;
 
-        foreach (var channel in bag)
+        foreach (var channel in set.Keys)
         {
             // Fire-and-forget: try to write, skip if channel is full or completed
             channel.Writer.TryWrite(serverEvent);
