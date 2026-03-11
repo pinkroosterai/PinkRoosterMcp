@@ -9,7 +9,7 @@ namespace PinkRooster.Api.Services;
 public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
 {
     public async Task PropagateStateUpwardAsync(
-        long phaseId, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct)
+        long phaseId, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct, List<WorkPackagePhase>? preloadedPhases = null)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -48,8 +48,8 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
         }
 
         // Auto-complete empty phases (no tasks = nothing left to do)
-        // Single query to get all phase IDs that have tasks, avoiding N+1 per-phase AnyAsync calls
-        var allPhases = await db.WorkPackagePhases
+        // Use preloaded phases if available (batch callers), otherwise query
+        var allPhases = preloadedPhases ?? await db.WorkPackagePhases
             .Where(p => p.WorkPackageId == wp.Id)
             .ToListAsync(ct);
 

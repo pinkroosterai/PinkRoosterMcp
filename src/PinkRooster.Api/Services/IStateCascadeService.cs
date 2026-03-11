@@ -13,7 +13,7 @@ public interface IStateCascadeService
     /// Checks if all tasks in a phase are terminal (→ auto-complete phase),
     /// then checks if all phases in WP are terminal (→ auto-complete WP).
     /// </summary>
-    Task PropagateStateUpwardAsync(long phaseId, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct);
+    Task PropagateStateUpwardAsync(long phaseId, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct, List<WorkPackagePhase>? preloadedPhases = null);
 
     /// <summary>
     /// When a WP reaches terminal state, finds blocked dependent WPs and restores their PreviousActiveState.

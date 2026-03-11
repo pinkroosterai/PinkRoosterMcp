@@ -349,8 +349,13 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         foreach (var task in terminalTasks)
             await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
 
+        // Pre-load phases once for batch propagation (avoids N+1 re-queries per affected phase)
+        var allPhases = affectedPhaseIds.Count > 0
+            ? await db.WorkPackagePhases.Where(p => p.WorkPackageId == wp.Id).ToListAsync(ct)
+            : null;
+
         foreach (var phaseId in affectedPhaseIds)
-            await cascadeService.PropagateStateUpwardAsync(phaseId, wp, changedBy, stateChanges, ct);
+            await cascadeService.PropagateStateUpwardAsync(phaseId, wp, changedBy, stateChanges, ct, allPhases);
 
         await db.SaveChangesAsync(ct);
 
