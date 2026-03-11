@@ -365,6 +365,7 @@ Claude Code skills in `.claude/skills/` provide AI-driven project management wor
 | `/pm-scaffold <desc\|id>` | Scaffold WP with phases/tasks from codebase analysis | linked Issue→Designing; linked FR→Scheduled |
 | `/pm-plan <description>` | Create issue or FR from natural language, optionally scaffold | Confirms classification before creation |
 | `/pm-triage` | Read-only priority analysis of open items (runs in Explore agent) | None (read-only) |
+| `/pm-refine-fr <fr-id>` | Refine FR: rewrite description, fill gaps, add user stories | None (content-only, no status change) |
 
 **Auto-state propagation rules** (no user confirmation needed):
 - Starting work on a task → activates WP + linked Issue/FR (if inactive)

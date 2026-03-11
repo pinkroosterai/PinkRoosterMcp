@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 
@@ -8,6 +9,10 @@ namespace PinkRooster.Mcp.Clients;
 
 public sealed class PinkRoosterApiClient(HttpClient httpClient)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
     public async Task<ProjectResponse?> GetProjectByPathAsync(
         string projectPath, CancellationToken ct = default)
     {
@@ -18,7 +23,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<ProjectResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct);
     }
 
     public async Task<ProjectStatusResponse?> GetProjectStatusAsync(
@@ -30,7 +35,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<ProjectStatusResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<ProjectStatusResponse>(JsonOptions, ct);
     }
 
     public async Task<List<NextActionItem>?> GetNextActionsAsync(
@@ -46,7 +51,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<List<NextActionItem>>(ct);
+        return await response.Content.ReadFromJsonAsync<List<NextActionItem>>(JsonOptions, ct);
     }
 
     public async Task<(ProjectResponse Project, bool IsNew)> CreateOrUpdateProjectAsync(
@@ -54,7 +59,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
     {
         var response = await httpClient.PutAsJsonAsync("/api/projects", request, ct);
         await EnsureSuccessAsync(response, ct);
-        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(ct)
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize project response.");
         return (project, response.StatusCode == HttpStatusCode.Created);
     }
@@ -68,7 +73,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (!string.IsNullOrWhiteSpace(stateFilter))
             url += $"?state={Uri.EscapeDataString(stateFilter)}";
 
-        return await httpClient.GetFromJsonAsync<List<FeatureRequestResponse>>(url, ct) ?? [];
+        return await httpClient.GetFromJsonAsync<List<FeatureRequestResponse>>(url, JsonOptions, ct) ?? [];
     }
 
     public async Task<FeatureRequestResponse?> GetFeatureRequestAsync(
@@ -81,7 +86,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
     }
 
     public async Task<FeatureRequestResponse> CreateFeatureRequestAsync(
@@ -90,7 +95,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/feature-requests", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize feature request response.");
     }
 
@@ -104,7 +109,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
     }
 
     public async Task<FeatureRequestResponse?> ManageUserStoriesAsync(
@@ -117,7 +122,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<FeatureRequestResponse>(JsonOptions, ct);
     }
 
     // ── Issue endpoints ──
@@ -129,7 +134,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (!string.IsNullOrWhiteSpace(stateFilter))
             url += $"?state={Uri.EscapeDataString(stateFilter)}";
 
-        return await httpClient.GetFromJsonAsync<List<IssueResponse>>(url, ct) ?? [];
+        return await httpClient.GetFromJsonAsync<List<IssueResponse>>(url, JsonOptions, ct) ?? [];
     }
 
     public async Task<IssueResponse?> GetIssueAsync(
@@ -142,7 +147,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
     }
 
     public async Task<IssueResponse> CreateIssueAsync(
@@ -151,7 +156,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/issues", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<IssueResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize issue response.");
     }
 
@@ -165,7 +170,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<IssueResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<IssueResponse>(JsonOptions, ct);
     }
 
     // ── Work Package endpoints ──
@@ -177,7 +182,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         if (!string.IsNullOrWhiteSpace(stateFilter))
             url += $"?state={Uri.EscapeDataString(stateFilter)}";
 
-        return await httpClient.GetFromJsonAsync<List<WorkPackageResponse>>(url, ct) ?? [];
+        return await httpClient.GetFromJsonAsync<List<WorkPackageResponse>>(url, JsonOptions, ct) ?? [];
     }
 
     public async Task<WorkPackageResponse?> GetWorkPackageAsync(
@@ -190,7 +195,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
     }
 
     public async Task<WorkPackageResponse> CreateWorkPackageAsync(
@@ -199,7 +204,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize work package response.");
     }
 
@@ -213,7 +218,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
     }
 
     public async Task<ScaffoldWorkPackageResponse> ScaffoldWorkPackageAsync(
@@ -222,7 +227,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/scaffold", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<ScaffoldWorkPackageResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize scaffold response.");
     }
 
@@ -232,7 +237,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/dependencies", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<DependencyResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<DependencyResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize dependency response.");
     }
 
@@ -257,7 +262,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/phases", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<PhaseResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize phase response.");
     }
 
@@ -271,7 +276,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<PhaseResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
     }
 
     // ── Task endpoints ──
@@ -282,7 +287,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks?phaseNumber={phaseNumber}", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<TaskResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize task response.");
     }
 
@@ -296,7 +301,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<BatchUpdateTaskStatesResponse>(JsonOptions, ct);
     }
 
     public async Task<TaskResponse?> UpdateTaskAsync(
@@ -309,7 +314,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
             return null;
 
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<TaskResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ct);
     }
 
     public async Task<TaskDependencyResponse> AddTaskDependencyAsync(
@@ -318,7 +323,7 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsJsonAsync(
             $"/api/projects/{projectId}/work-packages/{wpNumber}/tasks/{taskNumber}/dependencies", request, ct);
         await EnsureSuccessAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<TaskDependencyResponse>(ct)
+        return await response.Content.ReadFromJsonAsync<TaskDependencyResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to deserialize task dependency response.");
     }
 

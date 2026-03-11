@@ -7,6 +7,7 @@ import {
   Blocks,
   PenLine,
   ListFilter,
+  Sparkles,
   ArrowRight,
   Terminal,
   Zap,
@@ -107,6 +108,15 @@ const skills: SkillInfo[] = [
     usage: "/pm-triage",
     stateChanges: [],
     readOnly: true,
+  },
+  {
+    name: "pm-refine-fr",
+    icon: Sparkles,
+    description:
+      "Refine a feature request by analyzing its current state, rewriting the description with full detail, filling in missing fields (business value, acceptance summary), and adding structured user stories.",
+    usage: "/pm-refine-fr <fr-id>",
+    args: "Feature request ID (e.g., proj-1-fr-3). If omitted, lists inactive FRs to choose from",
+    stateChanges: [],
   },
 ];
 
