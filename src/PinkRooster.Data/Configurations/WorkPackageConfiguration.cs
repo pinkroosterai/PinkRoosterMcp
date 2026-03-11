@@ -72,5 +72,7 @@ public sealed class WorkPackageConfiguration : IEntityTypeConfiguration<WorkPack
         builder.HasIndex(x => x.State);
         builder.HasIndex(x => x.Priority);
         builder.HasIndex(x => x.Type);
+        builder.HasIndex(x => x.LinkedIssueId);
+        builder.HasIndex(x => x.LinkedFeatureRequestId);
     }
 }

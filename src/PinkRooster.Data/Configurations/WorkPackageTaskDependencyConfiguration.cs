@@ -30,5 +30,6 @@ public sealed class WorkPackageTaskDependencyConfiguration : IEntityTypeConfigur
 
         // ── Indexes ──
         builder.HasIndex(x => new { x.DependentTaskId, x.DependsOnTaskId }).IsUnique();
+        builder.HasIndex(x => x.DependsOnTaskId);
     }
 }
