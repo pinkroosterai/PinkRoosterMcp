@@ -1,11 +1,8 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
 import { renderWithProviders } from "@/test/render";
 import { IssueCreatePage } from "../issue-create-page";
 import { Route, Routes } from "react-router";
-import { server } from "@/test/mocks/server";
-import { createIssue } from "@/test/mocks/data/issues";
 
 function renderPage(projectId = 1) {
   return renderWithProviders(

@@ -59,6 +59,9 @@ logs/
 # Core dumps
 core.*
 
+# Release
+release.sh
+
 # Serena
 .serena/
 claudedocs/

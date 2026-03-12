@@ -1,11 +1,8 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
 import { renderWithProviders } from "@/test/render";
 import { FeatureRequestCreatePage } from "../feature-request-create-page";
 import { Route, Routes } from "react-router";
-import { server } from "@/test/mocks/server";
-import { createFeatureRequest } from "@/test/mocks/data/feature-requests";
 
 function renderPage(projectId = 1) {
   return renderWithProviders(
