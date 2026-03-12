@@ -18,7 +18,7 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
             .ToArray();
 
         if (keys.Length == 0)
-            logger.LogWarning("No API keys configured — all non-health requests will be rejected with 401");
+            logger.LogInformation("No API keys configured — running in open access mode");
         else
             logger.LogInformation("API key authentication enabled with {KeyCount} key(s)", keys.Length);
 
@@ -31,6 +31,10 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
 
         // Allow health endpoint without auth
         if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+            return next(context);
+
+        // No keys configured — open access
+        if (_validKeyBytes.Length == 0)
             return next(context);
 
         if (!context.Request.Headers.TryGetValue(AuthConstants.ApiKeyHeaderName, out var apiKeyHeader))

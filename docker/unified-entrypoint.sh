@@ -13,10 +13,7 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-if [ -z "$API_KEY" ]; then
-  echo "ERROR: API_KEY is required."
-  exit 1
-fi
+# API_KEY is optional — empty means open access (no auth required)
 
 # --- API environment ---
 export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Production}"

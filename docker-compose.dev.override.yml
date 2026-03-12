@@ -1,5 +1,5 @@
 # Dev overrides: hot reload for .NET projects via dotnet watch
-# Usage: docker compose up (automatically merges this file)
+# Usage: docker compose -f docker-compose.dev.yml -f docker-compose.dev.override.yml up
 services:
   api:
     build:

@@ -79,7 +79,7 @@ RUN rm -f /etc/nginx/sites-enabled/default \
 
 EXPOSE 80 8081
 
-HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=20s \
-    CMD curl -f http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s \
+    CMD curl -f http://localhost:8080/health && curl -f http://localhost:8081/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

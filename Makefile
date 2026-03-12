@@ -8,6 +8,7 @@ MCP_PROJECT    := src/PinkRooster.Mcp
 DATA_PROJECT   := src/PinkRooster.Data
 DASHBOARD_DIR  := src/dashboard
 COMPOSE        := docker compose
+COMPOSE_DEV    := docker compose -f docker-compose.dev.yml -f docker-compose.dev.override.yml
 
 # Colors (ANSI)
 C_RESET  := \033[0m
@@ -60,7 +61,7 @@ build-dashboard: ## Build dashboard only
 .PHONY: dev
 dev: ## Start all services locally (DB + API + MCP + dashboard)
 	@printf "$(C_BOLD)$(C_CYAN)▸ Starting PostgreSQL container…$(C_RESET)\n"
-	@$(COMPOSE) up -d postgres
+	@docker compose -f docker-compose.dev.yml up -d postgres
 	@printf "$(C_BOLD)$(C_CYAN)▸ Starting all services — Ctrl+C to stop$(C_RESET)\n"
 	@$(MAKE) -j3 dev-api dev-mcp dev-dashboard
 
@@ -80,16 +81,17 @@ dev-dashboard: ## Start dashboard dev server
 	@cd $(DASHBOARD_DIR) && npm run dev
 
 # ──────────────────────────────────────────────────────────────
-#  Docker
+#  Docker (unified image — default for users)
 # ──────────────────────────────────────────────────────────────
 
 .PHONY: up
-up: ## Start all containers (detached)
+up: ## Start all containers (unified image)
 	@$(COMPOSE) up -d --build
 	@printf "$(C_GREEN)✔ Services running$(C_RESET)\n"
+	@printf "  Dashboard  → http://localhost:3000\n"
 	@printf "  API        → http://localhost:5100\n"
 	@printf "  MCP        → http://localhost:5200\n"
-	@printf "  Dashboard  → http://localhost:3000\n"
+	@printf "  Swagger    → http://localhost:5100/swagger/index.html\n"
 
 .PHONY: down
 down: ## Stop all containers
@@ -99,28 +101,36 @@ down: ## Stop all containers
 restart: down up ## Rebuild and restart all containers
 
 .PHONY: logs
-logs: ## Tail container logs (all services)
+logs: ## Tail container logs
 	@$(COMPOSE) logs -f
-
-.PHONY: logs-api
-logs-api: ## Tail API container logs
-	@$(COMPOSE) logs -f api
-
-.PHONY: logs-mcp
-logs-mcp: ## Tail MCP container logs
-	@$(COMPOSE) logs -f mcp
-
-.PHONY: logs-dashboard
-logs-dashboard: ## Tail dashboard container logs
-	@$(COMPOSE) logs -f dashboard
 
 .PHONY: ps
 ps: ## Show running containers
 	@$(COMPOSE) ps
 
-.PHONY: docker-build
-docker-build: ## Build Docker images without starting
-	@$(COMPOSE) build
+# ──────────────────────────────────────────────────────────────
+#  Docker (multi-image — for developers)
+# ──────────────────────────────────────────────────────────────
+
+.PHONY: dev-up
+dev-up: ## Start multi-image containers with hot reload
+	@$(COMPOSE_DEV) up -d --build
+	@printf "$(C_GREEN)✔ Dev services running$(C_RESET)\n"
+	@printf "  API        → http://localhost:5100\n"
+	@printf "  MCP        → http://localhost:5200\n"
+	@printf "  Dashboard  → http://localhost:3000\n"
+
+.PHONY: dev-down
+dev-down: ## Stop multi-image dev containers
+	@$(COMPOSE_DEV) down
+
+.PHONY: dev-logs
+dev-logs: ## Tail multi-image dev container logs
+	@$(COMPOSE_DEV) logs -f
+
+.PHONY: dev-ps
+dev-ps: ## Show running dev containers
+	@$(COMPOSE_DEV) ps
 
 # ──────────────────────────────────────────────────────────────
 #  Database  (EF Core migrations)
@@ -179,14 +189,72 @@ format: ## Format .NET code
 	@dotnet format $(SOLUTION)
 
 .PHONY: setup
-setup: ## First-time setup (copy .env + install deps)
+setup: ## Quick start: configure, register MCP, install skills, start containers
+	@printf "\n$(C_BOLD)$(C_CYAN) 🐓 PinkRooster Setup$(C_RESET)\n\n"
+	@# 1. Copy .env if it doesn't exist
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
-		printf "$(C_GREEN)✔ Created .env from .env.example$(C_RESET)\n"; \
+		printf "$(C_GREEN)  ✔ Created .env from .env.example$(C_RESET)\n"; \
 	else \
 		printf "$(C_DIM)  .env already exists, skipping$(C_RESET)\n"; \
 	fi
-	@$(MAKE) install
+	@# 2. Register MCP server in Claude Code (global scope)
+	@if command -v claude >/dev/null 2>&1; then \
+		claude mcp remove --scope user pinkrooster >/dev/null 2>&1 || true; \
+		if claude mcp add --transport http --scope user pinkrooster http://localhost:5200 >/dev/null 2>&1; then \
+			printf "$(C_GREEN)  ✔ MCP server registered in Claude Code (global)$(C_RESET)\n"; \
+		else \
+			printf "$(C_YELLOW)  ⚠ Failed to register MCP server in Claude Code$(C_RESET)\n"; \
+		fi; \
+	else \
+		printf "$(C_DIM)  Claude Code CLI not found, skipping MCP registration$(C_RESET)\n"; \
+	fi
+	@# 3. Install PM skills globally
+	@mkdir -p ~/.claude/skills
+	@if [ -d .claude/skills ]; then \
+		cp -r .claude/skills/* ~/.claude/skills/ 2>/dev/null || true; \
+		printf "$(C_GREEN)  ✔ PM skills installed to ~/.claude/skills/$(C_RESET)\n"; \
+	fi
+	@# 4. Start containers
+	@printf "\n$(C_CYAN)  ▸ Starting containers…$(C_RESET)\n\n"
+	@$(MAKE) up
+
+.PHONY: setup-dev
+setup-dev: ## Developer setup: configure, install deps, register MCP, start dev containers
+	@printf "\n$(C_BOLD)$(C_CYAN) 🐓 PinkRooster Developer Setup$(C_RESET)\n\n"
+	@# 1. Copy .env if it doesn't exist
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		printf "$(C_GREEN)  ✔ Created .env from .env.example$(C_RESET)\n"; \
+	else \
+		printf "$(C_DIM)  .env already exists, skipping$(C_RESET)\n"; \
+	fi
+	@# 2. Install dependencies
+	@printf "$(C_CYAN)  ▸ Restoring .NET packages…$(C_RESET)\n"
+	@dotnet restore $(SOLUTION) -q
+	@printf "$(C_CYAN)  ▸ Installing npm packages…$(C_RESET)\n"
+	@cd $(DASHBOARD_DIR) && npm install --silent
+	@printf "$(C_GREEN)  ✔ Dependencies installed$(C_RESET)\n"
+	@# 3. Register MCP server in Claude Code (global scope)
+	@if command -v claude >/dev/null 2>&1; then \
+		claude mcp remove --scope user pinkrooster >/dev/null 2>&1 || true; \
+		if claude mcp add --transport http --scope user pinkrooster http://localhost:5200 >/dev/null 2>&1; then \
+			printf "$(C_GREEN)  ✔ MCP server registered in Claude Code (global)$(C_RESET)\n"; \
+		else \
+			printf "$(C_YELLOW)  ⚠ Failed to register MCP server in Claude Code$(C_RESET)\n"; \
+		fi; \
+	else \
+		printf "$(C_DIM)  Claude Code CLI not found, skipping MCP registration$(C_RESET)\n"; \
+	fi
+	@# 4. Install PM skills globally
+	@mkdir -p ~/.claude/skills
+	@if [ -d .claude/skills ]; then \
+		cp -r .claude/skills/* ~/.claude/skills/ 2>/dev/null || true; \
+		printf "$(C_GREEN)  ✔ PM skills installed to ~/.claude/skills/$(C_RESET)\n"; \
+	fi
+	@# 5. Start dev containers
+	@printf "\n$(C_CYAN)  ▸ Starting dev containers…$(C_RESET)\n\n"
+	@$(MAKE) dev-up
 
 .PHONY: clean
 clean: ## Remove build artifacts
@@ -199,4 +267,5 @@ clean: ## Remove build artifacts
 nuke: clean ## Deep clean (artifacts + node_modules + Docker volumes)
 	@rm -rf $(DASHBOARD_DIR)/node_modules
 	@$(COMPOSE) down -v 2>/dev/null || true
+	@$(COMPOSE_DEV) down -v 2>/dev/null || true
 	@printf "$(C_GREEN)✔ Nuked$(C_RESET)\n"

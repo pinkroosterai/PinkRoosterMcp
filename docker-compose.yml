@@ -1,3 +1,18 @@
+# PinkRooster — unified single-image deployment (default)
+#
+# Quick start:
+#   make setup     # copies .env, registers MCP, starts containers
+#
+# Or manually:
+#   cp .env.example .env
+#   docker compose up -d --build
+#
+# Dashboard:  http://localhost:3000
+# MCP server: http://localhost:5200
+# API:        http://localhost:5100  (Swagger at /swagger)
+#
+# For multi-image developer setup, see docker-compose.dev.yml
+
 services:
   postgres:
     image: postgres:17
@@ -15,61 +30,24 @@ services:
       timeout: 5s
       retries: 5
 
-  api:
+  pinkrooster:
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
-    ports:
-      - "5100:8080"
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      AUTO_MIGRATE: "true"
-      ENABLE_SWAGGER: "true"
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD}"
-      Auth__ApiKeys__0: ${API_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
-
-  mcp:
-    build:
-      context: .
-      dockerfile: docker/mcp.Dockerfile
-    ports:
-      - "5200:8080"
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ApiServer__BaseUrl: "http://api:8080"
-      ApiServer__ApiKey: ${API_KEY}
-      Auth__ApiKeys__0: ${MCP_API_KEY:-}
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
-
-  dashboard:
-    build:
-      context: .
-      dockerfile: docker/dashboard.Dockerfile
+      dockerfile: docker/unified.Dockerfile
+    # For published image, replace 'build' with:
+    # image: pinkrooster/pinkroostermcp:latest
     ports:
       - "3000:80"
+      - "5100:8080"
+      - "5200:8081"
     environment:
-      API_KEY: ${API_KEY}
+      DATABASE_URL: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD}"
+      API_KEY: ${API_KEY:-}
+      MCP_API_KEY: ${MCP_API_KEY:-}
       DASHBOARD_USER: ${DASHBOARD_USER:-}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     depends_on:
-      api:
+      postgres:
         condition: service_healthy
 
 volumes:

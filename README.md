@@ -187,23 +187,21 @@ Skills automatically propagate state to related entities. Starting a task activa
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (for local development)
-- [Node.js 20+](https://nodejs.org/) (for dashboard development)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (recommended — `make setup` auto-registers the MCP server)
 
-### Quick Start (Docker)
+### Quick Start
 
 ```bash
-# Clone and configure
 git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
-make setup        # Copy .env from template, install dashboard deps
-
-# Start everything
-make up           # PostgreSQL + API + MCP server + Dashboard
-
-# Verify
-docker compose ps # All services should show "healthy"
+make setup
 ```
+
+That's it. `make setup` will:
+1. Create `.env` with working defaults (no edits needed)
+2. Register the MCP server in Claude Code (global scope, skipped if CLI not found)
+3. Install PM workflow skills to `~/.claude/skills/`
+4. Build and start all containers (PostgreSQL + unified PinkRooster image)
 
 Services will be available at:
 | Service | URL |
@@ -215,42 +213,43 @@ Services will be available at:
 
 ### Connect Your AI Agent
 
-Add the MCP server to your agent's configuration. For Claude Code, it's already configured in `.mcp.json`:
+If you ran `make setup` with Claude Code installed, the MCP server is already registered. For other MCP clients, point them to `http://localhost:5200` (Streamable HTTP) or `http://localhost:5200/sse` (legacy SSE).
 
-```json
-{
-  "mcpServers": {
-    "pinkrooster": {
-      "type": "url",
-      "url": "http://localhost:5200"
-    }
-  }
-}
-```
+### Developer Setup
 
-For other MCP clients, point them to `http://localhost:5200` (Streamable HTTP) or `http://localhost:5200/sse` (legacy SSE).
-
-### Local Development
+For contributors making changes to PinkRoosterMcp:
 
 ```bash
-make dev          # Start all services with hot reload
+make setup-dev    # Install deps, register MCP, start multi-image containers with hot reload
+```
+
+Or use local processes with hot reload:
+
+```bash
+make dev          # Start PostgreSQL in Docker + API/MCP/Dashboard locally with dotnet watch
 make dev-api      # API only (hot reload)
 make dev-dashboard # Dashboard only (Vite dev server)
 ```
 
 ### Authentication (Optional)
 
-Both the MCP server and dashboard support optional authentication:
+Everything runs with open access by default. To enable authentication, edit `.env`:
 
 ```bash
-# In .env
-API_KEY=your-api-key          # API authentication
-MCP_API_KEY=your-mcp-key      # MCP server authentication
+API_KEY=your-api-key          # API + MCP authentication
+MCP_API_KEY=your-mcp-key      # Separate MCP-only key (optional)
 DASHBOARD_USER=admin           # Dashboard login
 DASHBOARD_PASSWORD=secret      # Dashboard password
 ```
 
-When no keys are configured, everything runs with open access — ideal for local development.
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Port already in use | Stop conflicting services or change ports in `docker-compose.yml` |
+| Container unhealthy | Run `make logs` to see error output |
+| MCP not registered | Run `claude mcp add --transport http --scope user pinkrooster http://localhost:5200` |
+| Database connection error | Ensure PostgreSQL container is healthy: `docker compose ps` |
 
 ---
 
