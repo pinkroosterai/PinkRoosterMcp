@@ -18,7 +18,7 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 
 PinkRoosterMcp is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
 
-It exposes an [MCP server](https://modelcontextprotocol.io/) with 20 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
+It exposes an [MCP server](https://modelcontextprotocol.io/) with 24 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
 
 ### Why not Jira / Linear / GitHub Issues?
 
@@ -123,12 +123,13 @@ Every API request is logged with method, path, status, duration, and caller iden
 | **Work Package** | Execution plan with phases, tasks, and dependencies | Same as Issue + automatic upward propagation |
 | **Phase** | Grouping of related tasks within a work package | Auto-completes when all tasks reach terminal state |
 | **Task** | Atomic unit of work with target files | Same states as Issue, supports dependency blocking |
+| **Project Memory** | Stored knowledge, decisions, patterns, and context | Stateless (no lifecycle) |
 
 ---
 
 ## MCP Tools
 
-PinkRoosterMcp exposes 20 MCP tools organized by entity:
+PinkRoosterMcp exposes 24 MCP tools organized by entity:
 
 | Tool | Description |
 |------|-------------|
@@ -146,6 +147,9 @@ PinkRoosterMcp exposes 20 MCP tools organized by entity:
 | `batch_update_task_states` | Update multiple task states in one call with consolidated cascades |
 | `verify_acceptance_criteria` | Record verification results for phase acceptance criteria |
 | `manage_dependency` | Add/remove WP or task dependencies with auto-block (auto-detects from ID format) |
+| `list_memories` / `get_memory_details` | Read project memories (filter by name pattern or tag) |
+| `create_or_update_memory` | Create or merge memory by name (append content, union tags) |
+| `delete_memory` | Permanently delete a project memory |
 | `delete_entity` | Permanently delete an entity by type with cascade handling |
 
 All write operations return structured `OperationResult` JSON with state change cascades, so the agent always knows what happened downstream.
@@ -260,7 +264,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-The test suite includes 154 API/MCP integration tests and 119 dashboard frontend tests.
+The test suite includes 176 API integration tests and 142 dashboard frontend tests.
 
 ---
 
