@@ -14,6 +14,7 @@ public sealed class Project : IHasUpdatedAt
     public int NextIssueNumber { get; set; } = 1;
     public int NextFrNumber { get; set; } = 1;
     public int NextWpNumber { get; set; } = 1;
+    public int NextMemoryNumber { get; set; } = 1;
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

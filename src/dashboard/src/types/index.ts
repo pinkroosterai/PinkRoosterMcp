@@ -231,6 +231,18 @@ export interface WorkPackageStatusSummary {
   blocked: StatusItem[];
 }
 
+export interface MemoryStatusItem {
+  memoryId: string;
+  name: string;
+  tags: string[];
+}
+
+export interface MemoryStatusSummary {
+  total: number;
+  recentMemories: MemoryStatusItem[];
+  tagCloud: Record<string, number>;
+}
+
 export interface ProjectStatus {
   projectId: string;
   name: string;
@@ -238,6 +250,26 @@ export interface ProjectStatus {
   issues: EntityStatusSummary;
   featureRequests: EntityStatusSummary;
   workPackages: WorkPackageStatusSummary;
+  memories: MemoryStatusSummary | null;
+}
+
+export interface ProjectMemoryListItem {
+  memoryId: string;
+  name: string;
+  tags: string[];
+  updatedAt: string;
+}
+
+export interface ProjectMemory {
+  memoryId: string;
+  projectId: string;
+  memoryNumber: number;
+  name: string;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  wasMerged: boolean;
 }
 
 export interface StateChangeDto {

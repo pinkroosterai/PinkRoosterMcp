@@ -94,6 +94,30 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         var wpBlocked = wpData.Where(w => w.State == CompletionState.Blocked).ToList();
         var wpTerminal = wpData.Count(w => CompletionStateConstants.TerminalStates.Contains(w.State));
 
+        // ── Memories summary ──
+        var memories = await db.ProjectMemories
+            .Where(m => m.ProjectId == projectId)
+            .OrderByDescending(m => m.UpdatedAt)
+            .Select(m => new { m.MemoryNumber, m.Name, m.Tags, m.ProjectId })
+            .ToListAsync(ct);
+
+        var memorySummary = memories.Count > 0
+            ? new MemoryStatusSummary
+            {
+                Total = memories.Count,
+                RecentMemories = memories.Take(5).Select(m => new MemoryStatusItem
+                {
+                    MemoryId = $"proj-{m.ProjectId}-mem-{m.MemoryNumber}",
+                    Name = m.Name,
+                    Tags = m.Tags
+                }).ToList(),
+                TagCloud = memories
+                    .SelectMany(m => m.Tags)
+                    .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Count())
+            }
+            : null;
+
         return new ProjectStatusResponse
         {
             ProjectId = $"proj-{project.Id}",
@@ -155,7 +179,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                     Id = $"proj-{w.ProjectId}-wp-{w.WorkPackageNumber}",
                     Name = w.Name
                 }).ToList()
-            }
+            },
+            Memories = memorySummary
         };
     }
 

@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MemoryPanel } from "@/components/memory-panel";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useServerEvents, type ConnectionState } from "@/hooks/use-server-events";
@@ -46,7 +47,8 @@ export function AppLayout() {
                 </Tooltip>
               </TooltipProvider>
             )}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              {projectId && <MemoryPanel projectId={projectId} />}
               <ThemeToggle />
             </div>
           </header>

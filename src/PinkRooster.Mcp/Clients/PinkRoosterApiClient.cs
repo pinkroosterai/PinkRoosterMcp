@@ -350,6 +350,58 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         return response.StatusCode == HttpStatusCode.NoContent;
     }
 
+    // ── Project Memory endpoints ──
+
+    public async Task<List<ProjectMemoryListItemResponse>> GetMemoriesByProjectAsync(
+        long projectId, string? namePattern = null, string? tag = null, CancellationToken ct = default)
+    {
+        var url = $"/api/projects/{projectId}/memories";
+        var queryParams = new List<string>();
+        if (!string.IsNullOrWhiteSpace(namePattern))
+            queryParams.Add($"namePattern={Uri.EscapeDataString(namePattern)}");
+        if (!string.IsNullOrWhiteSpace(tag))
+            queryParams.Add($"tag={Uri.EscapeDataString(tag)}");
+        if (queryParams.Count > 0)
+            url += "?" + string.Join("&", queryParams);
+
+        return await httpClient.GetFromJsonAsync<List<ProjectMemoryListItemResponse>>(url, JsonOptions, ct) ?? [];
+    }
+
+    public async Task<ProjectMemoryResponse?> GetMemoryAsync(
+        long projectId, int memoryNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync(
+            $"/api/projects/{projectId}/memories/{memoryNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<ProjectMemoryResponse>(JsonOptions, ct);
+    }
+
+    public async Task<ProjectMemoryResponse> UpsertMemoryAsync(
+        long projectId, UpsertProjectMemoryRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/projects/{projectId}/memories", request, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<ProjectMemoryResponse>(JsonOptions, ct)
+            ?? throw new InvalidOperationException("Failed to deserialize memory response.");
+    }
+
+    public async Task<bool> DeleteMemoryAsync(long projectId, int memoryNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync(
+            $"/api/projects/{projectId}/memories/{memoryNumber}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, ct);
+        return response.StatusCode == HttpStatusCode.NoContent;
+    }
+
     // ── Delete endpoints ──
 
     public async Task<bool> DeleteIssueAsync(long projectId, int issueNumber, CancellationToken ct = default)

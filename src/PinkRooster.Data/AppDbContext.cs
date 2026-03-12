@@ -22,6 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<FeatureRequestAuditLog> FeatureRequestAuditLogs => Set<FeatureRequestAuditLog>();
     public DbSet<WorkPackageIssueLink> WorkPackageIssueLinks => Set<WorkPackageIssueLink>();
     public DbSet<WorkPackageFeatureRequestLink> WorkPackageFeatureRequestLinks => Set<WorkPackageFeatureRequestLink>();
+    public DbSet<ProjectMemory> ProjectMemories => Set<ProjectMemory>();
+    public DbSet<ProjectMemoryAuditLog> ProjectMemoryAuditLogs => Set<ProjectMemoryAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

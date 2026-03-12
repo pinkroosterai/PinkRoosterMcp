@@ -8,6 +8,7 @@ public sealed class ProjectStatusResponse
     public required EntityStatusSummary Issues { get; init; }
     public required EntityStatusSummary FeatureRequests { get; init; }
     public required WorkPackageStatusSummary WorkPackages { get; init; }
+    public MemoryStatusSummary? Memories { get; init; }
 }
 
 public sealed class EntityStatusSummary
@@ -29,6 +30,20 @@ public sealed class WorkPackageStatusSummary
     public required List<StatusItem> Active { get; init; }
     public required List<StatusItem> Inactive { get; init; }
     public required List<StatusItem> Blocked { get; init; }
+}
+
+public sealed class MemoryStatusSummary
+{
+    public required int Total { get; init; }
+    public required List<MemoryStatusItem> RecentMemories { get; init; }
+    public required Dictionary<string, int> TagCloud { get; init; }
+}
+
+public sealed class MemoryStatusItem
+{
+    public required string MemoryId { get; init; }
+    public required string Name { get; init; }
+    public required List<string> Tags { get; init; }
 }
 
 public sealed class StatusItem

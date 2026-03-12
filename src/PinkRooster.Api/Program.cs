@@ -20,6 +20,7 @@ builder.Services.AddScoped<IWorkPackageService, WorkPackageService>();
 builder.Services.AddScoped<IPhaseService, PhaseService>();
 builder.Services.AddScoped<IWorkPackageTaskService, WorkPackageTaskService>();
 builder.Services.AddScoped<IStateCascadeService, StateCascadeService>();
+builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddSingleton<ActivityLogChannel>();
 builder.Services.AddHostedService<ActivityLogWriterService>();

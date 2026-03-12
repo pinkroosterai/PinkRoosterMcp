@@ -62,3 +62,4 @@ core.*
 # Serena
 .serena/
 claudedocs/
+CLAUDE.md

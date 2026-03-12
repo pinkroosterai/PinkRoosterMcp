@@ -103,6 +103,26 @@ public static class IdParser
             && int.TryParse(frPart, out frNumber) && frNumber > 0;
     }
 
+    public static bool TryParseProjectMemoryId(string humanId, out long projectId, out int memoryNumber)
+    {
+        projectId = 0;
+        memoryNumber = 0;
+
+        const string memMarker = "-mem-";
+        if (!humanId.StartsWith("proj-"))
+            return false;
+
+        var memIndex = humanId.IndexOf(memMarker, StringComparison.Ordinal);
+        if (memIndex < 0)
+            return false;
+
+        var projectPart = humanId.AsSpan(5, memIndex - 5);
+        var memPart = humanId.AsSpan(memIndex + memMarker.Length);
+
+        return long.TryParse(projectPart, out projectId) && projectId > 0
+            && int.TryParse(memPart, out memoryNumber) && memoryNumber > 0;
+    }
+
     public static bool TryParseTaskId(string humanId, out long projectId, out int wpNumber, out int taskNumber)
     {
         projectId = 0;
