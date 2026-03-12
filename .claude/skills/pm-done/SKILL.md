@@ -77,12 +77,12 @@ Detect entity type from ID format:
 
 1. Check `stateChanges` for any entry where `entityType` is `WorkPackage` and `newState` is `Completed`
 2. For each auto-completed WP:
-   a. Call `mcp__pinkrooster__get_work_package_details` with the WP ID to get `linkedIssueId` and `linkedFeatureRequestId`
-   b. **If `linkedIssueId` exists**: Call `mcp__pinkrooster__get_issue_details` with the issue ID
+   a. Call `mcp__pinkrooster__get_work_package_details` with the WP ID to get `linkedIssueIds` and `linkedFeatureRequestIds`
+   b. **For each issue ID in `linkedIssueIds`**: Call `mcp__pinkrooster__get_issue_details` with the issue ID
       - If the issue is NOT in a terminal state (Completed/Cancelled/Replaced):
         - Call `mcp__pinkrooster__create_or_update_issue` with `projectId`, `issueId`, and `state: "Completed"`
         - Report: "Auto-completed linked issue {issueId} '{name}'"
-   c. **If `linkedFeatureRequestId` exists**: Call `mcp__pinkrooster__get_feature_request_details` with the FR ID
+   c. **For each FR ID in `linkedFeatureRequestIds`**: Call `mcp__pinkrooster__get_feature_request_details` with the FR ID
       - If the FR is NOT in a terminal state (Completed/Rejected):
         - Call `mcp__pinkrooster__create_or_update_feature_request` with `projectId`, `featureRequestId`, and `status: "Completed"`
         - Report: "Auto-completed linked feature request {frId} '{name}'"

@@ -1,212 +1,224 @@
 ---
 name: pm-next
 description: >-
-  Pick up the next highest-priority work package and start implementing it.
-  Loads WP context including linked issue/FR and user stories, transitions
-  to Implementing, auto-activates linked entities, then delegates to
-  /pm-implement for task-level execution. Use --auto to loop until all
-  work is done.
+  Pick up the next highest-priority work item and start implementing it.
+  Finds WPs, unscaffolded Issues, and FRs by priority. Auto-scaffolds
+  Issues/FRs without work packages, then implements. Use --auto for
+  fully autonomous execution until all work is done.
 argument-hint: "[entity-type: Wp | Issue | FeatureRequest] [--auto]"
 ---
 
-# Start Next Priority Work Package
+# Pick Up Next Work Item
 
-Get the highest-priority actionable work package, load its full context, transition to active state, and begin implementing.
+Find the highest-priority actionable item, prepare it for implementation (scaffolding if needed), and execute it.
 
-## Step 0: Parse Flags
+## Step 1: Parse Arguments & Resolve Project
 
-Parse `$ARGUMENTS` for flags and entity type:
+Parse `$ARGUMENTS`:
+- **`--auto`**: Fully autonomous mode — no prompts, auto-select, auto-scaffold, auto-commit per WP. Remove the flag before further parsing.
+- **Entity type filter**: Optional `Wp`, `Issue`, or `FeatureRequest`. Default: omit (returns all types mixed by priority).
 
-- **`--auto` flag**: If present, enable auto-loop mode (see Auto-Loop Mode below). Remove the flag before further parsing.
-- **Entity type**: Remaining argument (Wp, Issue, FeatureRequest), or default to `Wp`.
-
-## Step 1: Resolve Project
-
+Resolve project:
 - Current directory: !`pwd`
-- Call `mcp__pinkrooster__get_project_status` with `projectPath` set to the directory above
-- Extract the `projectId`
+- Call `mcp__pinkrooster__get_project_status` with `projectPath` → extract `projectId`
 
-## Step 2: Get Priority Queue
+Initialize: `completedItems = []`, `skippedItems = []`
+
+## Step 2: Find Next Item
 
 Call `mcp__pinkrooster__get_next_actions` with:
 - `projectId` from Step 1
 - `limit`: 5
-- `entityType`: parsed entity type from Step 0, default `Wp`
+- `entityType`: the specified filter, or **omit entirely** to get all actionable WPs, Issues (without linked WPs), and FRs (without linked WPs), sorted by priority
 
-## Step 3: Present Options
+This returns a **queue** of candidates. Process them in order (Steps 3–6). If a candidate is skipped (blocked, scaffold failure), try the next one in the queue before re-fetching.
 
-**If `--auto` is NOT set** (interactive mode):
+**If empty queue**:
+- Auto mode → jump to Step 7 (Exit)
+- Interactive → "No actionable items found. Run `/pm-status` for overview."
 
-Show the top items to the user:
+### Select
+
+- **Auto mode**: Take #1 from the queue. No prompt.
+- **Interactive**: Present the queue and let the user pick (default #1, auto-select if only one).
 
 ```
 ## Next Actions
 
 1. [{priority}] {entityId} "{name}" ({state}) — {type}
-2. [{priority}] {entityId} "{name}" ({state}) — {type}
-3. ...
+2. ...
 
-Which item to start? (number, or Enter for #1)
+Which item? (number, or Enter for #1)
 ```
 
-If only one item, auto-select it. If no items, report: "No actionable work packages found. Run `/pm-status` for full overview."
+## Step 3: Normalize to Work Package
 
-**If `--auto` is set** (auto-loop mode):
+Every item must become a WP before implementation. This step resolves the selected item to a concrete WP with phases and tasks.
 
-Auto-select the #1 highest-priority item. Do not prompt the user. If no items, the loop ends (see Auto-Loop Mode).
+### If WP (`proj-N-wp-N`)
 
-## Step 4: Load Full Context
-
-Based on the selected item's entity type:
-
-**If Work Package** (ID format: `proj-N-wp-N`):
 1. Call `mcp__pinkrooster__get_work_package_details` with the WP ID
-2. Extract:
-   - WP: `name`, `description`, `plan`, `type`, `priority`, `state`, `estimatedComplexity`
-   - Phases: all `phases[]` with task counts, acceptance criteria
-   - Tasks: summary of non-terminal tasks across phases (count, states)
-   - Dependencies: `blockedBy` WPs — if any blocker is non-terminal:
-     - **In auto mode**: skip this WP silently and pick the next item from the queue
-     - **In interactive mode**: report "This WP is blocked by {blockerId}. Consider working on the blocker first, or pick a different item."
-3. **Load linked Issue** (if `linkedIssueId` exists):
-   - Call `mcp__pinkrooster__get_issue_details` — extract `name`, `description`, `stepsToReproduce`, `affectedComponent`
-4. **Load linked FR** (if `linkedFeatureRequestId` exists):
-   - Call `mcp__pinkrooster__get_feature_request_details` — extract `name`, `description`, `userStories` (array of role/goal/benefit), `businessValue`, `acceptanceSummary`
-   - Display user stories as context: "As a [role], I want [goal], so that [benefit]" for each story
+2. **Blocked check**: If `blockedBy` contains any non-terminal WP:
+   - Auto mode → add to `skippedItems` with reason "blocked by {blockerId}", try next candidate from Step 2 queue
+   - Interactive → "Blocked by {blockerId}. Work on the blocker first, or pick a different item."
+3. Load linked Issues (if `linkedIssueIds` is non-empty): call `mcp__pinkrooster__get_issue_details` for each
+4. Load linked FRs (if `linkedFeatureRequestIds` is non-empty): call `mcp__pinkrooster__get_feature_request_details` for each — note user stories for context
+5. Proceed to Step 4 with this WP.
 
-**If Issue** (ID format: `proj-N-issue-N`):
-1. Call `mcp__pinkrooster__get_issue_details` with the issue ID
-2. Extract: `name`, `description`, `stepsToReproduce`, `expectedBehavior`, `actualBehavior`, `affectedComponent`
-3. Check for linked work packages — if none, suggest: "This issue has no work package. Run `/pm-scaffold {issueId}` to create one."
+### If Issue (`proj-N-issue-N`)
 
-**If Feature Request** (ID format: `proj-N-fr-N`):
-1. Call `mcp__pinkrooster__get_feature_request_details` with the FR ID
-2. Extract: `name`, `description`, `userStories` (array of role/goal/benefit), `businessValue`, `acceptanceSummary`
-3. Display user stories as context: "As a [role], I want [goal], so that [benefit]" for each story
-4. Check for linked work packages — if none, suggest: "This FR has no work package. Run `/pm-scaffold {frId}` to create one."
+1. Call `mcp__pinkrooster__get_issue_details`
+2. **If linked WPs exist**: pick the first non-terminal WP → load its details → proceed as WP path above (skip steps 1-2, go straight to blocked check)
+3. **If no linked WP**: auto-scaffold:
+   - Invoke `/pm-scaffold {issueId}`
+   - **In auto mode**: scaffold must proceed without prompting (skip quality warnings for sparse data)
+   - On success: extract the new WP ID → load its details → proceed to Step 4
+   - On failure: auto mode → add to `skippedItems` with reason "scaffold failed", try next candidate. Interactive → report error.
 
-## Step 5: Transition State + Auto-Activate Related Entities
+### If Feature Request (`proj-N-fr-N`)
 
-Transition the selected item to an active state, and automatically activate all related entities. No user confirmation needed — starting work inherently means parent entities are active.
+1. Call `mcp__pinkrooster__get_feature_request_details` — note user stories
+2. **If linked WPs exist**: pick the first non-terminal WP → load its details → proceed as WP path above
+3. **If no linked WP**: auto-scaffold:
+   - Invoke `/pm-scaffold {frId}`
+   - **In auto mode**: scaffold must proceed without prompting (skip quality warnings for sparse data)
+   - On success: extract the new WP ID → load its details → proceed to Step 4
+   - On failure: auto mode → add to `skippedItems` with reason "scaffold failed", try next candidate. Interactive → report error.
 
-**For Work Packages**:
-1. **Activate WP**: If the WP state is inactive (NotStarted or Blocked):
-   - Call `mcp__pinkrooster__create_or_update_work_package` with `projectId`, `workPackageId`, and `state: "Implementing"`
-   - Report: "WP {wpId} → Implementing"
-2. **Auto-activate linked Issue**: If WP has a `linkedIssueId` and the issue is NotStarted or Blocked:
-   - Call `mcp__pinkrooster__create_or_update_issue` with `projectId`, `issueId`, and `state: "Implementing"`
-   - Report: "Auto-activated linked issue {issueId} → Implementing"
-3. **Auto-activate linked FR**: If WP has a `linkedFeatureRequestId` and the FR is in an inactive state (Proposed or Deferred):
-   - Call `mcp__pinkrooster__create_or_update_feature_request` with `projectId`, `featureRequestId`, and `status: "InProgress"`
-   - Report: "Auto-activated linked FR {frId} → InProgress"
+> **Note**: If all candidates in the queue are exhausted (all blocked or failed), auto mode re-fetches in Step 2. If re-fetch also returns nothing actionable → Step 7 (Exit).
 
-**For Issues**:
-- Call `mcp__pinkrooster__create_or_update_issue` with `projectId`, `issueId`, and `state: "Implementing"`
+## Step 4: Activate Entities
 
-**For Feature Requests**:
-- Call `mcp__pinkrooster__create_or_update_feature_request` with `projectId`, `featureRequestId`, and `status: "InProgress"`
+We now have a resolved WP. Activate all inactive entities without prompting.
 
-## Step 6: Present Summary and Delegate to pm-implement
+1. **WP** (if NotStarted or Blocked): call `mcp__pinkrooster__create_or_update_work_package` with `state: "Implementing"` → report "{wpId} → Implementing"
+2. **Linked Issues** (for each in `linkedIssueIds`, if NotStarted or Blocked): call `mcp__pinkrooster__create_or_update_issue` with `state: "Implementing"` → report "Auto-activated {issueId} → Implementing"
+3. **Linked FRs** (for each in `linkedFeatureRequestIds`, if Proposed or Deferred): call `mcp__pinkrooster__create_or_update_feature_request` with `status: "InProgress"` → report "Auto-activated {frId} → InProgress"
 
-Summarize the context loaded and hand off to `/pm-implement` for task-level execution:
+Brief summary:
 
 ```
-## Starting: {wpId} "{wpName}"
-
-### Context
-- **Type**: {wpType} | **Priority**: {priority} | **Complexity**: {estimatedComplexity}/10
-- **Description**: {description}
-- **Linked Issue**: {issueId} "{issueName}" (if present)
-- **Linked FR**: {frId} "{frName}" (if present)
-- **User Stories**: (if linked FR has user stories)
+## Implementing: {wpId} "{wpName}"
+- Priority: {priority} | Complexity: {estimatedComplexity}/10 | Type: {wpType}
+- Tasks: {nonTerminalCount} remaining across {phaseCount} phases
+- Linked: {issueId and/or frId if any}
+- User Stories: (if FR has user stories)
   - As a {role}, I want {goal}, so that {benefit}
-  - ...
-
-### Structure
-- **Phases**: {phaseCount}
-- **Tasks**: {nonTerminalCount} remaining of {totalTasks} total
-
-### State Transitions
-- {wpId} → Implementing
-- {linkedIssueId} → Implementing (if auto-activated)
-- {linkedFrId} → InProgress (if auto-activated)
 ```
 
-Then delegate task execution by invoking `/pm-implement {wpId}` to execute all tasks across phases.
+## Step 5: Implement
 
-## Step 7: Verify & Complete
+Invoke `/pm-implement {wpId}` to execute all tasks across all phases.
 
-When `/pm-implement` completes:
+`/pm-implement` autonomously handles:
+- Task dependency ordering and sequential execution
+- Reading target files, implementing code changes
+- Building and running tests after each task (with auto-fix on failure)
+- Transitioning tasks to Implementing → Completed
+- Phase verification gates (acceptance criteria checks between phases)
+- Phase/WP auto-completion via state cascades
+- Auto-completion of linked Issue and FR when the WP cascades to Completed
 
-1. **Verify acceptance criteria**: If the WP has phases with acceptance criteria, run `/pm-verify {wpId}` to check all criteria.
-   - If all criteria pass (or no criteria exist): proceed to completion.
-   - If any criteria fail:
-     - **In auto mode**: pause the loop and report failures. The user must fix issues before continuing.
-     - **In interactive mode**: report failures and suggest: "Fix issues and re-run `/pm-verify {wpId}`, then `/pm-done {wpId}`"
+### When `/pm-implement` returns
 
-2. **Mark the WP done**: Call `/pm-done {wpId}` to finalize completion and report cascades.
+Check the WP's final state by calling `mcp__pinkrooster__get_work_package_details`:
 
-**If `--auto` is set**: proceed to Auto-Loop Mode. Otherwise:
+**WP is Completed** (normal case — all tasks done, cascades fired):
+- Add to `completedItems`
+- Proceed to Step 6 (Commit)
 
-"Work package complete. Run `/pm-status` to check project progress."
+**WP is NOT Completed** (some tasks were blocked by external deps, or a phase verification gate failed):
+- Commit whatever changes were made (partial work is still valuable)
+- Auto mode → add to `skippedItems` with reason "incomplete: {details}", proceed to Step 6 then loop back to Step 2
+- Interactive → report status and suggest: "Continue with `/pm-implement {wpId}`, or `/pm-next` for different work."
 
+**Build/test failures that `/pm-implement` could not resolve**:
+- This is the one **hard stop** in auto mode. The agent could not fix the code.
+- Commit changes so far (even if broken — the user needs to see the attempt)
+- Report the failure clearly with test output and what was tried
+- **Exit the auto loop**. User must intervene.
+
+## Step 6: Commit
+
+After each WP (completed or partial), commit all changes:
+
+1. Stage all files changed during this WP's implementation
+2. Create a commit using conventional format:
+
+```
+<type>(<scope>): <summary of what was implemented>
+
+Implements {wpId} "{wpName}".
+{Linked: issueId "issueName" (if any)}
+{Linked: frId "frName" (if any)}
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+Commit type by WP type: `feat` (Feature), `fix` (BugFix), `refactor` (Refactor), `chore` (Chore/Spike).
+
+If no files were changed (e.g., all tasks were skipped), skip the commit.
+
+## Step 7: Loop or Exit
+
+### Auto mode
+
+**If the WP completed or was skipped** (not a hard failure): loop back to Step 2.
+
+Report between iterations:
+```
 ---
+## Auto-loop: {completedItems.length} completed, {skippedItems.length} skipped. Checking for more...
+---
+```
 
-## Auto-Loop Mode
+**Exit conditions** (any of these ends the loop):
 
-When `--auto` is set, after each WP completes (Step 7), loop back to continue with the next item:
+| Condition | Output |
+|-----------|--------|
+| No actionable items from Step 2 | "No more actionable items." |
+| All candidates blocked/failed | "All remaining items are blocked or failed to scaffold." |
+| Hard build/test failure | "Stopping: unresolvable build/test failure in {wpId}." |
 
-### Loop Iteration
-
-1. Report a progress separator:
-   ```
-   ---
-   ## Auto-loop: completed {completedCount} items. Checking for more...
-   ```
-2. Re-run **Step 2** (Get Priority Queue) with the same `projectId` and entity type
-3. If items remain:
-   - Auto-select #1 (no user prompt)
-   - Continue from **Step 4** through **Step 7**
-   - Increment `completedCount`
-4. If no items remain: exit the loop (see Loop Exit)
-
-### Blocked Item Handling in Auto Mode
-
-When the top item is blocked:
-1. Skip it and try the next item in the queue (items #2, #3, etc.)
-2. If ALL items in the queue are blocked, exit the loop:
-   "All remaining items are blocked. Completed {completedCount} items this session."
-
-### Loop Exit
-
-When no more actionable items exist:
+On exit, print the session summary:
 
 ```
 ## Auto-loop Complete
 
-### Session Summary
-- **Items completed**: {completedCount}
-- **Completed**: {list of entityId + name pairs}
+### Completed ({completedItems.length})
+- {wpId} "{wpName}" (feat/fix/refactor)
+- ...
 
-### Remaining
-- **Blocked**: {count} items still blocked
-- **Total open**: {count} across all entity types
+### Skipped ({skippedItems.length})
+- {entityId} "{name}" — {reason}
+- ...
 
-Run `/pm-status` for full project overview.
+### Project State
+Run `/pm-status` for full overview.
 ```
 
-### Safety Rails
+### Interactive mode
 
-- **No infinite loops**: The loop always terminates — either items run out or all remaining are blocked
-- **Re-fetch every iteration**: Always call `get_next_actions` fresh to reflect cascading state changes (auto-unblocks from completed work may surface new items)
-- **Build + test per WP**: Each `/pm-implement` cycle includes build and test — failures stop the current WP and pause the loop for user intervention
-- **Commit per WP**: After each successful WP, create a git commit with a conventional message summarizing the changes. This keeps work atomic and recoverable.
+"Work package complete. Run `/pm-next` for more or `/pm-status` for overview."
+
+---
+
+## Auto Mode Contract
+
+`--auto` guarantees a hands-off experience. The agent follows these rules:
+
+1. **Never prompt the user** — every decision point has an auto-mode default
+2. **Skip, don't stall** — blocked items, scaffold failures, and incomplete WPs are skipped. They'll resurface in future iterations when conditions change.
+3. **Only stop on unresolvable failures** — build/test errors that can't be auto-fixed are the single hard stop. Everything else is skippable.
+4. **Commit after every WP** — keeps work atomic and recoverable, even for partial implementations
+5. **Re-fetch every iteration** — completing a WP may auto-unblock other WPs via dependency cascades. Fresh data from `get_next_actions` reflects this.
+6. **Priority governs order** — the API returns items sorted by priority. The agent always takes the top actionable item.
+7. **Propagate auto-mode to delegated skills** — when invoking `/pm-scaffold` or `/pm-implement`, suppress all interactive prompts (quality warnings, confirmations, "proceed?" questions). Proceed with available data.
 
 ## Constraints
 
-- **Default to Work Packages** — when no entity type is specified, filter by `Wp`
-- Tasks are too fine-grained for `/pm-next` — use `/pm-implement` for task-level execution
-- If a WP is blocked by another WP, suggest working on the blocker first (or skip in auto mode)
-- For Issues/FRs without linked WPs, suggest `/pm-scaffold` before implementation
-- **Auto-activate** parent entities (WP, linked Issue/FR) at the START without asking
-- **`--auto` mode is fully autonomous** — no user prompts during the loop, auto-select #1, auto-commit after each WP
+- Everything becomes a WP before implementation — Issues/FRs without WPs are auto-scaffolded
+- Do NOT call `/pm-verify` separately — `/pm-implement` handles phase verification gates internally
+- Do NOT call `/pm-done` separately — task/phase/WP completion happens via cascades inside `/pm-implement`, including auto-completion of linked Issues and FRs
+- Tasks are too granular for this skill — use `/pm-implement {taskId}` directly for single-task work
+- When delegating to `/pm-scaffold` in auto mode, skip all quality checks and user prompts

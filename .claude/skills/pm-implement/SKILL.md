@@ -37,7 +37,7 @@ If the ID format doesn't match any pattern, report:
 Call `mcp__pinkrooster__get_work_package_details` with the extracted WP ID.
 
 From the response, extract:
-1. **Work Package**: `name`, `description`, `plan`, `type`, `priority`, `state`, `linkedIssueId`, `linkedFeatureRequestId`
+1. **Work Package**: `name`, `description`, `plan`, `type`, `priority`, `state`, `linkedIssueIds`, `linkedFeatureRequestIds`
 2. **All Phases**: `phases[]` with their tasks, ordered by phase number
 3. **Phase Details**: each phase's `name`, `description`, `acceptanceCriteria`
 4. **Task Details**: each task's `name`, `description`, `implementationNotes`, `targetFiles`, `attachments`, `blockedBy`, `state`
@@ -85,13 +85,13 @@ Before executing any tasks, automatically transition parent and linked entities 
    - Call `mcp__pinkrooster__create_or_update_work_package` with `projectId`, `workPackageId`, and `state: "Implementing"`
    - Report: "Auto-activated WP {wpId} → Implementing"
 
-2. **Auto-activate linked Issue**: If WP has a `linkedIssueId`:
+2. **Auto-activate linked Issues**: For each issue ID in `linkedIssueIds`:
    - Call `mcp__pinkrooster__get_issue_details` to check state
    - If the issue is NotStarted or Blocked (not already active or terminal):
      - Call `mcp__pinkrooster__create_or_update_issue` with `projectId`, `issueId`, and `state: "Implementing"`
      - Report: "Auto-activated linked issue {issueId} → Implementing"
 
-3. **Auto-activate linked FR**: If WP has a `linkedFeatureRequestId`:
+3. **Auto-activate linked FRs**: For each FR ID in `linkedFeatureRequestIds`:
    - Call `mcp__pinkrooster__get_feature_request_details` to check status
    - If the FR is in an inactive state (Proposed or Deferred):
      - Call `mcp__pinkrooster__create_or_update_feature_request` with `projectId`, `featureRequestId`, and `status: "InProgress"`
@@ -200,10 +200,10 @@ Call `mcp__pinkrooster__create_or_update_task` with:
 ```
 
 **Auto-complete linked entities on WP completion**: If `stateChanges` contains a WP auto-complete:
-1. Check the WP's `linkedIssueId` — if present and the issue is not terminal:
+1. For each issue ID in the WP's `linkedIssueIds` — if the issue is not terminal:
    - Call `mcp__pinkrooster__create_or_update_issue` with `state: "Completed"`
    - Report: "Auto-completed linked issue {issueId}"
-2. Check the WP's `linkedFeatureRequestId` — if present and the FR is not terminal:
+2. For each FR ID in the WP's `linkedFeatureRequestIds` — if the FR is not terminal:
    - Call `mcp__pinkrooster__create_or_update_feature_request` with `status: "Completed"`
    - Report: "Auto-completed linked FR {frId}"
 

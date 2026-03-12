@@ -28,9 +28,9 @@ Parse `$ARGUMENTS` to determine the source:
 - Extract: name, description, priority, state/status, userStories (array of role/goal/benefit), businessValue, acceptanceSummary, and any other detailed fields
 - Use user stories to inform task design — each story may map to one or more tasks across phases
 
-**Quality check for Feature Requests**: If the FR is missing key fields (no user stories, no business value, vague description <100 chars), warn:
-"FR {frId} is sparse — missing {fields}. Refine first for better scaffolding: `/pm-refine-fr {frId}`"
-Ask the user to proceed anyway or refine first. If they choose to refine, stop and let them run pm-refine-fr.
+**Quality check for Feature Requests**: If the FR is missing key fields (no user stories, no business value, vague description <100 chars):
+- **When called standalone (interactive)**: warn and ask: "FR {frId} is sparse — missing {fields}. Refine first for better scaffolding: `/pm-refine-fr {frId}`". Let the user choose to proceed or refine.
+- **When called from `/pm-next --auto` or any auto-mode workflow**: skip the warning entirely and proceed with scaffolding using available data. Do not prompt.
 
 **If free-text description**:
 - Use `$ARGUMENTS` directly as the feature description
@@ -101,8 +101,8 @@ Call `mcp__pinkrooster__scaffold_work_package` with:
 - `priority`: from the source entity, or `Medium` for free-text
 - `estimatedComplexity`: from Step 5
 - `estimationRationale`: from Step 5
-- `linkedIssueId`: if scaffolding from an issue
-- `linkedFeatureRequestId`: if scaffolding from an FR
+- `linkedIssueIds`: `[issueId]` if scaffolding from an issue
+- `linkedFeatureRequestIds`: `[frId]` if scaffolding from an FR
 
 ## Step 7: Auto-Transition Linked Entities
 

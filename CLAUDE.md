@@ -348,8 +348,8 @@ Feature requests track ideas and enhancements with a purpose-built lifecycle (Fe
 - `FeatureStatus` enum with 8 states: Proposed → UnderReview → Approved → Scheduled → InProgress → Completed/Rejected/Deferred
 - State-driven timestamps via `ApplyFeatureStatusTimestamps()` (same rules as CompletionState)
 - Full-field audit via `FeatureRequestAuditLog`
-- Optional bidirectional link to WorkPackages via `LinkedFeatureRequestId` FK (SetNull on delete)
-- LinkedWorkPackages enriched at read-time (query on WP.LinkedFeatureRequestId)
+- Many-to-many bidirectional link to WorkPackages via `WorkPackageFeatureRequestLink` join table (Cascade delete)
+- LinkedWorkPackages enriched at read-time (query via join table)
 - Included in `get_project_status` (counts + item lists) and `get_next_actions` (active FRs without linked WPs)
 - API routes: `api/projects/{projectId}/feature-requests` (POST/PATCH/DELETE/GET, same pattern as Issues)
 - 3 MCP tools: `create_or_update_feature_request`, `get_feature_request_details`, `get_feature_requests`
@@ -379,12 +379,6 @@ Claude Code skills in `.claude/skills/` provide AI-driven project management wor
 Skill files location: `.claude/skills/pm-*/SKILL.md`
 
 ### Design Documents
-Detailed design specs live in `claudedocs/`. Current docs:
-- `claudedocs/PROJECT_INDEX.md` — Comprehensive project documentation (architecture, entities, API endpoints, MCP tools, file tree)
-- `claudedocs/PROPOSAL_feature_request_tracking.md` — Feature request tracking proposal (3 paths analyzed, Path B implemented)
-- `claudedocs/MCP_TOOLS.md` — MCP tool reference documentation
-- `claudedocs/DASHBOARD_FEATURE_DRIFT.md` — Dashboard feature drift analysis
-- `claudedocs/workflow_dashboard_parity.md` — Dashboard parity workflow
-- `claudedocs/DESIGN_pm_skills.md` — PM skills design document
-- `claudedocs/workflow_dashboard_crud.md` — Dashboard CRUD workflow
-- `claudedocs/workflow_pm_skills_implementation.md` — PM skills implementation workflow
+Detailed design specs and reports live in `claudedocs/`. Current docs:
+- `claudedocs/PROJECT_INDEX.md` — Comprehensive project index (architecture, entities, API endpoints, MCP tools, file tree)
+- `claudedocs/MCP_TOOLS_TEST_REPORT.md` — MCP tools E2E test report (59 test cases, 20 tools, findings and fixes)
