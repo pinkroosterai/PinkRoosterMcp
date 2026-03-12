@@ -14,6 +14,29 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 
 ---
 
+## Quick Start
+
+```bash
+# Using Docker Hub (no clone needed)
+curl -sO https://raw.githubusercontent.com/pinkroosterai/PinkRoosterMcp/main/docker-compose.yml
+docker compose up -d
+
+# Or clone and run
+git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
+cd PinkRoosterMcp
+make setup
+```
+
+Then register the MCP server in Claude Code:
+
+```bash
+claude mcp add --transport http --scope user pinkrooster http://localhost:5200
+```
+
+Dashboard at [localhost:3000](http://localhost:3000) · API at [localhost:5100](http://localhost:5100) · MCP at [localhost:5200](http://localhost:5200)
+
+---
+
 ## What is PinkRoosterMcp?
 
 PinkRoosterMcp is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
