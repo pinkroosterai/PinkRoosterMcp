@@ -46,7 +46,9 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "get_memory_details", ReadOnly = true,
         Title = "Get Memory Details", OpenWorld = false)]
     [Description(
-        "Returns the full content and metadata for a single project memory. " +
+        "Returns the full content, metadata, and tags for a single project memory. " +
+        "Content may be long if the memory has been merged multiple times " +
+        "(content is appended with '---' separators on each upsert-by-name). " +
         "Use list_memories to find memory IDs first.")]
     public async Task<string> GetMemoryDetails(
         [Description("Memory ID (e.g. 'proj-1-mem-3').")] string memoryId,
@@ -73,8 +75,10 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
         Title = "Create or Update Memory", Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Creates a new project memory or merges into an existing one with the same name. " +
+        "Returns OperationResult with the memory ID and whether a merge occurred (wasMerged). " +
         "If a memory with the given name already exists, the new content is appended (separated by '---') " +
-        "and tags are merged (union, deduplicated). The response indicates whether a merge occurred via 'wasMerged'. " +
+        "and tags are merged (union, deduplicated). Does NOT replace existing content on name match — " +
+        "to fully replace, use delete_memory first then create. " +
         "Use this for storing project-specific knowledge, decisions, patterns, and context.")]
     public async Task<string> CreateOrUpdateMemory(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
@@ -114,7 +118,9 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "delete_memory",
         Title = "Delete Memory", Destructive = true, OpenWorld = false)]
     [Description(
-        "Permanently deletes a project memory by its ID. This action cannot be undone.")]
+        "Permanently deletes a project memory by its ID. This action cannot be undone. " +
+        "Does NOT affect other entities — memories are standalone. " +
+        "Returns OperationResult confirming deletion. Use list_memories to verify the correct ID before deleting.")]
     public async Task<string> DeleteMemory(
         [Description("Memory ID (e.g. 'proj-1-mem-3').")] string memoryId,
         CancellationToken ct = default)

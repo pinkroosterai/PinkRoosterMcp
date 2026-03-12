@@ -17,14 +17,15 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         Title = "Create or Update Task", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a single task or updates an existing one. " +
+        "Returns OperationResult with the task ID (e.g. 'proj-1-wp-2-task-5') and any cascade state changes. " +
         "To create: provide phaseId with name and description. " +
-        "To update: provide taskId plus fields to change. " +
+        "To update: provide taskId plus fields to change (PATCH semantics: null = keep current). " +
         "For creating multiple tasks: use create_or_update_phase with the tasks parameter (batch). " +
         "For state-only changes on multiple tasks: use batch_update_task_states (single call, consolidated cascades). " +
         "For full WP scaffolding: use scaffold_work_package.")]
     public async Task<string> CreateOrUpdateTask(
-        [Description("Phase ID (e.g. 'proj-1-wp-2-phase-1'). Required for task creation.")] string? phaseId = null,
-        [Description("Task ID (e.g. 'proj-1-wp-2-task-5'). Provide to update an existing task.")] string? taskId = null,
+        [Description("Phase ID (e.g. 'proj-1-wp-2-phase-1'). Required for task creation, ignored for update.")] string? phaseId = null,
+        [Description("Task ID (e.g. 'proj-1-wp-2-task-5'). Provide to update an existing task, omit to create.")] string? taskId = null,
         [Description("Task name.")] string? name = null,
         [Description("Task description.")] string? description = null,
         [Description("Sort order for display ordering.")] int? sortOrder = null,
@@ -58,9 +59,10 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         "PREFERRED for completing multiple tasks — updates the state of multiple tasks in one operation. " +
         "All tasks must belong to the same work package. " +
         "Cascades (auto-unblock, phase auto-complete, WP auto-complete) run once after ALL transitions, " +
-        "returning a single consolidated list of state changes. " +
+        "returning OperationResult with a consolidated list of state changes. " +
         "Much more efficient than calling create_or_update_task in a loop. " +
-        "For updating task fields beyond state (name, description, notes), use create_or_update_task instead.")]
+        "Does NOT update task fields beyond state (name, description, notes) — " +
+        "use create_or_update_task for that.")]
     public async Task<string> BatchUpdateTaskStates(
         [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
         [Description("Task state updates to apply.")] List<BatchTaskStateInput> tasks,

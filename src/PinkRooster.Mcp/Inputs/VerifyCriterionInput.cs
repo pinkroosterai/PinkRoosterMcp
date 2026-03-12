@@ -4,7 +4,7 @@ namespace PinkRooster.Mcp.Inputs;
 
 public sealed class VerifyCriterionInput
 {
-    [Description("Criterion name to verify (must match exactly).")]
+    [Description("Criterion name to verify (case-insensitive match against existing criteria names).")]
     public required string Name { get; set; }
 
     [Description("Verification evidence or result notes.")]

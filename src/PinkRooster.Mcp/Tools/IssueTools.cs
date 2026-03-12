@@ -20,21 +20,23 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
     [Description(
         "Creates a new issue or updates an existing one. " +
         "To create: provide projectId and required fields (name, description, issueType, severity). " +
-        "To update: provide projectId and issueId, plus any fields to change. " +
-        "Issues track bugs and problems — use create_or_update_work_package for planned work.")]
+        "To update: provide projectId and issueId, plus any fields to change (PATCH semantics: null = keep current). " +
+        "Returns OperationResult with the issue ID (e.g. 'proj-1-issue-5'). " +
+        "Issues track bugs and problems — use create_or_update_work_package for planned work. " +
+        "Does NOT delete issues — use delete_entity for that.")]
     public async Task<string> CreateOrUpdateIssue(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Issue ID (e.g. 'proj-1-issue-3'). Omit to create a new issue.")] string? issueId = null,
         [Description("Issue name/title.")] string? name = null,
         [Description("Detailed description of the issue.")] string? description = null,
-        [Description("Issue type. Required for create.")] IssueType? issueType = null,
-        [Description("Issue severity. Required for create.")] IssueSeverity? severity = null,
+        [Description("Issue type. Required for create, optional for update.")] IssueType? issueType = null,
+        [Description("Issue severity. Required for create, optional for update.")] IssueSeverity? severity = null,
         [Description("Priority level. Default: Medium.")] Priority? priority = null,
         [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
         [Description("Steps to reproduce the issue.")] string? stepsToReproduce = null,
         [Description("Expected behavior.")] string? expectedBehavior = null,
         [Description("Actual behavior observed.")] string? actualBehavior = null,
-        [Description("Affected file, module, or area.")] string? affectedComponent = null,
+        [Description("Affected file, module, or area (e.g. 'src/Services/IssueService.cs' or 'Authentication').")] string? affectedComponent = null,
         [Description("Stack trace or error output.")] string? stackTrace = null,
         [Description("Root cause analysis.")] string? rootCause = null,
         [Description("Resolution description.")] string? resolution = null,
@@ -65,6 +67,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         Title = "Get Issue Details", OpenWorld = false)]
     [Description(
         "Returns all fields for a single issue including state timestamps, attachments, and linked work packages. " +
+        "Does NOT include audit history. " +
         "For listing multiple issues, use get_issue_overview instead.")]
     public async Task<string> GetIssueDetails(
         [Description("Issue ID (e.g. 'proj-1-issue-3').")] string issueId,
@@ -117,6 +120,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         Title = "Get Issue Overview", OpenWorld = false)]
     [Description(
         "Returns a compact list of issues (ID, name, state, priority, severity) for a project. " +
+        "Does NOT include detailed fields (steps to reproduce, stack trace, attachments, linked WPs). " +
         "For full issue data, use get_issue_details instead. " +
         "For issue counts by category, use get_project_status.")]
     public async Task<string> GetIssueOverview(

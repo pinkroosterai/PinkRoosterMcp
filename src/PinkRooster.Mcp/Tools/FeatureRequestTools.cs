@@ -18,15 +18,17 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         Title = "Create or Update Feature Request", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a new feature request or updates an existing one. " +
+        "Returns OperationResult with the FR ID (e.g. 'proj-1-fr-3'). " +
         "To create: provide projectId and required fields (name, description, category). " +
-        "To update: provide projectId and featureRequestId, plus any fields to change. " +
-        "Feature requests track ideas and enhancements — use create_or_update_issue for bugs.")]
+        "To update: provide projectId and featureRequestId, plus any fields to change (PATCH semantics: null = keep current). " +
+        "Feature requests track ideas and enhancements — use create_or_update_issue for bugs. " +
+        "Does NOT manage user stories after creation — use manage_user_stories for that.")]
     public async Task<string> CreateOrUpdateFeatureRequest(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Feature request ID (e.g. 'proj-1-fr-3'). Omit to create a new feature request.")] string? featureRequestId = null,
         [Description("Feature request name/title.")] string? name = null,
         [Description("Detailed description of the feature request.")] string? description = null,
-        [Description("Feature category. Required for create.")] FeatureCategory? category = null,
+        [Description("Feature category. Required for create, optional for update.")] FeatureCategory? category = null,
         [Description("Priority level. Default: Medium.")] Priority? priority = null,
         [Description("Feature status (e.g. Proposed, UnderReview, Approved, Scheduled, InProgress, Completed, Rejected, Deferred). Omit to keep current.")] FeatureStatus? status = null,
         [Description("Business value / justification for the feature.")] string? businessValue = null,
@@ -57,7 +59,8 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "get_feature_request_details", ReadOnly = true,
         Title = "Get Feature Request Details", OpenWorld = false)]
     [Description(
-        "Returns all fields for a single feature request including status timestamps, attachments, and linked work packages. " +
+        "Returns all fields for a single feature request including status timestamps, user stories, " +
+        "attachments, and linked work packages. Does NOT include audit history. " +
         "For listing multiple feature requests, use get_feature_requests instead.")]
     public async Task<string> GetFeatureRequestDetails(
         [Description("Feature request ID (e.g. 'proj-1-fr-3').")] string featureRequestId,
@@ -106,6 +109,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         Title = "Get Feature Requests", OpenWorld = false)]
     [Description(
         "Returns a compact list of feature requests (ID, name, status, priority, category) for a project. " +
+        "Does NOT include user stories, business value, or linked work packages. " +
         "For full data, use get_feature_request_details instead. " +
         "For feature request counts by category, use get_project_status.")]
     public async Task<string> GetFeatureRequests(
@@ -149,15 +153,16 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         Title = "Manage User Stories", Destructive = false, OpenWorld = false)]
     [Description(
         "Add, update, or remove a user story on a feature request. " +
+        "Returns OperationResult with the FR ID and updated story count. " +
         "Each user story has structured fields: role, goal, benefit (maps to 'As a [role], I want [goal], so that [benefit]'). " +
         "Use index (0-based) to target a specific story for Update or Remove.")]
     public async Task<string> ManageUserStories(
         [Description("Feature request ID (e.g. 'proj-1-fr-3').")] string featureRequestId,
         [Description("Action to perform.")] UserStoryAction action,
-        [Description("0-based index of the user story to update or remove. Required for Update and Remove.")] int? index = null,
-        [Description("The user role (e.g. 'developer', 'project manager'). Required for Add and Update.")] string? role = null,
-        [Description("What the user wants to achieve. Required for Add and Update.")] string? goal = null,
-        [Description("Why the user wants this (the benefit). Required for Add and Update.")] string? benefit = null,
+        [Description("0-based index of the user story to update or remove (e.g. 0 for first story). Required for Update and Remove, ignored for Add.")] int? index = null,
+        [Description("The user role (e.g. 'developer', 'project manager'). Required for Add and Update, ignored for Remove.")] string? role = null,
+        [Description("What the user wants to achieve. Required for Add and Update, ignored for Remove.")] string? goal = null,
+        [Description("Why the user wants this (the benefit). Required for Add and Update, ignored for Remove.")] string? benefit = null,
         CancellationToken ct = default)
     {
         if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var projId, out var frNumber))

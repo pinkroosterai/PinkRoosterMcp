@@ -17,6 +17,7 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
         Title = "Create or Update Phase", Destructive = false, OpenWorld = false)]
     [Description(
         "Creates a new phase or updates an existing one. " +
+        "Returns OperationResult with the phase ID (e.g. 'proj-1-wp-2-phase-1') and any cascade state changes. " +
         "PREFERRED for batch task operations: pass the 'tasks' parameter to create or update multiple tasks " +
         "in one call instead of calling create_or_update_task repeatedly. " +
         "To create: provide workPackageId and name. To update: provide phaseId plus fields to change. " +
@@ -55,7 +56,9 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
     [Description(
         "Records verification results for acceptance criteria on a phase. " +
         "Matches criteria by name (case-insensitive) and sets VerificationResult + VerifiedAt timestamp. " +
-        "Safe to call multiple times — re-verification updates the result and timestamp.")]
+        "Returns OperationResult listing matched criteria. " +
+        "Safe to call multiple times — re-verification updates the result and timestamp. " +
+        "Does NOT create new criteria — use create_or_update_phase with acceptanceCriteria to define them first.")]
     public async Task<string> VerifyAcceptanceCriteria(
         [Description("Phase ID (e.g. 'proj-1-wp-1-phase-2').")] string phaseId,
         [Description("List of criteria to verify, each with name and verification result.")] List<VerifyCriterionInput> criteria,

@@ -18,8 +18,8 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
         "CALL THIS FIRST — resolves a project by filesystem path and returns projectId " +
         "(required by all other tools). Also returns a compact status summary: " +
         "issue/FR/WP counts by state, active items, blocked items, and priority overview. " +
-        "Does not include individual entity details — use get_issue_details, " +
-        "get_feature_request_details, or get_work_package_details to drill in.")]
+        "Does NOT include individual entity details, audit history, or phase/task trees — " +
+        "use get_issue_details, get_feature_request_details, or get_work_package_details to drill in.")]
     public async Task<string> GetProjectStatus(
         [Description("Absolute path to the project root directory.")] string projectPath,
         CancellationToken ct = default)
@@ -56,10 +56,12 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
         "that need attention. Sorted by priority, then entity type (tasks first, then WPs, issues, FRs). " +
         "Each item includes enriched context: WP/task items show linkedIssueName, linkedFrName, " +
         "workPackageType, estimatedComplexity; issues show issueType, severity; FRs show category. " +
-        "Excludes blocked and terminal items. Use after get_project_status to decide what to work on next.")]
+        "Excludes blocked and terminal items. Does NOT return full entity details — " +
+        "use the entity-specific detail tools to get complete data. " +
+        "Use after get_project_status to decide what to work on next.")]
     public async Task<string> GetNextActions(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
-        [Description("Maximum number of items to return. Default 10.")] int limit = 10,
+        [Description("Maximum number of items to return (e.g. 5, 10, 20). Default: 10.")] int limit = 10,
         [Description("Filter by entity type. Omit for all types.")] EntityTypeFilter? entityType = null,
         CancellationToken ct = default)
     {
@@ -86,9 +88,10 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "create_or_update_project",
         Title = "Create or Update Project", Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Creates or updates a project, matched by path. Returns the project ID. " +
+        "Creates or updates a project, matched by path. Returns OperationResult with the project ID. " +
         "Required to register a project before using other tools. " +
-        "If the project already exists at this path, it updates name and description.")]
+        "If the project already exists at this path, it updates name and description. " +
+        "Does NOT create issues, work packages, or other entities — use entity-specific tools for that.")]
     public async Task<string> CreateOrUpdateProject(
         [Description("Project display name.")] string name,
         [Description("Short project description.")] string description,

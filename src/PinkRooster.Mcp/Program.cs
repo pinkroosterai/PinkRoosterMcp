@@ -42,31 +42,46 @@ builder.Services.AddMcpServer(options =>
         - Task: proj-{N}-wp-{N}-task-{N} (e.g. proj-1-wp-2-task-5)
         - Memory: proj-{N}-mem-{N} (e.g. proj-1-mem-1)
 
-        ## States (CompletionState)
-        NotStarted, Designing, Implementing, Testing, InReview, Completed, Cancelled, Blocked, Replaced
-        Categories — Active: Designing, Implementing, Testing, InReview | Inactive: NotStarted, Blocked | Terminal: Completed, Cancelled, Replaced
+        ## State Categories
+        States have three categories — Active, Inactive, Terminal — used by stateFilter params on list tools.
 
-        ## States (FeatureStatus)
-        Proposed, UnderReview, Approved, Scheduled, InProgress, Completed, Rejected, Deferred
-        Categories — Active: UnderReview, Approved, Scheduled, InProgress | Inactive: Proposed, Deferred | Terminal: Completed, Rejected
+        ## Common Workflows
 
-        ## Other Enums
-        - Priority: Critical, High, Medium, Low
-        - IssueType: Bug, Defect, Regression, TechnicalDebt, PerformanceIssue, SecurityVulnerability
-        - IssueSeverity: Critical, Major, Minor, Trivial
-        - WorkPackageType: Feature, BugFix, Refactor, Spike, Chore
-        - FeatureCategory: Feature, Enhancement, Improvement
-        - VerificationMethod: AutomatedTest, Manual, AgentReview
-        - StateFilterCategory: Active, Inactive, Terminal (used by get_issue_overview, get_feature_requests, get_work_packages)
-        - EntityTypeFilter: Task, Wp, Issue, FeatureRequest (used by get_next_actions)
-        - DependencyAction: Add, Remove (used by manage_dependency)
-        - DeleteEntityType: Issue, FeatureRequest, WorkPackage, Phase, Task (used by delete_entity)
+        ### Creating structured work from an issue
+        1. get_issue_details → understand the problem
+        2. scaffold_work_package with linkedIssueIds → creates WP + phases + tasks in one call
+        3. get_work_package_details → verify the scaffold result
 
-        ## Write Operations
+        ### Implementing a work package
+        1. get_work_package_details → review phases and tasks
+        2. create_or_update_task (state: Implementing) → start a task
+        3. batch_update_task_states → complete multiple tasks (triggers phase/WP auto-complete cascade)
+
+        ### Dependency management
+        1. manage_dependency (action: Add) → auto-blocks dependent if blocker is non-terminal
+        2. Complete blocker via state update → dependents auto-unblock to their previous active state
+        3. Check stateChanges in response for cascade effects
+
+        ### Adding detail to a feature request
+        1. create_or_update_feature_request → set core fields
+        2. manage_user_stories (action: Add) → add structured user stories one at a time
+
+        ## Operational Constraints
+        - batch_update_task_states: all tasks must belong to the same work package
+        - scaffold_work_package task dependencies (dependsOnTaskIndices): 0-based, within same phase only
+        - create_or_update_memory: upsert-by-name — same name appends content and unions tags
+        - Update operations use PATCH semantics: null = "don't change", not "clear"
+        - linkedIssueIds/linkedFeatureRequestIds on WP update: replaces ALL links (not additive)
+
+        ## Write Responses
         Return OperationResult JSON with responseType (Success/Warning/Error), message, optional id, and optional stateChanges array.
         State changes report automatic cascades: auto-block on dependency add, auto-unblock on blocker completion, phase/WP auto-complete when all children reach terminal state.
-        create_or_update_memory uses upsert-by-name: if a memory with the same name exists, content is appended and tags are unioned. Response includes wasMerged flag.
-        delete_entity and delete_memory are destructive and cannot be undone.
+
+        ## Error Recovery
+        - Circular dependency → restructure task/WP ordering
+        - Entity not found → verify ID format matches patterns above, check get_project_status for valid IDs
+        - "already exists" on create → use the returned ID to update instead
+        - delete_entity and delete_memory are destructive and cannot be undone
         """;
 })
 .WithHttpTransport()

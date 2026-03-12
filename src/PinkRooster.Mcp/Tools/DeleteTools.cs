@@ -13,9 +13,10 @@ public sealed class DeleteTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "delete_entity",
         Title = "Delete Entity", Destructive = true, OpenWorld = false)]
     [Description(
-        "Permanently deletes an entity. Work package deletion cascades to all its phases and tasks. " +
+        "Permanently deletes an entity. Returns OperationResult confirming deletion. " +
+        "Work package deletion cascades to all its phases and tasks. " +
         "Phase deletion cascades to all its tasks. Issue/FR deletion clears WP links (WPs are NOT deleted). " +
-        "This action cannot be undone.")]
+        "Does NOT create audit entries for the deletion itself. This action cannot be undone.")]
     public async Task<string> DeleteEntity(
         [Description("Type of entity to delete.")] DeleteEntityType entityType,
         [Description("Entity ID (e.g. 'proj-1-issue-3', 'proj-1-fr-2', 'proj-1-wp-1', 'proj-1-wp-1-phase-1', 'proj-1-wp-1-task-3').")] string entityId,

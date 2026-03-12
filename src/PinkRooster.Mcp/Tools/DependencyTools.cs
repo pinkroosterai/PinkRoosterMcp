@@ -17,10 +17,12 @@ public sealed class DependencyTools(PinkRoosterApiClient apiClient)
         "Adds or removes a dependency between work packages or between tasks. " +
         "Entity type is auto-detected from the ID format: " +
         "'proj-N-wp-N' for work packages, 'proj-N-wp-N-task-N' for tasks. " +
-        "Both IDs must be the same type (both WP or both task). " +
+        "Both IDs must be the same type (both WP or both task) — " +
+        "does NOT support cross-type dependencies (WP-to-Task or Task-to-WP). " +
         "When adding: if the blocker is non-terminal, the dependent auto-transitions to Blocked. " +
         "When the blocker completes, dependents auto-unblock. " +
-        "Returns stateChanges showing any automatic state transitions.")]
+        "Returns OperationResult with stateChanges showing any automatic state transitions. " +
+        "Circular dependencies are rejected with an error.")]
     public async Task<string> ManageDependency(
         [Description("Dependent entity ID (e.g. 'proj-1-wp-3' or 'proj-1-wp-2-task-3').")] string entityId,
         [Description("Blocker entity ID (e.g. 'proj-1-wp-1' or 'proj-1-wp-2-task-1').")] string dependsOnEntityId,

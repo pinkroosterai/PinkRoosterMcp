@@ -21,6 +21,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         Title = "Get Work Packages", OpenWorld = false)]
     [Description(
         "Returns a compact list of work packages (ID, name, state, task counts) for a project. " +
+        "Does NOT include phase/task trees, dependencies, or linked issues/FRs. " +
         "For full WP tree (phases, tasks, dependencies), use get_work_package_details. " +
         "For WP counts by category, use get_project_status.")]
     public async Task<string> GetWorkPackages(
@@ -123,10 +124,11 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
     [McpServerTool(Name = "create_or_update_work_package",
         Title = "Create or Update Work Package", Destructive = false, OpenWorld = false)]
     [Description(
-        "Creates a new work package or updates an existing one. Returns the WP ID and any cascade state changes. " +
+        "Creates a new work package or updates an existing one. " +
+        "Returns OperationResult with the WP ID (e.g. 'proj-1-wp-3') and any cascade state changes. " +
         "To create: provide projectId and required fields (name, description). " +
-        "To update: provide projectId and workPackageId, plus any fields to change. " +
-        "For creating a complete WP with phases and tasks in one call, use scaffold_work_package instead.")]
+        "To update: provide projectId and workPackageId, plus any fields to change (PATCH semantics: null = keep current). " +
+        "Does NOT create phases or tasks — use scaffold_work_package for that, or create_or_update_phase after.")]
     public async Task<string> CreateOrUpdateWorkPackage(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Work package ID (e.g. 'proj-1-wp-2'). Omit to create a new work package.")] string? workPackageId = null,
@@ -135,7 +137,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Work package type. Default: Feature.")] WorkPackageType? type = null,
         [Description("Priority level. Default: Medium.")] Priority? priority = null,
         [Description("Implementation plan (supports markdown).")] string? plan = null,
-        [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
+        [Description("Estimated complexity on a 1-10 scale (e.g. 3 for simple, 7 for complex).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing, Completed). Omit to keep current.")] CompletionState? state = null,
         [Description("Linked issue IDs (e.g. ['proj-1-issue-3']). Provide to set/replace all linked issues. Omit to keep current.")] List<string>? linkedIssueIds = null,
@@ -169,10 +171,11 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         "Creates a complete work package with phases, tasks, acceptance criteria, and dependencies in ONE call. " +
         "This is the most efficient way to create structured work. " +
         "Tasks require name + description; all other fields are optional. " +
-        "Task dependencies use 0-based indices within the same phase's task array (dependsOnTaskIndices). " +
+        "Task dependencies use 0-based indices within the same phase's task array (dependsOnTaskIndices) — " +
+        "does NOT support cross-phase task dependencies. " +
         "Supports WP-level blockers via blockedByWorkPackageIds and linked issues/FRs via linkedIssueIds/linkedFeatureRequestIds. " +
-        "Returns a compact ID map of all created entities (WP, phases, tasks). " +
-        "For creating/updating a WP without phases, use create_or_update_work_package instead.")]
+        "Returns a ScaffoldOperationResult with the WP ID plus an ID map of all created phases and tasks. " +
+        "Does NOT update existing work packages — use create_or_update_work_package for updates.")]
     public async Task<string> ScaffoldWorkPackage(
         [Description("Project ID (e.g. 'proj-1').")] string projectId,
         [Description("Work package name/title.")] string name,
@@ -181,7 +184,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Work package type. Default: Feature.")] WorkPackageType? type = null,
         [Description("Priority level. Default: Medium.")] Priority? priority = null,
         [Description("Implementation plan (supports markdown).")] string? plan = null,
-        [Description("Estimated complexity (1-10 scale).")] int? estimatedComplexity = null,
+        [Description("Estimated complexity on a 1-10 scale (e.g. 3 for simple, 7 for complex).")] int? estimatedComplexity = null,
         [Description("Rationale for the complexity estimation.")] string? estimationRationale = null,
         [Description("Completion state (e.g. NotStarted, Implementing). Default: NotStarted.")] CompletionState? state = null,
         [Description("Linked issue IDs (e.g. ['proj-1-issue-3']).")] List<string>? linkedIssueIds = null,
