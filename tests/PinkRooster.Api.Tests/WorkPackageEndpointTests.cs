@@ -499,4 +499,62 @@ public sealed class WorkPackageEndpointTests(PostgresFixture postgres) : Integra
         Assert.Equal("Implementing", updatedWp.StateChanges[0].NewState);
         Assert.Contains("Auto-unblocked", updatedWp.StateChanges[0].Reason);
     }
+
+    // ── Sort Order ──
+
+    [Fact]
+    public async Task Phases_ReturnedInSortOrder()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+        var wp = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest(), ct);
+        var wpResponse = await wp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
+        var wpNum = wpResponse!.WorkPackageNumber;
+
+        // Create phases in reverse sort order
+        await Client.PostAsJsonAsync($"{WpPath(projectId)}/{wpNum}/phases",
+            new CreatePhaseRequest { Name = "Phase C", SortOrder = 3 }, ct);
+        await Client.PostAsJsonAsync($"{WpPath(projectId)}/{wpNum}/phases",
+            new CreatePhaseRequest { Name = "Phase A", SortOrder = 1 }, ct);
+        await Client.PostAsJsonAsync($"{WpPath(projectId)}/{wpNum}/phases",
+            new CreatePhaseRequest { Name = "Phase B", SortOrder = 2 }, ct);
+
+        var detail = await GetJson<WorkPackageResponse>($"{WpPath(projectId)}/{wpNum}", ct);
+
+        Assert.Equal(3, detail.Phases.Count);
+        Assert.Equal("Phase A", detail.Phases[0].Name);
+        Assert.Equal("Phase B", detail.Phases[1].Name);
+        Assert.Equal("Phase C", detail.Phases[2].Name);
+    }
+
+    [Fact]
+    public async Task Tasks_ReturnedInSortOrder_WithinPhase()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+        var wp = await Client.PostAsJsonAsync(WpPath(projectId), MakeWpRequest(), ct);
+        var wpResponse = await wp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
+        var wpNum = wpResponse!.WorkPackageNumber;
+
+        await Client.PostAsJsonAsync($"{WpPath(projectId)}/{wpNum}/phases",
+            new CreatePhaseRequest { Name = "Phase 1" }, ct);
+
+        var taskPath = $"{BasePath}/{projectId}/work-packages/{wpNum}/tasks";
+
+        // Create tasks in reverse sort order
+        await Client.PostAsJsonAsync($"{taskPath}?phaseNumber=1",
+            new CreateTaskRequest { Name = "Task Z", Description = "d", SortOrder = 3 }, ct);
+        await Client.PostAsJsonAsync($"{taskPath}?phaseNumber=1",
+            new CreateTaskRequest { Name = "Task A", Description = "d", SortOrder = 1 }, ct);
+        await Client.PostAsJsonAsync($"{taskPath}?phaseNumber=1",
+            new CreateTaskRequest { Name = "Task M", Description = "d", SortOrder = 2 }, ct);
+
+        var detail = await GetJson<WorkPackageResponse>($"{WpPath(projectId)}/{wpNum}", ct);
+        var tasks = detail.Phases[0].Tasks;
+
+        Assert.Equal(3, tasks.Count);
+        Assert.Equal("Task A", tasks[0].Name);
+        Assert.Equal("Task M", tasks[1].Name);
+        Assert.Equal("Task Z", tasks[2].Name);
+    }
 }

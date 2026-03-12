@@ -7,5 +7,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PinkRooster.Api.Tests/PinkRooster.Api.Tests.csproj" />
+    <Project Path="tests/PinkRooster.UnitTests/PinkRooster.UnitTests.csproj" />
   </Folder>
 </Solution>

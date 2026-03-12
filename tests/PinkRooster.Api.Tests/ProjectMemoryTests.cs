@@ -259,4 +259,165 @@ public sealed class ProjectMemoryTests(PostgresFixture postgres) : IntegrationTe
         var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
         Assert.Single(memory.Tags);
     }
+
+    // ── Merge Edge Cases ──
+
+    [Fact]
+    public async Task Upsert_IdenticalContent_StillAppendsWithSeparator()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "dup-content",
+            Content = "Same content."
+        }, ct);
+
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "dup-content",
+            Content = "Same content."
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        // Content should appear twice with separator
+        Assert.Contains("---", memory.Content);
+        var parts = memory.Content.Split("---");
+        Assert.True(parts.Length >= 2);
+        Assert.Contains("Same content.", parts[0]);
+        Assert.Contains("Same content.", parts[1]);
+    }
+
+    [Fact]
+    public async Task Upsert_EmptyContent_MergesWithSeparator()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "empty-merge",
+            Content = "Initial content."
+        }, ct);
+
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "empty-merge",
+            Content = ""
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        Assert.Contains("Initial content.", memory.Content);
+    }
+
+    [Fact]
+    public async Task Upsert_TagMerge_CaseInsensitiveDeduplication()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "tag-case",
+            Content = "A",
+            Tags = ["Architecture", "database"]
+        }, ct);
+
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "tag-case",
+            Content = "B",
+            Tags = ["architecture", "Database", "newTag"]
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        // Should have 3 unique tags (case-insensitive dedup)
+        Assert.Equal(3, memory.Tags.Count);
+    }
+
+    [Fact]
+    public async Task Upsert_LargeContent_MergesSuccessfully()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        var largeContent = new string('x', 5000);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "large-merge",
+            Content = largeContent
+        }, ct);
+
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "large-merge",
+            Content = largeContent
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        // Should contain both large contents with separator
+        Assert.True(memory.Content.Length > 10000);
+    }
+
+    [Fact]
+    public async Task Upsert_NoTags_MergedWithExistingTags()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "tag-preserve",
+            Content = "A",
+            Tags = ["existing"]
+        }, ct);
+
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "tag-preserve",
+            Content = "B"
+            // No tags in this upsert
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        Assert.Contains("existing", memory.Tags);
+    }
+
+    [Fact]
+    public async Task Upsert_TripleMerge_MaintainsOrder()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = await CreateProjectAsync(ct);
+
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "triple",
+            Content = "First."
+        }, ct);
+        await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "triple",
+            Content = "Second."
+        }, ct);
+        var r = await Client.PostAsJsonAsync(MemPath(projectId), new UpsertProjectMemoryRequest
+        {
+            Name = "triple",
+            Content = "Third."
+        }, ct);
+
+        var memory = await ReadJson<ProjectMemoryResponse>(r, ct);
+        Assert.True(memory.WasMerged);
+        var firstIdx = memory.Content.IndexOf("First.");
+        var secondIdx = memory.Content.IndexOf("Second.");
+        var thirdIdx = memory.Content.IndexOf("Third.");
+        Assert.True(firstIdx < secondIdx);
+        Assert.True(secondIdx < thirdIdx);
+    }
 }
