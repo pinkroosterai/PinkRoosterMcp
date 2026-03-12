@@ -96,7 +96,7 @@ Every API request is logged with method, path, status, duration, and caller iden
                                                             │ HTTP
 ┌─────────────────┐          HTTP / REST           ┌────────▼────────┐
 │   Dashboard     │ ◄──────────────────────────► │   REST API      │
-│   :5173         │                                │   :5100         │
+│   :3000         │                                │   :5100         │
 └─────────────────┘                                └────────┬────────┘
                                                             │ EF Core
                                                    ┌────────▼────────┐
@@ -177,7 +177,7 @@ Eleven Claude Code slash commands provide high-level project management workflow
 Skills automatically propagate state to related entities. Starting a task activates its work package and linked issue/FR. Completing all tasks cascades completion upward through phases, work packages, and linked entities.
 
 <div align="center">
-<img src="docs/screenshots/skills-help.png" alt="PM Workflow Skills help page showing all seven slash commands with usage syntax and auto-state propagation rules" width="900" />
+<img src="docs/screenshots/skills-help.png" alt="PM Workflow Skills help page showing all eleven slash commands with usage syntax and auto-state propagation rules" width="900" />
 </div>
 
 ---
@@ -188,6 +188,7 @@ Skills automatically propagate state to related entities. Starting a task activa
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (recommended — `make setup` auto-registers the MCP server)
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) and [Node.js 20+](https://nodejs.org/) (for local development only)
 
 ### Quick Start
 
@@ -236,8 +237,8 @@ make dev-dashboard # Dashboard only (Vite dev server)
 Everything runs with open access by default. To enable authentication, edit `.env`:
 
 ```bash
-API_KEY=your-api-key          # API + MCP authentication
-MCP_API_KEY=your-mcp-key      # Separate MCP-only key (optional)
+API_KEY=your-api-key          # API authentication (required by MCP→API calls)
+MCP_API_KEY=your-mcp-key      # MCP server authentication (optional, separate from API_KEY)
 DASHBOARD_USER=admin           # Dashboard login
 DASHBOARD_PASSWORD=secret      # Dashboard password
 ```
@@ -263,7 +264,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-The test suite includes 176 API integration tests and 142 dashboard frontend tests.
+The test suite includes 277 API integration tests, 112 unit tests, and 255 dashboard frontend tests.
 
 ---
 
