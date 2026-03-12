@@ -212,6 +212,64 @@ Services will be available at:
 | MCP Server | http://localhost:5200 |
 | Swagger | http://localhost:5100/swagger/index.html |
 
+### Deploy with Docker Hub Image
+
+You can run PinkRoosterMcp without cloning the repository by using the pre-built image from Docker Hub.
+
+1. Create a `docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: pinkrooster
+      POSTGRES_USER: pinkrooster
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pinkrooster}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinkrooster"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pinkrooster:
+    image: pinkrooster/pinkroostermcp:latest
+    ports:
+      - "3000:80"      # Dashboard
+      - "5100:8080"    # REST API
+      - "5200:8081"    # MCP Server
+    environment:
+      DATABASE_URL: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD:-pinkrooster}"
+      API_KEY: ${API_KEY:-}
+      MCP_API_KEY: ${MCP_API_KEY:-}
+      DASHBOARD_USER: ${DASHBOARD_USER:-}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+```
+
+2. Start the services:
+
+```bash
+docker compose up -d
+```
+
+3. Register the MCP server in Claude Code:
+
+```bash
+claude mcp add --transport http --scope user pinkrooster http://localhost:5200
+```
+
+To pin a specific version, replace `latest` with a version tag (e.g., `pinkrooster/pinkroostermcp:1.0.1`).
+
 ### Connect Your AI Agent
 
 If you ran `make setup` with Claude Code installed, the MCP server is already registered. For other MCP clients, point them to `http://localhost:5200` (Streamable HTTP) or `http://localhost:5200/sse` (legacy SSE).
