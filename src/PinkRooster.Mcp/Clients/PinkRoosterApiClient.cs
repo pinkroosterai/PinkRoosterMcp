@@ -426,8 +426,32 @@ public sealed class PinkRoosterApiClient(HttpClient httpClient)
         try
         {
             var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+            // Custom error shape: { "error": "message" }
             if (body.TryGetProperty("error", out var errorProp))
                 return errorProp.GetString() ?? response.ReasonPhrase ?? "Unknown error";
+
+            // ASP.NET Core ValidationProblemDetails: { "errors": { "Field": ["message"] } }
+            if (body.TryGetProperty("errors", out var errorsProp) && errorsProp.ValueKind == JsonValueKind.Object)
+            {
+                var messages = new List<string>();
+                foreach (var field in errorsProp.EnumerateObject())
+                {
+                    if (field.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var msg in field.Value.EnumerateArray())
+                            messages.Add($"{field.Name}: {msg.GetString()}");
+                    }
+                }
+                if (messages.Count > 0)
+                    return string.Join("; ", messages);
+            }
+
+            // RFC 7807 ProblemDetails: { "title": "message", "detail": "details" }
+            if (body.TryGetProperty("detail", out var detailProp))
+                return detailProp.GetString() ?? response.ReasonPhrase ?? "Unknown error";
+            if (body.TryGetProperty("title", out var titleProp))
+                return titleProp.GetString() ?? response.ReasonPhrase ?? "Unknown error";
         }
         catch
         {

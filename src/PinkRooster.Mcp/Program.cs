@@ -10,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 // JSON options for MCP tool parameter marshalling — enables enum schema constraints
 var toolSerializerOptions = new JsonSerializerOptions(JsonSerializerOptions.Default)
 {
-    Converters = { new JsonStringEnumConverter() }
+    Converters = { new JsonStringEnumConverter() },
+    NumberHandling = JsonNumberHandling.AllowReadingFromString,
+    PropertyNameCaseInsensitive = true
 };
 
 // MCP Server with HTTP/SSE transport
@@ -45,7 +47,7 @@ builder.Services.AddMcpServer(options =>
         - IssueType: Bug, Defect, Regression, TechnicalDebt, PerformanceIssue, SecurityVulnerability
         - IssueSeverity: Critical, Major, Minor, Trivial
         - WorkPackageType: Feature, BugFix, Refactor, Spike, Chore
-        - VerificationMethod: Manual, Automated, CodeReview
+        - VerificationMethod: AutomatedTest, Manual, AgentReview
 
         ## Write Operations
         Return OperationResult JSON with responseType (Success/Warning/Error), message, optional id, and optional stateChanges array.
