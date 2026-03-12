@@ -45,6 +45,7 @@ export function createProjectStatus(overrides?: Partial<ProjectStatus>): Project
       inactive: [{ id: "proj-1-wp-2", name: "Not Started WP" }],
       blocked: [{ id: "proj-1-wp-3", name: "Blocked WP" }],
     },
+    memories: null,
     ...overrides,
   };
 }
