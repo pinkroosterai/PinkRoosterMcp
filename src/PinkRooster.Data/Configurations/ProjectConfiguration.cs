@@ -19,6 +19,11 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(x => x.ProjectPath).HasColumnName("project_path").HasMaxLength(1024).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(20)
             .HasConversion<string>().HasDefaultValue(ProjectStatus.Active);
+        // ── Sequential number counters ──
+        builder.Property(x => x.NextIssueNumber).HasColumnName("next_issue_number").HasDefaultValue(1);
+        builder.Property(x => x.NextFrNumber).HasColumnName("next_fr_number").HasDefaultValue(1);
+        builder.Property(x => x.NextWpNumber).HasColumnName("next_wp_number").HasDefaultValue(1);
+
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
 

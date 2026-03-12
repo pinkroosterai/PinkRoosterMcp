@@ -34,6 +34,10 @@ public sealed class WorkPackage : IHasBlockedState, IHasUpdatedAt
     // ── Attachments (jsonb) ──
     public List<FileReference> Attachments { get; set; } = [];
 
+    // ── Sequential number counters (monotonically increasing, never decremented on deletion) ──
+    public int NextPhaseNumber { get; set; } = 1;
+    public int NextTaskNumber { get; set; } = 1;
+
     // ── Children ──
     public List<WorkPackagePhase> Phases { get; set; } = [];
 

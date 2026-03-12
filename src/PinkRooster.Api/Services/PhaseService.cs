@@ -25,11 +25,9 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
                 .FirstOrDefaultAsync(w => w.ProjectId == projectId && w.WorkPackageNumber == wpNumber, cancellation)
                 ?? throw new InvalidOperationException($"Work package {wpNumber} not found in project {projectId}");
 
-            // Assign PhaseNumber: MAX(phase_number) + 1 within WP
-            var nextPhaseNumber = await db.WorkPackagePhases
-                .Where(p => p.WorkPackageId == wp.Id)
-                .MaxAsync(p => (int?)p.PhaseNumber, cancellation) ?? 0;
-            nextPhaseNumber++;
+            // Assign PhaseNumber from monotonically-increasing counter
+            var nextPhaseNumber = wp.NextPhaseNumber;
+            wp.NextPhaseNumber++;
 
             // Auto-assign SortOrder if not provided
             var sortOrder = request.SortOrder
@@ -69,11 +67,6 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
             // Create Tasks if provided
             if (request.Tasks is { Count: > 0 })
             {
-                // Fetch starting numbers once before the loop to avoid duplicate key issues in batch
-                var nextTaskNumber = (await db.WorkPackageTasks
-                    .Where(t => t.WorkPackageId == wp.Id)
-                    .MaxAsync(t => (int?)t.TaskNumber, cancellation) ?? 0) + 1;
-
                 var nextSortOrder = (await db.WorkPackageTasks
                     .Where(t => t.WorkPackageId == wp.Id)
                     .MaxAsync(t => (int?)t.SortOrder, cancellation) ?? 0) + 1;
@@ -84,7 +77,7 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
 
                     var task = new WorkPackageTask
                     {
-                        TaskNumber = nextTaskNumber++,
+                        TaskNumber = wp.NextTaskNumber++,
                         Phase = phase,
                         WorkPackageId = wp.Id,
                         Name = taskReq.Name,
@@ -221,11 +214,6 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
 
         if (request.Tasks is { Count: > 0 })
         {
-            // Pre-fetch starting numbers for new tasks to avoid duplicate key issues in batch
-            var nextNewTaskNumber = (await db.WorkPackageTasks
-                .Where(t => t.WorkPackageId == wp.Id)
-                .MaxAsync(t => (int?)t.TaskNumber, ct) ?? 0) + 1;
-
             var nextNewSortOrder = (await db.WorkPackageTasks
                 .Where(t => t.WorkPackageId == wp.Id)
                 .MaxAsync(t => (int?)t.SortOrder, ct) ?? 0) + 1;
@@ -316,7 +304,7 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
 
                     var newTask = new WorkPackageTask
                     {
-                        TaskNumber = nextNewTaskNumber++,
+                        TaskNumber = wp.NextTaskNumber++,
                         Phase = phase,
                         WorkPackageId = wp.Id,
                         Name = taskDto.Name ?? throw new InvalidOperationException("Name is required for new tasks"),

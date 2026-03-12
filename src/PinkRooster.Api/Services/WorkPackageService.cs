@@ -69,10 +69,9 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             await using var transaction = await db.Database.BeginTransactionAsync(
                 System.Data.IsolationLevel.Serializable, cancellation);
 
-            var nextNumber = await db.WorkPackages
-                .Where(w => w.ProjectId == projectId)
-                .MaxAsync(w => (int?)w.WorkPackageNumber, cancellation) ?? 0;
-            nextNumber++;
+            var project = await db.Projects.FirstAsync(p => p.Id == projectId, cancellation);
+            var nextNumber = project.NextWpNumber;
+            project.NextWpNumber++;
 
             var wp = new WorkPackage
             {
@@ -519,10 +518,9 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 System.Data.IsolationLevel.Serializable, cancellation);
 
             // 1. Create Work Package
-            var nextWpNumber = await db.WorkPackages
-                .Where(w => w.ProjectId == projectId)
-                .MaxAsync(w => (int?)w.WorkPackageNumber, cancellation) ?? 0;
-            nextWpNumber++;
+            var project = await db.Projects.FirstAsync(p => p.Id == projectId, cancellation);
+            var nextWpNumber = project.NextWpNumber;
+            project.NextWpNumber++;
 
             var wp = new WorkPackage
             {
@@ -699,6 +697,10 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                     }
                 }
             }
+
+            // Update sequential number counters on the WP
+            wp.NextPhaseNumber = nextPhaseNumber;
+            wp.NextTaskNumber = nextTaskNumber;
 
             // 4. WP-level Dependencies (blockedBy existing WPs)
             if (request.BlockedByWpIds is { Count: > 0 })

@@ -29,11 +29,9 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
                 .FirstOrDefaultAsync(p => p.WorkPackageId == wp.Id && p.PhaseNumber == phaseNumber, cancellation)
                 ?? throw new InvalidOperationException($"Phase {phaseNumber} not found in work package {wpNumber}");
 
-            // TaskNumber is sequential across ALL phases within the WP
-            var nextTaskNumber = await db.WorkPackageTasks
-                .Where(t => t.WorkPackageId == wp.Id)
-                .MaxAsync(t => (int?)t.TaskNumber, cancellation) ?? 0;
-            nextTaskNumber++;
+            // TaskNumber from monotonically-increasing counter on WP
+            var nextTaskNumber = wp.NextTaskNumber;
+            wp.NextTaskNumber++;
 
             // SortOrder: auto-assign within the target phase if not provided
             var sortOrder = request.SortOrder;

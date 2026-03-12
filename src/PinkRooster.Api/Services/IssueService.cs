@@ -97,10 +97,9 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
             await using var transaction = await db.Database.BeginTransactionAsync(
                 System.Data.IsolationLevel.Serializable, cancellation);
 
-            var nextNumber = await db.Issues
-                .Where(i => i.ProjectId == projectId)
-                .MaxAsync(i => (int?)i.IssueNumber, cancellation) ?? 0;
-            nextNumber++;
+            var project = await db.Projects.FirstAsync(p => p.Id == projectId, cancellation);
+            var nextNumber = project.NextIssueNumber;
+            project.NextIssueNumber++;
 
             var issue = new Issue
             {

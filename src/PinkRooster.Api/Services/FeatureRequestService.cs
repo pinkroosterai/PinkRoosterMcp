@@ -50,10 +50,9 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
             await using var transaction = await db.Database.BeginTransactionAsync(
                 System.Data.IsolationLevel.Serializable, cancellation);
 
-            var nextNumber = await db.FeatureRequests
-                .Where(fr => fr.ProjectId == projectId)
-                .MaxAsync(fr => (int?)fr.FeatureRequestNumber, cancellation) ?? 0;
-            nextNumber++;
+            var project = await db.Projects.FirstAsync(p => p.Id == projectId, cancellation);
+            var nextNumber = project.NextFrNumber;
+            project.NextFrNumber++;
 
             var fr = new FeatureRequest
             {

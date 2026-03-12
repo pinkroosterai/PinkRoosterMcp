@@ -43,6 +43,10 @@ public sealed class WorkPackageConfiguration : IEntityTypeConfiguration<WorkPack
             a.ToJson("attachments");
         });
 
+        // ── Sequential number counters ──
+        builder.Property(x => x.NextPhaseNumber).HasColumnName("next_phase_number").HasDefaultValue(1);
+        builder.Property(x => x.NextTaskNumber).HasColumnName("next_task_number").HasDefaultValue(1);
+
         // ── Timestamps ──
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
