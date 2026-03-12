@@ -76,10 +76,13 @@ Scan all items and categorize cleanup candidates by reason:
 - Deleting a WP also deletes all its phases and tasks
 - Deleting an Issue/FR clears links from associated WPs (WPs are NOT deleted)
 
-Select items to delete:
-- Enter numbers (e.g., "1, 3, 5") or "all" to delete all
-- Enter "none" to cancel
 ```
+
+After presenting the table, use the `AskUserQuestion` tool to let the user select:
+- Question: "Which items would you like to delete?"
+- Header: "Delete"
+- multiSelect: true
+- Options: Build from candidates (up to 4), e.g. `[{label: "#1 {id}", description: "{name} ({type}, {state}) — {reason}"}, {label: "#2 {id}", description: "{name} ({type}, {state}) — {reason}"}, {label: "All", description: "Delete all {N} cleanup candidates"}, {label: "None", description: "Cancel — keep all items"}]`
 
 If no candidates found:
 "No cleanup candidates found. Project is clean."

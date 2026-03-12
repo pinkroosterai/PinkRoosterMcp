@@ -64,10 +64,11 @@ Detect entity type from ID format:
 1. Call `mcp__pinkrooster__get_work_package_details` with the WP ID
 2. Collect all tasks that are NOT in a terminal state (Completed, Cancelled, Replaced)
 3. If no non-terminal tasks found, report: "All tasks in {wpId} are already terminal."
-4. Show the user which tasks will be completed and ask for confirmation:
-   "Complete these {N} tasks? (y/n)"
-   - List each task: `{taskId} "{name}" (currently {state})`
-5. If confirmed, call `mcp__pinkrooster__batch_update_task_states` with all task IDs
+4. Show the user which tasks will be completed using the `AskUserQuestion` tool:
+   - Question: "Complete these {N} tasks in {wpId}? {taskId1} \"{name1}\" ({state1}), {taskId2} \"{name2}\" ({state2}), ..."
+   - Header: "Batch done"
+   - Options: `[{label: "Complete all", description: "Mark all {N} non-terminal tasks as Completed"}, {label: "Cancel", description: "Do not complete any tasks"}]`
+5. If "Complete all" selected, call `mcp__pinkrooster__batch_update_task_states` with all task IDs
 6. Report consolidated `stateChanges`
 7. **Run Auto-Complete Linked Entities** (see below)
 

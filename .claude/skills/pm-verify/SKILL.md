@@ -19,7 +19,10 @@ Parse `!arguments` for:
 - **Target ID**: phase ID (e.g., `proj-1-wp-2-phase-1`) or WP ID (e.g., `proj-1-wp-2`)
 - **`--dry-run`**: If present, show what would be verified without recording results
 
-If no arguments provided, prompt: "Usage: `/pm-verify <phase-id | wp-id> [--dry-run]`"
+If no arguments provided, use the `AskUserQuestion` tool:
+- Question: "What would you like to verify? Provide a phase or work package ID."
+- Header: "Verify"
+- Options: `[{label: "Phase", description: "Verify acceptance criteria for a specific phase (e.g., proj-1-wp-2-phase-1)"}, {label: "Work Package", description: "Verify all phases in a work package (e.g., proj-1-wp-2)"}]`
 
 ## Step 1: Load Context
 

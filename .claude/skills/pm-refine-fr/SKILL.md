@@ -22,7 +22,10 @@ Analyze an existing feature request, rewrite it with comprehensive detail, fill 
 
 Call `mcp__pinkrooster__get_feature_request_details` with the FR ID from `$ARGUMENTS`.
 
-If no ID is provided, call `mcp__pinkrooster__get_feature_requests` with `projectId` and `stateFilter: "Inactive"` to list candidates, then ask the user which one to refine.
+If no ID is provided, call `mcp__pinkrooster__get_feature_requests` with `projectId` and `stateFilter: "Inactive"` to list candidates, then use the `AskUserQuestion` tool to let the user pick:
+- Question: "Which feature request would you like to refine?"
+- Header: "Select FR"
+- Options: Build from candidates (up to 4), e.g. `[{label: "{frId}", description: "\"{name}\" ({status}, {priority})"}, ...]`
 
 Record the current state of all fields:
 - name, description, category, priority, status

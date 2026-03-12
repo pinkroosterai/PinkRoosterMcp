@@ -40,16 +40,11 @@ This returns a **queue** of candidates. Process them in order (Steps 3–6). If 
 ### Select
 
 - **Auto mode**: Take #1 from the queue. No prompt.
-- **Interactive**: Present the queue and let the user pick (default #1, auto-select if only one).
-
-```
-## Next Actions
-
-1. [{priority}] {entityId} "{name}" ({state}) — {type}
-2. ...
-
-Which item? (number, or Enter for #1)
-```
+- **Interactive**: Present the queue and let the user pick using the `AskUserQuestion` tool:
+  - Question: "Which item would you like to work on next?"
+  - Header: "Next item"
+  - Options: Build from the queue (up to 4), e.g. `[{label: "#1 {entityId}", description: "[{priority}] \"{name}\" ({state}) — {type} (Recommended)"}, {label: "#2 {entityId}", description: "[{priority}] \"{name}\" ({state}) — {type}"}, ...]`
+  - If only one candidate, auto-select it without asking.
 
 ## Step 3: Normalize to Work Package
 
@@ -60,7 +55,10 @@ Every item must become a WP before implementation. This step resolves the select
 1. Call `mcp__pinkrooster__get_work_package_details` with the WP ID
 2. **Blocked check**: If `blockedBy` contains any non-terminal WP:
    - Auto mode → add to `skippedItems` with reason "blocked by {blockerId}", try next candidate from Step 2 queue
-   - Interactive → "Blocked by {blockerId}. Work on the blocker first, or pick a different item."
+   - Interactive → use the `AskUserQuestion` tool:
+     - Question: "{wpId} is blocked by {blockerId}. What would you like to do?"
+     - Header: "Blocked"
+     - Options: `[{label: "Work on blocker", description: "Switch to implementing {blockerId} first"}, {label: "Pick different", description: "Go back and choose a different item from the queue"}]`
 3. Load linked Issues (if `linkedIssueIds` is non-empty): call `mcp__pinkrooster__get_issue_details` for each
 4. Load linked FRs (if `linkedFeatureRequestIds` is non-empty): call `mcp__pinkrooster__get_feature_request_details` for each — note user stories for context
 5. Proceed to Step 4 with this WP.
@@ -199,7 +197,10 @@ Run `/pm-status` for full overview.
 
 ### Interactive mode
 
-"Work package complete. Run `/pm-next` for more or `/pm-status` for overview."
+Use the `AskUserQuestion` tool:
+- Question: "Work package complete. What would you like to do next?"
+- Header: "Continue?"
+- Options: `[{label: "Next item", description: "Pick up the next priority item: /pm-next (Recommended)"}, {label: "Status", description: "Check project progress: /pm-status"}, {label: "Done", description: "Stop here for now"}]`
 
 ---
 

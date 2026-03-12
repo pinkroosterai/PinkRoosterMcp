@@ -124,10 +124,13 @@ Before presenting, check each suggestion against the deduplication list from Ste
 
 ---
 
-Select which suggestions to create as feature requests:
-- Enter numbers (e.g., "1, 3, 5") or "all" to create all
-- Enter "none" to skip creation
 ```
+
+After presenting the table, use the `AskUserQuestion` tool to let the user select:
+- Question: "Which suggestions would you like to create as feature requests?"
+- Header: "Create FRs"
+- multiSelect: true
+- Options: Build from suggestions (up to 4), e.g. `[{label: "#1 {name}", description: "{category} | {priority}"}, {label: "#2 {name}", description: "{category} | {priority}"}, {label: "All", description: "Create all {N} suggestions as feature requests"}, {label: "None", description: "Skip creation — keep suggestions for reference only"}]`
 
 ## Step 7: Create Feature Requests
 

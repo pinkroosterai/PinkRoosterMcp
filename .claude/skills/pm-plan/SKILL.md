@@ -26,8 +26,10 @@ Analyze `$ARGUMENTS` to determine if this is a bug/defect or a feature/enhanceme
 - User stories: "as a...", "I want...", "we need..."
 - Capabilities: dashboard, page, export, import, notification, integration
 
-**If ambiguous**, ask the user:
-"Is this a bug/issue to fix, or a new feature/enhancement to build?"
+**If ambiguous**, use the `AskUserQuestion` tool:
+- Question: "Is this a bug/issue to fix, or a new feature/enhancement to build?"
+- Header: "Work type"
+- Options: `[{label: "Bug/Issue", description: "Something broken, slow, or insecure that needs fixing"}, {label: "Feature/Enhancement", description: "A new capability or improvement to build"}]`
 
 **Map to specific types**:
 - Bug/broken/error/crash → IssueType: `Bug`
@@ -69,29 +71,18 @@ Before classifying, check if the description is missing critical information. As
 **Priority signals conflict** — description mixes urgency levels:
 - "Nice to have but also kind of urgent" → Clarify actual priority
 
-**Ask concisely** — combine related questions into a single prompt rather than asking one at a time. Example:
-```
-A few clarifications before I create this:
-1. Which dashboard pages should this cover? (all, or specific ones)
-2. Should this include API changes or frontend only?
-```
+**Ask concisely** — use the `AskUserQuestion` tool to combine related clarifications (up to 4 questions per call). Example:
+- Question 1: "Which dashboard pages should this cover?" / Header: "Scope" / Options: [{label: "All pages", ...}, {label: "Specific pages", ...}]
+- Question 2: "Should this include API changes?" / Header: "Layers" / Options: [{label: "Frontend only", ...}, {label: "Frontend + API", ...}]
 
 **If the description is clear and specific**, skip this step — do not ask unnecessary questions.
 
 ## Step 3: Confirm Classification
 
-Present the classification to the user before creating:
-
-```
-## Classification
-
-**Type**: Issue (Bug) / Feature Request (Enhancement) / etc.
-**Name**: {derived from description}
-**Priority**: {mapped priority}
-**Severity**: {mapped severity, if issue}
-
-Proceed with creation? (y/n, or adjust)
-```
+Present the classification to the user using the `AskUserQuestion` tool:
+- Question: "Create {entityType} '{name}' with priority {priority}? (Severity: {severity, if issue})"
+- Header: "Confirm"
+- Options: `[{label: "Create", description: "Proceed with the classification above"}, {label: "Adjust type", description: "Change the entity type or classification"}, {label: "Cancel", description: "Do not create anything"}]`
 
 ## Step 4: Resolve Project
 
@@ -131,9 +122,11 @@ Before creating, cross-reference existing items to avoid duplicates:
 1. Call `mcp__pinkrooster__get_issue_overview` with `projectId` and `stateFilter: "Active"` + `"Inactive"`
 2. Call `mcp__pinkrooster__get_feature_requests` with `projectId` and `stateFilter: "Active"` + `"Inactive"`
 3. Compare the derived name and description against existing items
-4. If a potential duplicate is found, warn the user:
-   "Similar item found: **{existingId}** '{existingName}' ({state}). Create anyway? (y/n/view)"
-5. If the user selects "view", show the existing item details so they can decide
+4. If a potential duplicate is found, use the `AskUserQuestion` tool:
+   - Question: "Similar item found: {existingId} '{existingName}' ({state}). How would you like to proceed?"
+   - Header: "Duplicate?"
+   - Options: `[{label: "Create anyway", description: "Create a new item despite the similarity"}, {label: "View existing", description: "Show details of the existing item before deciding"}, {label: "Skip", description: "Don't create — use the existing item instead"}]`
+5. If the user selects "View existing", show the existing item details and re-ask
 
 If no duplicates, proceed silently.
 
@@ -155,11 +148,14 @@ If no duplicates, proceed silently.
 
 ## Step 7: Optional Scaffolding or Refinement
 
-Ask the user: "What would you like to do next? (scaffold / refine / skip)"
+Use the `AskUserQuestion` tool to offer next steps:
+- Question: "What would you like to do next with {entityId}?"
+- Header: "Next step"
+- Options: `[{label: "Scaffold", description: "Create a work package with implementation tasks: /pm-scaffold {entityId}"}, {label: "Refine", description: "Add user stories and business value: /pm-refine-fr {entityId} (FR only)"}, {label: "Skip", description: "Done for now — refine or scaffold later"}]`
 
-**If scaffold**: Delegate to `/pm-scaffold {entityId}`
-**If refine** (FR only): Delegate to `/pm-refine-fr {entityId}` — enriches the FR with user stories, business value, and acceptance criteria before scaffolding
-**If skip**: "Entity created. You can refine with `/pm-refine-fr {entityId}` or scaffold with `/pm-scaffold {entityId}` later."
+**If Scaffold**: Delegate to `/pm-scaffold {entityId}`
+**If Refine** (FR only): Delegate to `/pm-refine-fr {entityId}` — enriches the FR with user stories, business value, and acceptance criteria before scaffolding
+**If Skip**: "Entity created. You can refine with `/pm-refine-fr {entityId}` or scaffold with `/pm-scaffold {entityId}` later."
 
 ## Constraints
 

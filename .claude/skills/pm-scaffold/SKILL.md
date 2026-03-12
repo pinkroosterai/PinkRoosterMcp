@@ -29,7 +29,10 @@ Parse `$ARGUMENTS` to determine the source:
 - Use user stories to inform task design — each story may map to one or more tasks across phases
 
 **Quality check for Feature Requests**: If the FR is missing key fields (no user stories, no business value, vague description <100 chars):
-- **When called standalone (interactive)**: warn and ask: "FR {frId} is sparse — missing {fields}. Refine first for better scaffolding: `/pm-refine-fr {frId}`". Let the user choose to proceed or refine.
+- **When called standalone (interactive)**: use the `AskUserQuestion` tool:
+  - Question: "FR {frId} is sparse — missing {fields}. Refine first for better scaffolding?"
+  - Header: "Sparse FR"
+  - Options: `[{label: "Refine first", description: "Run /pm-refine-fr {frId} to add user stories and detail before scaffolding (Recommended)"}, {label: "Proceed anyway", description: "Scaffold now with the available data"}]`
 - **When called from `/pm-next --auto` or any auto-mode workflow**: skip the warning entirely and proceed with scaffolding using available data. Do not prompt.
 
 **If free-text description**:
