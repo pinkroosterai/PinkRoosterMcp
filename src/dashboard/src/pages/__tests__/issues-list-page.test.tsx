@@ -59,6 +59,12 @@ describe("IssuesListPage", () => {
     });
   });
 
+  it("shows loading state before data loads", () => {
+    renderPage();
+
+    expect(screen.getByText("Loading issues...")).toBeInTheDocument();
+  });
+
   it("shows delete confirmation dialog", async () => {
     const user = userEvent.setup();
     renderPage();

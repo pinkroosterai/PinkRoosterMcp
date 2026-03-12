@@ -304,6 +304,25 @@ describe("FeatureRequestDetailPage", () => {
     expect(strong?.textContent).toBe("dark mode");
   });
 
+  it("handles API 500 error gracefully", async () => {
+    server.use(
+      http.get("/api/projects/:id/feature-requests/:n", () =>
+        HttpResponse.json({ error: "Server error" }, { status: 500 }),
+      ),
+    );
+    renderPage(1, 1);
+
+    await waitFor(() => {
+      expect(screen.getByText("Feature request not found.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading state before data loads", () => {
+    renderPage();
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+  });
+
   it("hides optional sections when data is null", async () => {
     server.use(
       http.get("/api/projects/:id/feature-requests/:n", () =>

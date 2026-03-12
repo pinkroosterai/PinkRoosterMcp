@@ -84,6 +84,12 @@ describe("WorkPackagesListPage", () => {
     expect(createLinks.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("shows loading state before data loads", () => {
+    renderPage();
+
+    expect(screen.getByText("Loading work packages...")).toBeInTheDocument();
+  });
+
   it("shows delete confirmation dialog", async () => {
     const user = userEvent.setup();
     renderPage();

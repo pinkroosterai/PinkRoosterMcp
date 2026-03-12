@@ -267,6 +267,25 @@ describe("IssueDetailPage", () => {
     expect(strong?.textContent).toBe("broken");
   });
 
+  it("handles API 500 error gracefully", async () => {
+    server.use(
+      http.get("/api/projects/:id/issues/:n", () =>
+        HttpResponse.json({ error: "Server error" }, { status: 500 }),
+      ),
+    );
+    renderPage(1, 1);
+
+    await waitFor(() => {
+      expect(screen.getByText("Issue not found.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading state before data loads", () => {
+    renderPage();
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+  });
+
   it("hides reproduction section when no reproduction data", async () => {
     server.use(
       http.get("/api/projects/:id/issues/:n", () =>
@@ -306,5 +325,26 @@ describe("IssueDetailPage", () => {
     });
     expect(screen.queryByText("Reproduction")).not.toBeInTheDocument();
     expect(screen.queryByText("Resolution")).not.toBeInTheDocument();
+  });
+
+  it("closes delete dialog on Escape key", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Bug")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Delete issue?")).toBeInTheDocument();
+    });
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Delete issue?")).not.toBeInTheDocument();
+    });
   });
 });

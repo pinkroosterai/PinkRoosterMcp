@@ -358,4 +358,44 @@ describe("WorkPackageDetailPage", () => {
     });
     expect(screen.getByText("(was: Designing)")).toBeInTheDocument();
   });
+
+  it("handles API 500 error gracefully", async () => {
+    server.use(
+      http.get("/api/projects/:id/work-packages/:n", () =>
+        HttpResponse.json({ error: "Server error" }, { status: 500 }),
+      ),
+    );
+    renderPage(1, 1);
+
+    await waitFor(() => {
+      expect(screen.getByText("Work package not found.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading state before data loads", () => {
+    renderPage();
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+  });
+
+  it("closes delete dialog on Escape key", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Work Package")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Delete work package?")).toBeInTheDocument();
+    });
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Delete work package?")).not.toBeInTheDocument();
+    });
+  });
 });
