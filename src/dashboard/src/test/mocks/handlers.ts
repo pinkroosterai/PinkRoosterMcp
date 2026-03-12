@@ -3,6 +3,7 @@ import { issueHandlers } from "./handlers/issue-handlers";
 import { workPackageHandlers } from "./handlers/work-package-handlers";
 import { featureRequestHandlers } from "./handlers/feature-request-handlers";
 import { activityHandlers } from "./handlers/activity-handlers";
+import { memoryHandlers } from "./handlers/memory-handlers";
 
 export const handlers = [
   ...projectHandlers,
@@ -10,4 +11,5 @@ export const handlers = [
   ...workPackageHandlers,
   ...featureRequestHandlers,
   ...activityHandlers,
+  ...memoryHandlers,
 ];
