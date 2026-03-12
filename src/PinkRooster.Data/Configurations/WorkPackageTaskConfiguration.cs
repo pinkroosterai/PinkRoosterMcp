@@ -19,9 +19,9 @@ public sealed class WorkPackageTaskConfiguration : IEntityTypeConfiguration<Work
 
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
+        builder.Property(x => x.Description).HasColumnName("description").IsRequired();
         builder.Property(x => x.SortOrder).HasColumnName("sort_order");
-        builder.Property(x => x.ImplementationNotes).HasColumnName("implementation_notes").HasMaxLength(8000);
+        builder.Property(x => x.ImplementationNotes).HasColumnName("implementation_notes");
 
         // ── State ──
         builder.Property(x => x.State).HasColumnName("state").HasMaxLength(20)

@@ -18,20 +18,20 @@ public sealed class FeatureRequestConfiguration : IEntityTypeConfiguration<Featu
 
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
+        builder.Property(x => x.Description).HasColumnName("description").IsRequired();
         builder.Property(x => x.Category).HasColumnName("category").HasMaxLength(20)
             .HasConversion<string>();
         builder.Property(x => x.Priority).HasColumnName("priority").HasMaxLength(20)
             .HasConversion<string>();
 
         // ── Context ──
-        builder.Property(x => x.BusinessValue).HasColumnName("business_value").HasMaxLength(4000);
+        builder.Property(x => x.BusinessValue).HasColumnName("business_value");
         builder.OwnsMany(x => x.UserStories, us =>
         {
             us.ToJson("user_stories");
         });
         builder.Property(x => x.Requester).HasColumnName("requester").HasMaxLength(200);
-        builder.Property(x => x.AcceptanceSummary).HasColumnName("acceptance_summary").HasMaxLength(4000);
+        builder.Property(x => x.AcceptanceSummary).HasColumnName("acceptance_summary");
 
         // ── State ──
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(20)

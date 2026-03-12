@@ -18,7 +18,7 @@ public sealed class WorkPackagePhaseConfiguration : IEntityTypeConfiguration<Wor
 
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000);
+        builder.Property(x => x.Description).HasColumnName("description");
         builder.Property(x => x.SortOrder).HasColumnName("sort_order");
 
         // ── State ──

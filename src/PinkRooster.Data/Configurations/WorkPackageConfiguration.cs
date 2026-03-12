@@ -17,16 +17,16 @@ public sealed class WorkPackageConfiguration : IEntityTypeConfiguration<WorkPack
         builder.Property(x => x.ProjectId).HasColumnName("project_id").IsRequired();
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
+        builder.Property(x => x.Description).HasColumnName("description").IsRequired();
         builder.Property(x => x.Type).HasColumnName("type").HasMaxLength(20)
             .HasConversion<string>();
         builder.Property(x => x.Priority).HasColumnName("priority").HasMaxLength(20)
             .HasConversion<string>();
-        builder.Property(x => x.Plan).HasColumnName("plan").HasMaxLength(16000);
+        builder.Property(x => x.Plan).HasColumnName("plan");
 
         // ── Estimation ──
         builder.Property(x => x.EstimatedComplexity).HasColumnName("estimated_complexity");
-        builder.Property(x => x.EstimationRationale).HasColumnName("estimation_rationale").HasMaxLength(4000);
+        builder.Property(x => x.EstimationRationale).HasColumnName("estimation_rationale");
 
         // ── State ──
         builder.Property(x => x.State).HasColumnName("state").HasMaxLength(20)

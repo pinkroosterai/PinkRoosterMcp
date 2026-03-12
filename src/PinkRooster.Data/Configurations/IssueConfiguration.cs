@@ -19,7 +19,7 @@ public sealed class IssueConfiguration : IEntityTypeConfiguration<Issue>
 
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
+        builder.Property(x => x.Description).HasColumnName("description").IsRequired();
         builder.Property(x => x.IssueType).HasColumnName("issue_type").HasMaxLength(30)
             .HasConversion<string>();
         builder.Property(x => x.Severity).HasColumnName("severity").HasMaxLength(20)
@@ -28,15 +28,15 @@ public sealed class IssueConfiguration : IEntityTypeConfiguration<Issue>
             .HasConversion<string>();
 
         // ── Reproduction / diagnosis ──
-        builder.Property(x => x.StepsToReproduce).HasColumnName("steps_to_reproduce").HasMaxLength(4000);
-        builder.Property(x => x.ExpectedBehavior).HasColumnName("expected_behavior").HasMaxLength(4000);
-        builder.Property(x => x.ActualBehavior).HasColumnName("actual_behavior").HasMaxLength(4000);
+        builder.Property(x => x.StepsToReproduce).HasColumnName("steps_to_reproduce");
+        builder.Property(x => x.ExpectedBehavior).HasColumnName("expected_behavior");
+        builder.Property(x => x.ActualBehavior).HasColumnName("actual_behavior");
         builder.Property(x => x.AffectedComponent).HasColumnName("affected_component").HasMaxLength(500);
-        builder.Property(x => x.StackTrace).HasColumnName("stack_trace").HasMaxLength(8000);
+        builder.Property(x => x.StackTrace).HasColumnName("stack_trace");
 
         // ── Resolution ──
-        builder.Property(x => x.RootCause).HasColumnName("root_cause").HasMaxLength(4000);
-        builder.Property(x => x.Resolution).HasColumnName("resolution").HasMaxLength(4000);
+        builder.Property(x => x.RootCause).HasColumnName("root_cause");
+        builder.Property(x => x.Resolution).HasColumnName("resolution");
 
         // ── State ──
         builder.Property(x => x.State).HasColumnName("state").HasMaxLength(20)

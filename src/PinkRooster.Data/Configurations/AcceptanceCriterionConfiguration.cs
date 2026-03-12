@@ -17,12 +17,12 @@ public sealed class AcceptanceCriterionConfiguration : IEntityTypeConfiguration<
 
         // ── Definition ──
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(4000).IsRequired();
+        builder.Property(x => x.Description).HasColumnName("description").IsRequired();
         builder.Property(x => x.VerificationMethod).HasColumnName("verification_method").HasMaxLength(20)
             .HasConversion<string>();
 
         // ── Verification ──
-        builder.Property(x => x.VerificationResult).HasColumnName("verification_result").HasMaxLength(4000);
+        builder.Property(x => x.VerificationResult).HasColumnName("verification_result");
         builder.Property(x => x.VerifiedAt).HasColumnName("verified_at");
 
         // ── Relationships ──
