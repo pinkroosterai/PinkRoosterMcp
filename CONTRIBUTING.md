@@ -16,8 +16,15 @@ Thank you for your interest in contributing to PinkRooster! This guide will help
 ```bash
 git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
-make setup    # Copy .env template and install dashboard dependencies
-make dev      # Start all services with hot reload
+make setup-dev   # Install deps, copy .env, register MCP, start dev containers with hot reload
+```
+
+Or start services individually:
+
+```bash
+make dev            # Start PostgreSQL in Docker + API/MCP/Dashboard locally with dotnet watch
+make dev-api        # API only (hot reload)
+make dev-dashboard  # Dashboard only (Vite dev server)
 ```
 
 ### Project Structure
@@ -56,7 +63,7 @@ Open a GitHub issue describing:
 3. Make your changes
 4. Run tests to ensure nothing is broken:
    ```bash
-   dotnet test                          # API + MCP integration tests
+   dotnet test                          # All .NET tests (integration + unit)
    cd src/dashboard && npm test         # Dashboard frontend tests
    ```
 5. Open a pull request against `main`
@@ -74,6 +81,20 @@ Run formatting before committing:
 make format   # Format .NET code
 make lint     # Lint dashboard
 ```
+
+## Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat(api): add pagination validation filter
+fix(dashboard): prevent SSE reconnect loop
+docs(readme): update quick start instructions
+chore(docker): optimize image layer caching
+test(api): add edge cases for batch task updates
+```
+
+Format: `type(scope): description` — keep the description concise and lowercase.
 
 ## Architecture Guidelines
 
@@ -106,4 +127,4 @@ npm run test:coverage # With coverage report
 
 ## Questions?
 
-Open a GitHub issue — we're happy to help.
+Open a [GitHub Discussion](https://github.com/pinkroosterai/PinkRoosterMcp/discussions) for questions and ideas, or a [GitHub Issue](https://github.com/pinkroosterai/PinkRoosterMcp/issues) for bug reports and feature requests.
