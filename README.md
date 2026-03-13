@@ -19,14 +19,10 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 ```bash
 git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
-make setup
+make install
 ```
 
-Then register the MCP server in Claude Code:
-
-```bash
-claude mcp add --transport http --scope user pinkrooster http://localhost:5200
-```
+That's it. `make install` pulls the pre-built image from Docker Hub, registers the MCP server in Claude Code, installs PM skills, and starts all containers.
 
 Dashboard at [localhost:3000](http://localhost:3000) · API at [localhost:5100](http://localhost:5100) · MCP at [localhost:5200](http://localhost:5200)
 
@@ -213,14 +209,16 @@ Skills automatically propagate state to related entities. Starting a task activa
 ```bash
 git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
-make setup
+make install
 ```
 
-That's it. `make setup` will:
+That's it. `make install` will:
 1. Create `.env` with working defaults (no edits needed)
 2. Register the MCP server in Claude Code (global scope, skipped if CLI not found)
 3. Install PM workflow skills to `~/.claude/skills/`
-4. Build and start all containers (PostgreSQL + unified PinkRooster image)
+4. Pull and start the pre-built Docker Hub image (no local build required)
+
+To build from source instead, use `make setup` (same steps but builds the image locally).
 
 Services will be available at:
 | Service | URL |

@@ -8,6 +8,7 @@ MCP_PROJECT    := src/PinkRooster.Mcp
 DATA_PROJECT   := src/PinkRooster.Data
 DASHBOARD_DIR  := src/dashboard
 COMPOSE        := docker compose
+COMPOSE_HUB    := docker compose -f docker-compose.yml -f docker-compose.hub.yml
 COMPOSE_DEV    := docker compose -f docker-compose.dev.yml -f docker-compose.dev.override.yml
 
 # Colors (ANSI)
@@ -172,8 +173,8 @@ db-reset: ## Drop and recreate database (destructive!)
 #  Utilities
 # ──────────────────────────────────────────────────────────────
 
-.PHONY: install
-install: ## Install all dependencies (.NET restore + npm install)
+.PHONY: deps
+deps: ## Install all dependencies (.NET restore + npm install)
 	@printf "$(C_CYAN)▸ Restoring .NET packages…$(C_RESET)\n"
 	@dotnet restore $(SOLUTION) -q
 	@printf "$(C_CYAN)▸ Installing npm packages…$(C_RESET)\n"
@@ -218,6 +219,43 @@ setup: ## Quick start: configure, register MCP, install skills, start containers
 	@# 4. Start containers
 	@printf "\n$(C_CYAN)  ▸ Starting containers…$(C_RESET)\n\n"
 	@$(MAKE) up
+
+.PHONY: install
+install: ## Quick start with Docker Hub image (no build required)
+	@printf "\n$(C_BOLD)$(C_CYAN) 🐓 PinkRooster Install$(C_RESET)\n\n"
+	@# 1. Copy .env if it doesn't exist
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		printf "$(C_GREEN)  ✔ Created .env from .env.example$(C_RESET)\n"; \
+	else \
+		printf "$(C_DIM)  .env already exists, skipping$(C_RESET)\n"; \
+	fi
+	@# 2. Register MCP server in Claude Code (global scope)
+	@if command -v claude >/dev/null 2>&1; then \
+		claude mcp remove --scope user pinkrooster >/dev/null 2>&1 || true; \
+		if claude mcp add --transport http --scope user pinkrooster http://localhost:5200 >/dev/null 2>&1; then \
+			printf "$(C_GREEN)  ✔ MCP server registered in Claude Code (global)$(C_RESET)\n"; \
+		else \
+			printf "$(C_YELLOW)  ⚠ Failed to register MCP server in Claude Code$(C_RESET)\n"; \
+		fi; \
+	else \
+		printf "$(C_DIM)  Claude Code CLI not found, skipping MCP registration$(C_RESET)\n"; \
+	fi
+	@# 3. Install PM skills globally
+	@mkdir -p ~/.claude/skills
+	@if [ -d .claude/skills ]; then \
+		cp -r .claude/skills/* ~/.claude/skills/ 2>/dev/null || true; \
+		printf "$(C_GREEN)  ✔ PM skills installed to ~/.claude/skills/$(C_RESET)\n"; \
+	fi
+	@# 4. Pull and start containers from Docker Hub
+	@printf "\n$(C_CYAN)  ▸ Pulling Docker Hub image…$(C_RESET)\n\n"
+	@$(COMPOSE_HUB) pull pinkrooster
+	@$(COMPOSE_HUB) up -d
+	@printf "$(C_GREEN)✔ Services running$(C_RESET)\n"
+	@printf "  Dashboard  → http://localhost:3000\n"
+	@printf "  API        → http://localhost:5100\n"
+	@printf "  MCP        → http://localhost:5200\n"
+	@printf "  Swagger    → http://localhost:5100/swagger/index.html\n"
 
 .PHONY: setup-dev
 setup-dev: ## Developer setup: configure, install deps, register MCP, start dev containers

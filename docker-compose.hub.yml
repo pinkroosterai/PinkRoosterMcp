@@ -1,0 +1,5 @@
+# Override: use pre-built Docker Hub image instead of local build
+# Used by: make install
+services:
+  pinkrooster:
+    image: pinkrooster/pinkroostermcp:latest
