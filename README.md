@@ -17,11 +17,6 @@ Track issues, plan features, scaffold work packages, and manage your entire deve
 ## Quick Start
 
 ```bash
-# Using Docker Hub (no clone needed)
-curl -sO https://raw.githubusercontent.com/pinkroosterai/PinkRoosterMcp/main/docker-compose.yml
-docker compose up -d
-
-# Or clone and run
 git clone https://github.com/pinkroosterai/PinkRoosterMcp.git
 cd PinkRoosterMcp
 make setup
