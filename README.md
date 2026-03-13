@@ -4,11 +4,17 @@
 
 # PinkRoosterMcp
 
-**AI-native project management for coding agents**
+**Project management that thinks in code, not tickets.**
 
-Track issues, plan features, scaffold work packages, and manage your entire development lifecycle — all driven by your AI coding assistant through the [Model Context Protocol](https://modelcontextprotocol.io/).
+The first project management system built from scratch for AI coding agents — not a wrapper around Jira or Linear.
 
-[Getting Started](#getting-started) · [How It Works](#how-it-works) · [MCP Tools](#mcp-tools) · [Dashboard](#dashboard) · [PM Skills](#pm-workflow-skills)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-green)](https://modelcontextprotocol.io/)
+[![Docker](https://img.shields.io/badge/Docker-Hub-2496ED)](https://hub.docker.com/r/pinkrooster/pinkroostermcp)
+[![Tests](https://img.shields.io/badge/Tests-644_passing-brightgreen)]()
+
+[Quick Start](#quick-start) · [Why PinkRooster?](#why-pinkrooster) · [Dashboard](#dashboard) · [MCP Tools](#mcp-tools) · [PM Skills](#pm-workflow-skills) · [Getting Started](#getting-started)
 
 </div>
 
@@ -22,27 +28,97 @@ cd PinkRoosterMcp
 make install
 ```
 
-That's it. `make install` pulls the pre-built image from Docker Hub, registers the MCP server in Claude Code, installs PM skills, and starts all containers.
+That's it. `make install` pulls the pre-built image from Docker Hub, registers the MCP server in Claude Code, installs PM skills, and starts all containers. No accounts, no configuration, no build step.
 
 Dashboard at [localhost:3000](http://localhost:3000) · API at [localhost:5100](http://localhost:5100) · MCP at [localhost:5200](http://localhost:5200)
 
 ---
 
-## What is PinkRoosterMcp?
+## Why PinkRooster?
 
-PinkRoosterMcp is a project management system purpose-built for AI-assisted development workflows. Instead of switching between your IDE and a project tracker, your AI agent manages everything — creating issues, breaking down features into work packages, tracking progress, and marking tasks complete — all while it writes your code.
+Every other PM-related MCP server is a wrapper around an existing SaaS product. PinkRoosterMcp is **purpose-built for AI agents** — the data model, response format, and workflow skills are designed for AI consumption first, with a dashboard for human visibility.
 
-It exposes an [MCP server](https://modelcontextprotocol.io/) with 24 tools that any MCP-compatible client (Claude Code, Cursor, Windsurf, etc.) can use to read and write project data. A React dashboard gives you full visibility into what your agent has been doing.
+### The Problem
 
-### Why not Jira / Linear / GitHub Issues?
+```
+Traditional workflow:
+  1. Open browser → find Jira ticket → read requirements
+  2. Switch to IDE → write code → run tests
+  3. Switch to browser → update ticket status → add comment
+  4. Repeat 50x per day
+```
 
-| | Traditional PM tools | PinkRoosterMcp |
-|---|---|---|
-| **Created for** | Humans typing in web UIs | AI agents calling structured tools |
-| **Work breakdown** | Manual — you write tickets | Automatic — agent scaffolds phases, tasks, and dependencies from a description |
-| **State management** | Manual drag-and-drop | Automatic cascading — completing a task can auto-complete its phase, work package, and linked issue |
-| **Context switching** | Tab to browser, find ticket, update | Zero — the agent updates state inline while coding |
-| **Audit trail** | Varies | Full-field audit log on every entity, plus HTTP request logging |
+### The PinkRooster Workflow
+
+```
+  You: /pm-next --auto
+  Agent: picks highest priority work → scaffolds plan → implements code →
+         runs tests → commits → updates all project state → picks next item →
+         repeats until done
+  You: ☕
+```
+
+### How It Compares
+
+| | PinkRoosterMcp | Jira + MCP Wrapper | Linear + MCP Wrapper |
+|---|---|---|---|
+| **Built for AI agents** | From scratch | Bolt-on API wrapper | Bolt-on API wrapper |
+| **Self-hosted** | Single Docker image | SaaS only | SaaS only |
+| **Setup time** | 1 command | Account + OAuth + config | Account + API key + config |
+| **State cascades** | Automatic (5 levels deep) | Manual updates | Manual updates |
+| **Work breakdown** | Agent scaffolds from description | You write every ticket | You write every ticket |
+| **Project memories** | Built-in cross-session context | None | None |
+| **Autonomous mode** | `/pm-next --auto` | None | None |
+| **Token-optimized responses** | Purpose-built for agents | Verbose human-facing payloads | Verbose human-facing payloads |
+| **Cost** | Free (MIT) | $8-16/user/month | $8-16/user/month |
+
+---
+
+## Features at a Glance
+
+### Automatic State Cascades
+
+Complete a task and everything upstream updates automatically — no manual ticket grooming:
+
+```
+Task completed
+  └→ Phase auto-completes (all tasks done)
+       └→ Work Package auto-completes (all phases done)
+            ├→ Linked Issue auto-resolved
+            └→ Linked Feature Request auto-completed
+```
+
+Dependencies auto-block and auto-unblock. The agent always knows what happened downstream via structured `OperationResult` responses with state change notifications.
+
+### Autonomous Implementation Loop
+
+A single command drives the full development lifecycle:
+
+```
+/pm-next --auto
+```
+
+The agent picks the highest-priority work item, scaffolds a plan if needed, implements every task (reading code, writing changes, running tests), commits after each work package, and loops until all work is done.
+
+### 24 MCP Tools
+
+Every tool is designed for AI consumption — compact responses, actionable next steps, and state cascade notifications. Scaffold an entire work package with phases, tasks, and dependencies in a single call.
+
+### 11 PM Workflow Skills
+
+High-level slash commands that encode sophisticated PM workflows: `/pm-scaffold` analyzes your codebase to produce realistic target files and implementation notes. `/pm-implement` handles dependency ordering, test running with auto-fix, and phase verification gates. `/pm-explore` analyzes your codebase and suggests user-facing features.
+
+### Project Memories
+
+Persistent knowledge store for decisions, patterns, and context that survives across agent sessions. Merge-by-name semantics — writing to an existing memory appends content and unions tags.
+
+### Human-Readable IDs
+
+`proj-1-issue-3`, `proj-1-wp-2-task-5` — readable by both agents and humans in conversation. No GUIDs, no opaque numeric IDs.
+
+### Full Observability
+
+Two layers of audit: per-entity field-change audit logs (old/new values on every field) and HTTP request activity logging (method, path, status, duration, caller). The dashboard surfaces both.
 
 ---
 
@@ -201,7 +277,7 @@ Skills automatically propagate state to related entities. Starting a task activa
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (recommended — `make setup` auto-registers the MCP server)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (recommended — `make install` auto-registers the MCP server)
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) and [Node.js 20+](https://nodejs.org/) (for local development only)
 
 ### Quick Start
@@ -288,7 +364,7 @@ To pin a specific version, replace `latest` with a version tag (e.g., `pinkroost
 
 ### Connect Your AI Agent
 
-If you ran `make setup` with Claude Code installed, the MCP server is already registered. For other MCP clients, point them to `http://localhost:5200` (Streamable HTTP) or `http://localhost:5200/sse` (legacy SSE).
+If you ran `make install` with Claude Code installed, the MCP server is already registered. For other MCP clients, point them to `http://localhost:5200` (Streamable HTTP) or `http://localhost:5200/sse` (legacy SSE).
 
 ### Developer Setup
 
@@ -338,7 +414,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-The test suite includes 277 API integration tests, 112 unit tests, and 255 dashboard frontend tests.
+644 tests: 277 API integration tests + 112 unit tests + 255 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
 
 ---
 
@@ -352,6 +428,12 @@ The test suite includes 277 API integration tests, 112 unit tests, and 255 dashb
 | Dashboard | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui, TanStack Query/Table, Recharts |
 | Testing | xUnit v3, Testcontainers, Respawn, Vitest, React Testing Library, MSW |
 | Infrastructure | Docker Compose, nginx |
+
+---
+
+## Contributing
+
+Contributions are welcome! See the [Developer Setup](#developer-setup) section to get started. The project uses `make setup-dev` for the full contributor workflow with hot reload across all services.
 
 ---
 
