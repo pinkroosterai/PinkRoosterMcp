@@ -31,8 +31,8 @@ public sealed partial class ProjectAuthorizationMiddleware(RequestDelegate next)
             return;
         }
 
-        // API key callers bypass RBAC (no UserId means authenticated via API key)
-        if (!context.Items.ContainsKey("UserId"))
+        // API key callers bypass RBAC (CallerIdentity set but no UserId)
+        if (context.Items.ContainsKey(AuthConstants.CallerIdentityKey) && !context.Items.ContainsKey("UserId"))
         {
             await next(context);
             return;

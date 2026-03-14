@@ -19,6 +19,7 @@ interface AuthContextValue {
   isProtected: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authError: boolean;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isProtected, setIsProtected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const checkAuth = useCallback(async () => {
@@ -58,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(false);
       }
     } catch {
-      // API not available — treat as unprotected
-      setIsProtected(false);
+      // API not available — show error, do NOT grant access
+      setAuthError(true);
       setIsAuthenticated(false);
       setUser(null);
     } finally {
@@ -123,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isProtected,
         isAuthenticated,
         isLoading,
+        authError,
         user,
         login,
         logout,

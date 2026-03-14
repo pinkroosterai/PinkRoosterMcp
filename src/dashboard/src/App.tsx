@@ -35,7 +35,7 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, authError } = useAuth();
 
   if (isLoading) {
     return (
@@ -45,9 +45,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Show login/register page when:
-  // - Users exist but not authenticated (login mode)
-  // - No users exist yet (registration mode)
+  if (authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p className="text-destructive font-medium">Unable to connect to the API</p>
+          <p className="text-sm text-muted-foreground">Check that the server is running and try again.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <LoginPage />;
   }

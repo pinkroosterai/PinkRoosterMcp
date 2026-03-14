@@ -55,16 +55,18 @@ public sealed class UserController(IUserService userService) : ControllerBase
         if (!IsSuperUserOrApiKey() && !IsSelf(id))
             return StatusCode(403, new { error = "Insufficient permissions" });
 
-        // Non-SuperUser self-edit: only allow displayName and email changes
+        // Non-SuperUser self-edit: only allow displayName changes (email change must go through /api/auth/me with password verification)
         GlobalRole? globalRole = null;
         bool? isActive = null;
+        string? email = null;
         if (IsSuperUserOrApiKey())
         {
             globalRole = request.GlobalRole;
             isActive = request.IsActive;
+            email = request.Email;
         }
 
-        var user = await userService.UpdateAsync(id, request.DisplayName, request.Email, globalRole, isActive, ct);
+        var user = await userService.UpdateAsync(id, request.DisplayName, email, globalRole, isActive, ct);
         return user is null ? NotFound() : Ok(user);
     }
 

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Lock, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,12 @@ import { useAuth } from "@/components/auth-provider";
 export function LoginPage() {
   const { isProtected, login, register } = useAuth();
 
-  // If no users exist (!isProtected), show registration; otherwise show login
-  const [mode, setMode] = useState<"login" | "register">(
-    isProtected ? "login" : "register",
-  );
+  const [mode, setMode] = useState<"login" | "register">("login");
+
+  // Sync mode with isProtected (may update after async auth check)
+  useEffect(() => {
+    setMode(isProtected ? "login" : "register");
+  }, [isProtected]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

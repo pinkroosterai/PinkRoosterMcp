@@ -6,7 +6,7 @@ namespace PinkRooster.Api.Middleware;
 
 public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<ApiKeyAuthMiddleware> logger)
 {
-    private readonly byte[][] _validKeyBytes = InitializeKeys(configuration, logger);
+    private readonly byte[][] _validKeyHashes = InitializeKeys(configuration, logger);
 
     private static byte[][] InitializeKeys(IConfiguration configuration, ILogger logger)
     {
@@ -14,7 +14,7 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
             .GetSection("Auth:ApiKeys")
             .Get<string[]>() ?? [])
             .Where(k => !string.IsNullOrWhiteSpace(k))
-            .Select(k => Encoding.UTF8.GetBytes(k))
+            .Select(k => SHA256.HashData(Encoding.UTF8.GetBytes(k)))
             .ToArray();
 
         if (keys.Length == 0)
@@ -39,7 +39,7 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
             return next(context);
 
         // No keys configured — open access
-        if (_validKeyBytes.Length == 0)
+        if (_validKeyHashes.Length == 0)
             return next(context);
 
         if (!context.Request.Headers.TryGetValue(AuthConstants.ApiKeyHeaderName, out var apiKeyHeader))
@@ -63,13 +63,12 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
 
     private bool IsValidKeyConstantTime(string apiKey)
     {
-        var inputBytes = Encoding.UTF8.GetBytes(apiKey);
+        var inputHash = SHA256.HashData(Encoding.UTF8.GetBytes(apiKey));
         var match = false;
 
-        foreach (var validKeyBytes in _validKeyBytes)
+        foreach (var validKeyHash in _validKeyHashes)
         {
-            if (inputBytes.Length == validKeyBytes.Length &&
-                CryptographicOperations.FixedTimeEquals(inputBytes, validKeyBytes))
+            if (CryptographicOperations.FixedTimeEquals(inputHash, validKeyHash))
             {
                 match = true;
             }

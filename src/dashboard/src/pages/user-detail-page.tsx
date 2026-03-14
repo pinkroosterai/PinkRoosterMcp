@@ -250,11 +250,13 @@ function ProjectRolesSection({ userId }: { userId: number }) {
     queryFn: async () => {
       if (!projects?.length) return new Map<number, string>();
       const map = new Map<number, string>();
-      for (const project of projects) {
-        const roles = await getProjectRoles(project.id);
-        const userRole = roles.find((r) => r.userId === userId);
-        if (userRole) map.set(project.id, userRole.role);
-      }
+      await Promise.all(
+        projects.map(async (project) => {
+          const roles = await getProjectRoles(project.id);
+          const userRole = roles.find((r) => r.userId === userId);
+          if (userRole) map.set(project.id, userRole.role);
+        }),
+      );
       return map;
     },
     enabled: !!projects?.length,

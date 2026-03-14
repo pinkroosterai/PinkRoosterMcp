@@ -92,11 +92,11 @@ public sealed class UserService(AppDbContext db) : IUserService
         if (!AuthService.VerifyPassword(user.PasswordHash, currentPassword))
             return false;
 
+        // Invalidate all existing sessions first (before password is updated)
+        await db.UserSessions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
+
         user.PasswordHash = AuthService.HashPassword(newPassword);
         await db.SaveChangesAsync(ct);
-
-        // Invalidate all existing sessions for this user
-        await db.UserSessions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
 
         return true;
     }
