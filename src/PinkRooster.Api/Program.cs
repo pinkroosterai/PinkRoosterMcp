@@ -29,14 +29,8 @@ builder.Services.AddScoped<IProjectRoleService, ProjectRoleService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddSingleton<ActivityLogChannel>();
-builder.Services.AddSingleton<WebhookEventChannel>();
 builder.Services.AddHostedService<ActivityLogWriterService>();
 builder.Services.AddHostedService<SessionCleanupService>();
-builder.Services.AddScoped<IWebhookService, WebhookService>();
-builder.Services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
-builder.Services.AddHttpClient("webhook");
-builder.Services.AddHostedService<WebhookRetryService>();
-builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
 
 // Controllers + Swagger
 builder.Services.AddControllers()

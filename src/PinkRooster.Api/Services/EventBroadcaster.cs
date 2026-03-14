@@ -5,7 +5,7 @@ using PinkRooster.Shared.DTOs;
 
 namespace PinkRooster.Api.Services;
 
-public sealed class EventBroadcaster(WebhookEventChannel? webhookChannel = null) : IEventBroadcaster
+public sealed class EventBroadcaster : IEventBroadcaster
 {
     private const int MaxConnectionsPerProject = 10;
 
@@ -74,15 +74,5 @@ public sealed class EventBroadcaster(WebhookEventChannel? webhookChannel = null)
                 channel.Writer.TryWrite(serverEvent);
             }
         }
-
-        // Enqueue for webhook delivery
-        webhookChannel?.TryWrite(new WebhookEvent
-        {
-            ProjectId = serverEvent.ProjectId,
-            EventType = $"{serverEvent.EntityType}.{serverEvent.Action}",
-            EntityType = serverEvent.EntityType,
-            EntityId = serverEvent.EntityId,
-            Payload = serverEvent
-        });
     }
 }

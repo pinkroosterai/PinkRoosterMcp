@@ -1,4 +1,4 @@
-import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut, Users, Webhook } from "lucide-react";
+import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link, useLocation } from "react-router";
 import {
@@ -28,7 +28,6 @@ export function AppSidebar() {
         { title: "Issues", href: `/projects/${selectedProject.id}/issues`, icon: Bug },
         { title: "Feature Requests", href: `/projects/${selectedProject.id}/feature-requests`, icon: Lightbulb },
         { title: "Work Packages", href: `/projects/${selectedProject.id}/work-packages`, icon: Layers },
-        { title: "Webhooks", href: `/projects/${selectedProject.id}/webhooks`, icon: Webhook },
       ]
     : [];
 

@@ -24,7 +24,7 @@ import { UsersListPage } from "@/pages/users-list-page";
 import { UserCreatePage } from "@/pages/user-create-page";
 import { UserDetailPage } from "@/pages/user-detail-page";
 import { ProfilePage } from "@/pages/profile-page";
-import { WebhooksPage } from "@/pages/webhooks-page";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,7 +93,6 @@ function App() {
                       <Route path="projects/:id/work-packages" element={<WorkPackagesListPage />} />
                       <Route path="projects/:id/work-packages/new" element={<WorkPackageCreatePage />} />
                       <Route path="projects/:id/work-packages/:wpNumber" element={<WorkPackageDetailPage />} />
-                      <Route path="projects/:id/webhooks" element={<WebhooksPage />} />
                       <Route path="users" element={<UsersListPage />} />
                       <Route path="users/new" element={<UserCreatePage />} />
                       <Route path="users/:id" element={<UserDetailPage />} />

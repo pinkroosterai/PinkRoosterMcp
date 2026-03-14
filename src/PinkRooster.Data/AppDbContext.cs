@@ -27,9 +27,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserProjectRole> UserProjectRoles => Set<UserProjectRole>();
-    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
-    public DbSet<WebhookDeliveryLog> WebhookDeliveryLogs => Set<WebhookDeliveryLog>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
