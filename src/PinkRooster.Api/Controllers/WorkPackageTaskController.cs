@@ -14,16 +14,9 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
     public async Task<ActionResult<TaskResponse>> Create(
         long projectId, int wpNumber, [FromQuery] int phaseNumber, CreateTaskRequest request, CancellationToken ct)
     {
-        try
-        {
-            var changedBy = HttpContext.GetCallerIdentity();
-            var task = await taskService.CreateAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
-            return Created("", task);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return this.ProblemBadRequest(ex.Message);
-        }
+        var changedBy = HttpContext.GetCallerIdentity();
+        var task = await taskService.CreateAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
+        return Created("", task);
     }
 
     [HttpPatch("batch-states")]
@@ -56,15 +49,8 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
     public async Task<ActionResult<TaskDependencyResponse>> AddDependency(
         long projectId, int wpNumber, int taskNumber, ManageDependencyRequest request, CancellationToken ct)
     {
-        try
-        {
-            var dep = await taskService.AddDependencyAsync(projectId, wpNumber, taskNumber, request, ct: ct);
-            return Created("", dep);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return this.ProblemBadRequest(ex.Message);
-        }
+        var dep = await taskService.AddDependencyAsync(projectId, wpNumber, taskNumber, request, ct: ct);
+        return Created("", dep);
     }
 
     [HttpDelete("{taskNumber:int}/dependencies/{dependsOnTaskId:long}")]

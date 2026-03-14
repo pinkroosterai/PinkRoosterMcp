@@ -140,6 +140,7 @@ app.UseMiddleware<SessionAuthMiddleware>();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseMiddleware<ProjectAuthorizationMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<ExceptionMappingMiddleware>();
 
 // Endpoints
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy" }));

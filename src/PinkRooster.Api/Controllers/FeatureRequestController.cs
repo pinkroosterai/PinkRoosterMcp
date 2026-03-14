@@ -49,15 +49,8 @@ public sealed class FeatureRequestController(IFeatureRequestService featureReque
         long projectId, int frNumber, ManageUserStoriesRequest request, CancellationToken ct)
     {
         var changedBy = HttpContext.GetCallerIdentity();
-        try
-        {
-            var fr = await featureRequestService.ManageUserStoriesAsync(projectId, frNumber, request, changedBy, ct);
-            return fr is null ? NotFound() : Ok(fr);
-        }
-        catch (ArgumentException ex)
-        {
-            return this.ProblemBadRequest(ex.Message);
-        }
+        var fr = await featureRequestService.ManageUserStoriesAsync(projectId, frNumber, request, changedBy, ct);
+        return fr is null ? NotFound() : Ok(fr);
     }
 
     [HttpDelete("{frNumber:int}")]

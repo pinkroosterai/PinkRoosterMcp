@@ -14,16 +14,9 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
     public async Task<ActionResult<PhaseResponse>> Create(
         long projectId, int wpNumber, CreatePhaseRequest request, CancellationToken ct)
     {
-        try
-        {
-            var changedBy = HttpContext.GetCallerIdentity();
-            var phase = await phaseService.CreateAsync(projectId, wpNumber, request, changedBy, ct);
-            return Created("", phase);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return this.ProblemBadRequest(ex.Message);
-        }
+        var changedBy = HttpContext.GetCallerIdentity();
+        var phase = await phaseService.CreateAsync(projectId, wpNumber, request, changedBy, ct);
+        return Created("", phase);
     }
 
     [HttpPatch("{phaseNumber:int}")]
@@ -39,16 +32,9 @@ public sealed class PhaseController(IPhaseService phaseService) : ControllerBase
     public async Task<ActionResult<PhaseResponse>> VerifyAcceptanceCriteria(
         long projectId, int wpNumber, int phaseNumber, VerifyAcceptanceCriteriaRequest request, CancellationToken ct)
     {
-        try
-        {
-            var changedBy = HttpContext.GetCallerIdentity();
-            var phase = await phaseService.VerifyAcceptanceCriteriaAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
-            return phase is null ? NotFound() : Ok(phase);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return this.ProblemBadRequest(ex.Message);
-        }
+        var changedBy = HttpContext.GetCallerIdentity();
+        var phase = await phaseService.VerifyAcceptanceCriteriaAsync(projectId, wpNumber, phaseNumber, request, changedBy, ct);
+        return phase is null ? NotFound() : Ok(phase);
     }
 
     [HttpDelete("{phaseNumber:int}")]
