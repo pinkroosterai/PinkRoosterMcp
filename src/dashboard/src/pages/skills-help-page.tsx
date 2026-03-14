@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ScanSearch,
   Bug,
+  Wrench,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -137,8 +138,19 @@ const skills: SkillInfo[] = [
     name: "pm-cleanup",
     icon: Trash2,
     description:
-      "Identify and remove stale, cancelled, or rejected items from a project. Scans for cleanup candidates, presents them for confirmation, and safely deletes selected items.",
-    usage: "/pm-cleanup [--dry-run]",
+      "Analyze the codebase for dead code, unused imports, inconsistencies, and structural debt. Scaffolds a Chore work package with cleanup tasks that flow through the normal implement/test/commit pipeline.",
+    usage: "/pm-cleanup [--dry-run] [--scope path]",
+    args: "Optional: --dry-run to preview findings, --scope to limit analysis to a directory",
+    stateChanges: [
+      "Scaffolds a Chore WP (code changes via /pm-implement)",
+    ],
+  },
+  {
+    name: "pm-housekeeping",
+    icon: Wrench,
+    description:
+      "Identify and remove stale, cancelled, rejected, or replaced PinkRooster entities. Scans for cleanup candidates, presents them for confirmation, and safely deletes selected items.",
+    usage: "/pm-housekeeping [--dry-run]",
     args: "Optional: --dry-run to preview candidates without deleting",
     stateChanges: [],
   },
