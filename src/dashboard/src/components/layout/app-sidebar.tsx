@@ -1,4 +1,5 @@
-import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut, Users, User } from "lucide-react";
+import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut, Users, Webhook } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -27,6 +28,7 @@ export function AppSidebar() {
         { title: "Issues", href: `/projects/${selectedProject.id}/issues`, icon: Bug },
         { title: "Feature Requests", href: `/projects/${selectedProject.id}/feature-requests`, icon: Lightbulb },
         { title: "Work Packages", href: `/projects/${selectedProject.id}/work-packages`, icon: Layers },
+        { title: "Webhooks", href: `/projects/${selectedProject.id}/webhooks`, icon: Webhook },
       ]
     : [];
 
@@ -136,8 +138,12 @@ export function AppSidebar() {
                   asChild
                   isActive={location.pathname === "/profile"}
                 >
-                  <Link to="/profile">
-                    <User />
+                  <Link to="/profile" className="flex items-center gap-2">
+                    <Avatar className="size-5">
+                      <AvatarFallback className="text-[10px] bg-primary/20 text-primary">
+                        {user.displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <span>{user.displayName}</span>
                   </Link>
                 </SidebarMenuButton>
