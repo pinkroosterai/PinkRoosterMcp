@@ -13,10 +13,68 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
     {
         var now = DateTimeOffset.UtcNow;
 
-        // Check if all tasks in the phase are terminal
+        // ── Upward activation: auto-activate phase and WP when tasks become active ──
         var phaseTasks = await db.WorkPackageTasks
             .Where(t => t.PhaseId == phaseId)
             .ToListAsync(ct);
+
+        var firstActiveTask = phaseTasks.FirstOrDefault(t => CompletionStateConstants.ActiveStates.Contains(t.State));
+        if (firstActiveTask is not null)
+        {
+            var phase = await db.WorkPackagePhases.FirstAsync(p => p.Id == phaseId, ct);
+            if (phase.State == CompletionState.NotStarted)
+            {
+                var oldPhaseState = phase.State;
+                phase.State = firstActiveTask.State;
+
+                db.PhaseAuditLogs.Add(new PhaseAuditLog
+                {
+                    PhaseId = phase.Id,
+                    FieldName = "State",
+                    OldValue = oldPhaseState.ToString(),
+                    NewValue = firstActiveTask.State.ToString(),
+                    ChangedBy = changedBy,
+                    ChangedAt = now
+                });
+
+                stateChanges?.Add(new StateChangeDto
+                {
+                    EntityType = "Phase",
+                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
+                    OldState = oldPhaseState.ToString(),
+                    NewState = firstActiveTask.State.ToString(),
+                    Reason = "Auto-activated: task transitioned to active state"
+                });
+            }
+
+            if (wp.State == CompletionState.NotStarted)
+            {
+                var oldWpState = wp.State;
+                wp.State = firstActiveTask.State;
+                StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, firstActiveTask.State);
+
+                db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
+                {
+                    WorkPackageId = wp.Id,
+                    FieldName = "State",
+                    OldValue = oldWpState.ToString(),
+                    NewValue = firstActiveTask.State.ToString(),
+                    ChangedBy = changedBy,
+                    ChangedAt = now
+                });
+
+                stateChanges?.Add(new StateChangeDto
+                {
+                    EntityType = "WorkPackage",
+                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
+                    OldState = oldWpState.ToString(),
+                    NewState = firstActiveTask.State.ToString(),
+                    Reason = "Auto-activated: task transitioned to active state"
+                });
+            }
+        }
+
+        // ── Downward completion: auto-complete phase and WP when all tasks are terminal ──
 
         if (phaseTasks.Count > 0 && phaseTasks.All(t => CompletionStateConstants.TerminalStates.Contains(t.State)))
         {
