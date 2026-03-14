@@ -138,16 +138,6 @@
 .accent-blue { border-left: 3px solid hsl(217 91% 60%); }
 .accent-purple { border-left: 3px solid hsl(271 91% 65%); }
 
-/* ── Animated progress fill ── */
-@keyframes progress-fill {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-.animate-progress [data-indicator] {
-  animation: progress-fill 0.6s ease-out;
-  transform-origin: left;
-}
-
 /* ── Entrance animations ── */
 @keyframes fade-slide-up {
   from {
@@ -219,21 +209,12 @@
   to { background-color: transparent; }
 }
 
-@keyframes field-flash {
-  from { color: var(--flash-color, hsl(350 80% 55%)); }
-  to { color: inherit; }
-}
-
 .animate-badge-pulse {
   animation: badge-pulse 0.6s ease-out forwards;
 }
 
 .animate-row-highlight {
   animation: row-highlight 1.5s ease-out forwards;
-}
-
-.animate-field-flash {
-  animation: field-flash 0.8s ease-out forwards;
 }
 
 /* ── Prose / Markdown content styles ── */

@@ -8,7 +8,7 @@ namespace PinkRooster.Api.Controllers;
 
 [ApiController]
 [Route("api/projects/{projectId:long}/work-packages")]
-public sealed class WorkPackageController(IWorkPackageService workPackageService) : ControllerBase
+public sealed class WorkPackageController(IWorkPackageService workPackageService, IWorkPackageScaffoldingService scaffoldingService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<WorkPackageResponse>>> GetAll(
@@ -65,7 +65,7 @@ public sealed class WorkPackageController(IWorkPackageService workPackageService
         long projectId, ScaffoldWorkPackageRequest request, CancellationToken ct)
     {
         var changedBy = HttpContext.GetCallerIdentity();
-        var result = await workPackageService.ScaffoldAsync(projectId, request, changedBy, ct: ct);
+        var result = await scaffoldingService.ScaffoldAsync(projectId, request, changedBy, ct: ct);
         return Created($"api/projects/{projectId}/work-packages", result);
     }
 

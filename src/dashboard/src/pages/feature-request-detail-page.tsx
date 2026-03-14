@@ -3,9 +3,14 @@ import { useParams, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Lightbulb, Package, Paperclip, Clock, Pencil, X, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Lightbulb, Pencil, X, Save } from "lucide-react";
 import { useFeatureRequest, useDeleteFeatureRequest, useUpdateFeatureRequest, useManageUserStories } from "@/hooks/use-feature-requests";
 import { usePermissions } from "@/hooks/use-permissions";
+import { computeDiff } from "@/lib/form-utils";
+import { TimelineSection } from "@/components/timeline-section";
+import { AttachmentsTable } from "@/components/attachments-table";
+import { RelatedWorkPackages } from "@/components/related-work-packages";
+import { StateChangeConfirmDialog, DeleteConfirmDialog } from "@/components/confirm-dialogs";
 import { PageTransition } from "@/components/page-transition";
 import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateFeatureRequestSchema, type UpdateFeatureRequestInput, featureCategories, priorities, featureStatuses } from "@/lib/schemas";
@@ -22,25 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { stateColorClass } from "@/lib/state-colors";
-import { AnimatedBadge } from "@/components/animated-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { UserStoryCard } from "@/components/user-story-card";
 import { AddUserStoryForm } from "@/components/add-user-story-form";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -59,11 +45,6 @@ const priorityVariant: Record<string, "destructive" | "default" | "secondary" | 
   Low: "outline",
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return "\u2014";
-  return new Date(value).toLocaleString();
-}
-
 function frToFormValues(fr: FeatureRequest): UpdateFeatureRequestInput {
   return {
     name: fr.name,
@@ -76,18 +57,6 @@ function frToFormValues(fr: FeatureRequest): UpdateFeatureRequestInput {
   };
 }
 
-function computeDiff(original: UpdateFeatureRequestInput, current: UpdateFeatureRequestInput): Record<string, unknown> {
-  const diff: Record<string, unknown> = {};
-  for (const key of Object.keys(current) as (keyof UpdateFeatureRequestInput)[]) {
-    const curr = current[key];
-    const orig = original[key];
-    if (curr !== orig && curr !== undefined) {
-      if (curr === "" && (orig === "" || orig === undefined)) continue;
-      diff[key] = curr === "" ? null : curr;
-    }
-  }
-  return diff;
-}
 
 export function FeatureRequestDetailPage() {
   const { id, featureNumber: frNumParam } = useParams<{ id: string; featureNumber: string }>();
@@ -403,156 +372,35 @@ export function FeatureRequestDetailPage() {
         </Card>
       )}
 
-      {/* Related Work Packages */}
-      {fr.linkedWorkPackages.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2.5">
-              <Package className="size-4" /> Related Work Packages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>State</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fr.linkedWorkPackages.map((wp) => {
-                    const wpNum = wp.workPackageId.split("-wp-")[1];
-                    return (
-                      <TableRow
-                        key={wp.workPackageId}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/projects/${projectId}/work-packages/${wpNum}`)}
-                      >
-                        <TableCell className="font-mono text-sm">{wp.workPackageId}</TableCell>
-                        <TableCell className="text-sm">{wp.name}</TableCell>
-                        <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
-                        <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
-                        <TableCell>
-                          <AnimatedBadge value={wp.state} className={stateColorClass(wp.state)}>{wp.state}</AnimatedBadge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <RelatedWorkPackages items={fr.linkedWorkPackages} projectId={projectId} />
 
-      {/* Attachments */}
-      {fr.attachments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2.5">
-              <Paperclip className="size-4" /> Attachments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File</TableHead>
-                    <TableHead>Path</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fr.attachments.map((att, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-sm">{att.fileName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{att.relativePath}</TableCell>
-                      <TableCell className="text-sm">{att.description ?? "\u2014"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <AttachmentsTable attachments={fr.attachments} />
 
-      {/* Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            <Clock className="size-4" /> Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Created</div>
-              <div>{formatDate(fr.createdAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Started</div>
-              <div>{formatDate(fr.startedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Completed</div>
-              <div>{formatDate(fr.completedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Resolved</div>
-              <div>{formatDate(fr.resolvedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Updated</div>
-              <div>{formatDate(fr.updatedAt)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TimelineSection
+        createdAt={fr.createdAt}
+        startedAt={fr.startedAt}
+        completedAt={fr.completedAt}
+        resolvedAt={fr.resolvedAt}
+        updatedAt={fr.updatedAt}
+      />
 
-      {/* Status change confirmation */}
-      <AlertDialog open={!!statusToChange} onOpenChange={(open) => !open && setStatusToChange(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change feature request status?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Transition from <strong>{fr.status}</strong> to <strong>{statusToChange}</strong>.
-              State-driven timestamps will be updated automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleStatusChange}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <StateChangeConfirmDialog
+        open={!!statusToChange}
+        onOpenChange={(open) => !open && setStatusToChange(null)}
+        entityType="feature request"
+        currentState={fr.status}
+        newState={statusToChange}
+        onConfirm={handleStatusChange}
+      />
 
-      {/* Delete confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete feature request?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{fr.name}</strong> ({fr.featureRequestId}).
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        entityType="feature request"
+        entityName={fr.name}
+        entityId={fr.featureRequestId}
+        onConfirm={handleDelete}
+      />
     </div>
     </PageTransition>
   );

@@ -19,6 +19,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IIssueService, IssueService>();
 builder.Services.AddScoped<IFeatureRequestService, FeatureRequestService>();
 builder.Services.AddScoped<IWorkPackageService, WorkPackageService>();
+builder.Services.AddScoped<IWorkPackageScaffoldingService, WorkPackageScaffoldingService>();
 builder.Services.AddScoped<IPhaseService, PhaseService>();
 builder.Services.AddScoped<IWorkPackageTaskService, WorkPackageTaskService>();
 builder.Services.AddScoped<IStateCascadeService, StateCascadeService>();

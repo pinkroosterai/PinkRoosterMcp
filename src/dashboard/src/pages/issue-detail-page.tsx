@@ -3,9 +3,15 @@ import { useParams, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package, Pencil, X, Save } from "lucide-react";
+import { ArrowLeft, Trash2, FileText, Shield, Pencil, X, Save } from "lucide-react";
 import { useIssue, useIssueAuditLog, useDeleteIssue, useUpdateIssue } from "@/hooks/use-issues";
 import { usePermissions } from "@/hooks/use-permissions";
+import { computeDiff } from "@/lib/form-utils";
+import { TimelineSection } from "@/components/timeline-section";
+import { AttachmentsTable } from "@/components/attachments-table";
+import { RelatedWorkPackages } from "@/components/related-work-packages";
+import { AuditLogSection } from "@/components/audit-log-section";
+import { StateChangeConfirmDialog, DeleteConfirmDialog } from "@/components/confirm-dialogs";
 import { PageTransition } from "@/components/page-transition";
 import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateIssueSchema, type UpdateIssueInput, issueTypes, issueSeverities, priorities, completionStates } from "@/lib/schemas";
@@ -21,26 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { stateColorClass } from "@/lib/state-colors";
-import { AnimatedBadge } from "@/components/animated-badge";
 import { MarkdownContent } from "@/components/markdown-content";
 import type { Issue } from "@/types";
 
@@ -50,11 +37,6 @@ const severityVariant: Record<string, "destructive" | "default" | "secondary" | 
   Minor: "secondary",
   Trivial: "outline",
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return "\u2014";
-  return new Date(value).toLocaleString();
-}
 
 function issueToFormValues(issue: Issue): UpdateIssueInput {
   return {
@@ -73,19 +55,6 @@ function issueToFormValues(issue: Issue): UpdateIssueInput {
   };
 }
 
-function computeDiff(original: UpdateIssueInput, current: UpdateIssueInput): Record<string, unknown> {
-  const diff: Record<string, unknown> = {};
-  for (const key of Object.keys(current) as (keyof UpdateIssueInput)[]) {
-    const curr = current[key];
-    const orig = original[key];
-    if (curr !== orig && curr !== undefined) {
-      // Skip empty strings for optional fields (don't send empty string as update)
-      if (curr === "" && (orig === "" || orig === undefined)) continue;
-      diff[key] = curr === "" ? null : curr;
-    }
-  }
-  return diff;
-}
 
 export function IssueDetailPage() {
   const { id, issueNumber: issueNumParam } = useParams<{ id: string; issueNumber: string }>();
@@ -434,204 +403,42 @@ export function IssueDetailPage() {
         </Card>
       )}
 
-      {/* Related Work Packages */}
-      {issue.linkedWorkPackages.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2.5">
-              <Package className="size-4" /> Related Work Packages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>State</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {issue.linkedWorkPackages.map((wp) => {
-                    const wpNum = wp.workPackageId.split("-wp-")[1];
-                    return (
-                      <TableRow
-                        key={wp.workPackageId}
-                        className="cursor-pointer hover:bg-accent/50"
-                        onClick={() => navigate(`/projects/${projectId}/work-packages/${wpNum}`)}
-                      >
-                        <TableCell className="font-mono text-sm">{wp.workPackageId}</TableCell>
-                        <TableCell className="text-sm">{wp.name}</TableCell>
-                        <TableCell><Badge variant="outline">{wp.type}</Badge></TableCell>
-                        <TableCell><Badge variant="outline">{wp.priority}</Badge></TableCell>
-                        <TableCell>
-                          <AnimatedBadge value={wp.state} className={stateColorClass(wp.state)}>{wp.state}</AnimatedBadge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <RelatedWorkPackages items={issue.linkedWorkPackages} projectId={projectId} />
 
-      {/* Attachments */}
-      {issue.attachments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2.5">
-              <Paperclip className="size-4" /> Attachments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File</TableHead>
-                    <TableHead>Path</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {issue.attachments.map((att, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-sm">{att.fileName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{att.relativePath}</TableCell>
-                      <TableCell className="text-sm">{att.description ?? "\u2014"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <AttachmentsTable attachments={issue.attachments} />
 
-      {/* Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            <Clock className="size-4" /> Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Created</div>
-              <div>{formatDate(issue.createdAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Started</div>
-              <div>{formatDate(issue.startedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Completed</div>
-              <div>{formatDate(issue.completedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Resolved</div>
-              <div>{formatDate(issue.resolvedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Updated</div>
-              <div>{formatDate(issue.updatedAt)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TimelineSection
+        createdAt={issue.createdAt}
+        startedAt={issue.startedAt}
+        completedAt={issue.completedAt}
+        resolvedAt={issue.resolvedAt}
+        updatedAt={issue.updatedAt}
+      />
 
-      {/* Audit Log */}
-      <Card>
-        <CardHeader className="cursor-pointer select-none" onClick={() => setAuditExpanded(!auditExpanded)}>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            Audit Log
-            <span className="text-xs text-muted-foreground font-normal">
-              ({auditLog?.length ?? 0} entries) {auditExpanded ? "\u25B2" : "\u25BC"}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        {auditExpanded && (
-          <CardContent>
-            {auditLoading ? (
-              <div className="text-muted-foreground text-sm">Loading audit log...</div>
-            ) : !auditLog?.length ? (
-              <div className="text-muted-foreground text-sm">No audit entries.</div>
-            ) : (
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>Field</TableHead>
-                      <TableHead>Old Value</TableHead>
-                      <TableHead>New Value</TableHead>
-                      <TableHead>Changed By</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {auditLog.map((entry, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(entry.changedAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{entry.fieldName}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">{entry.oldValue ?? "\u2014"}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">{entry.newValue ?? "\u2014"}</TableCell>
-                        <TableCell className="text-xs">{entry.changedBy}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+      <AuditLogSection
+        entries={auditLog}
+        isLoading={auditLoading}
+        expanded={auditExpanded}
+        onExpandedChange={setAuditExpanded}
+      />
 
-      {/* State change confirmation dialog */}
-      <AlertDialog open={!!stateToChange} onOpenChange={(open) => !open && setStateToChange(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change issue state?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Transition from <strong>{issue.state}</strong> to <strong>{stateToChange}</strong>.
-              State-driven timestamps will be updated automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleStateChange}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <StateChangeConfirmDialog
+        open={!!stateToChange}
+        onOpenChange={(open) => !open && setStateToChange(null)}
+        entityType="issue"
+        currentState={issue.state}
+        newState={stateToChange}
+        onConfirm={handleStateChange}
+      />
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete issue?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{issue.name}</strong> ({issue.issueId}).
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        entityType="issue"
+        entityName={issue.name}
+        entityId={issue.issueId}
+        onConfirm={handleDelete}
+      />
     </div>
     </PageTransition>
   );

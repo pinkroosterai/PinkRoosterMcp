@@ -3,9 +3,13 @@ import { useParams, useNavigate, Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock, Pencil, X, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, X, Save } from "lucide-react";
 import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask, useUpdateWorkPackage, useUpdateTask } from "@/hooks/use-work-packages";
 import { usePermissions } from "@/hooks/use-permissions";
+import { computeDiff } from "@/lib/form-utils";
+import { TimelineSection } from "@/components/timeline-section";
+import { AttachmentsTable } from "@/components/attachments-table";
+import { StateChangeConfirmDialog, DeleteConfirmDialog } from "@/components/confirm-dialogs";
 import { PageTransition } from "@/components/page-transition";
 import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateWorkPackageSchema, type UpdateWorkPackageInput, workPackageTypes, priorities, completionStates } from "@/lib/schemas";
@@ -58,11 +62,6 @@ const priorityVariant: Record<string, "destructive" | "default" | "secondary" | 
   Low: "outline",
 };
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "\u2014";
-  return new Date(value).toLocaleString();
-}
-
 function showCascadeToasts(stateChanges?: StateChangeDto[] | null) {
   if (!stateChanges?.length) return;
   for (const sc of stateChanges) {
@@ -82,18 +81,6 @@ function wpToFormValues(wp: WorkPackage): UpdateWorkPackageInput {
   };
 }
 
-function computeDiff(original: UpdateWorkPackageInput, current: UpdateWorkPackageInput): Record<string, unknown> {
-  const diff: Record<string, unknown> = {};
-  for (const key of Object.keys(current) as (keyof UpdateWorkPackageInput)[]) {
-    const curr = current[key];
-    const orig = original[key];
-    if (curr !== orig && curr !== undefined) {
-      if (curr === "" && (orig === "" || orig === undefined)) continue;
-      diff[key] = curr === "" ? null : curr;
-    }
-  }
-  return diff;
-}
 
 export function WorkPackageDetailPage() {
   const { id, wpNumber: wpNumParam } = useParams<{ id: string; wpNumber: string }>();
@@ -516,71 +503,15 @@ export function WorkPackageDetailPage() {
         </Card>
       )}
 
-      {/* Timeline Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            <Clock className="size-4" /> Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Started</div>
-              <div>{formatDate(wp.startedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Completed</div>
-              <div>{formatDate(wp.completedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Resolved</div>
-              <div>{formatDate(wp.resolvedAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Created</div>
-              <div>{formatDate(wp.createdAt)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Updated</div>
-              <div>{formatDate(wp.updatedAt)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TimelineSection
+        createdAt={wp.createdAt}
+        startedAt={wp.startedAt}
+        completedAt={wp.completedAt}
+        resolvedAt={wp.resolvedAt}
+        updatedAt={wp.updatedAt}
+      />
 
-      {/* Attachments Card */}
-      {wp.attachments && wp.attachments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Attachments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File</TableHead>
-                    <TableHead>Path</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {wp.attachments.map((att, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-sm">{att.fileName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {att.relativePath}
-                      </TableCell>
-                      <TableCell className="text-sm">{att.description ?? "\u2014"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <AttachmentsTable attachments={wp.attachments ?? []} />
 
       {/* Phase / Task Tree Section */}
       <div className="space-y-4">
@@ -834,22 +765,14 @@ export function WorkPackageDetailPage() {
         )}
       </div>
 
-      {/* State change confirmation dialog */}
-      <AlertDialog open={!!stateToChange} onOpenChange={(open) => !open && setStateToChange(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change work package state?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Transition from <strong>{wp.state}</strong> to <strong>{stateToChange}</strong>.
-              State-driven timestamps will be updated automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleStateChange}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <StateChangeConfirmDialog
+        open={!!stateToChange}
+        onOpenChange={(open) => !open && setStateToChange(null)}
+        entityType="work package"
+        currentState={wp.state}
+        newState={stateToChange}
+        onConfirm={handleStateChange}
+      />
 
       {/* Phase Delete Dialog */}
       <AlertDialog
@@ -901,27 +824,14 @@ export function WorkPackageDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete work package?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{wp.name}</strong> ({wp.workPackageId}).
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        entityType="work package"
+        entityName={wp.name}
+        entityId={wp.workPackageId}
+        onConfirm={handleDelete}
+      />
     </div>
     </PageTransition>
   );

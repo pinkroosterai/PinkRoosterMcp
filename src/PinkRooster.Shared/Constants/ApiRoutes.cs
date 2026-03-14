@@ -14,13 +14,4 @@ public static class ApiRoutes
         public const string Route = $"{Base}/projects";
     }
 
-    public static class Issues
-    {
-        public const string Route = $"{Base}/projects/{{projectId:long}}/issues";
-    }
-
-    public static class WorkPackages
-    {
-        public const string Route = $"{Base}/projects/{{projectId:long}}/work-packages";
-    }
 }

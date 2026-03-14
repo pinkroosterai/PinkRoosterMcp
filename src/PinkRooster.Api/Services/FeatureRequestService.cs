@@ -328,13 +328,18 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
 
     private static IQueryable<FeatureRequest> ApplyStateFilter(IQueryable<FeatureRequest> query, string? stateFilter)
     {
-        return stateFilter?.ToLowerInvariant() switch
+        if (string.IsNullOrWhiteSpace(stateFilter))
+            return query;
+
+        var statuses = stateFilter.ToLowerInvariant() switch
         {
-            "active" => query.Where(fr => FeatureStatusConstants.ActiveStates.Contains(fr.Status)),
-            "inactive" => query.Where(fr => FeatureStatusConstants.InactiveStates.Contains(fr.Status)),
-            "terminal" => query.Where(fr => FeatureStatusConstants.TerminalStates.Contains(fr.Status)),
-            _ => query
+            "active" => FeatureStatusConstants.ActiveStates,
+            "inactive" => FeatureStatusConstants.InactiveStates,
+            "terminal" => FeatureStatusConstants.TerminalStates,
+            _ => null
         };
+
+        return statuses is null ? query : query.Where(fr => statuses.Contains(fr.Status));
     }
 
     private static List<UserStory> MapUserStories(List<UserStoryDto>? dtos) =>

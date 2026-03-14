@@ -24,7 +24,7 @@ export interface Project {
   name: string;
   description: string;
   projectPath: string;
-  status: "Active" | "Archived";
+  status: "Active";
   createdAt: string;
   updatedAt: string;
 }
