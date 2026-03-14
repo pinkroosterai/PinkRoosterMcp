@@ -423,7 +423,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-475+ tests: 333 API integration tests + 142 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
+700+ tests: 333 API integration tests + 112 unit tests + 255 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
 
 ---
 

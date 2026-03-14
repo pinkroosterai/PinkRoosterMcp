@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Bug, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -58,7 +58,8 @@ function MiniDonut({ percent, size = 48 }: { percent: number; size?: number }) {
 }
 
 const stateFilters = [
-  { label: "All", value: undefined },
+  { label: "Open", value: "open" },
+  { label: "All", value: "all" },
   { label: "Active", value: "active" },
   { label: "Inactive", value: "inactive" },
   { label: "Terminal", value: "terminal" },
@@ -102,8 +103,13 @@ export function IssuesListPage() {
   const projectId = Number(id);
   const navigate = useNavigate();
 
-  const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
-  const { data: issues, isLoading } = useIssues(projectId, stateFilter);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stateFilter = searchParams.get("state") ?? "open";
+  const setStateFilter = (value: string) => {
+    setSearchParams({ state: value }, { replace: true });
+  };
+  const apiFilter = stateFilter === "all" ? undefined : stateFilter;
+  const { data: issues, isLoading } = useIssues(projectId, apiFilter);
   const { data: summary } = useIssueSummary(projectId);
   const { canCreate } = usePermissions(projectId);
   const deleteIssue = useDeleteIssue();

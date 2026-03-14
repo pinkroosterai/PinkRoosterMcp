@@ -331,6 +331,9 @@ public sealed class FeatureRequestService(AppDbContext db, IEventBroadcaster bro
         if (string.IsNullOrWhiteSpace(stateFilter))
             return query;
 
+        if (stateFilter.Equals("open", StringComparison.OrdinalIgnoreCase))
+            return query.Where(fr => !FeatureStatusConstants.TerminalStates.Contains(fr.Status));
+
         var statuses = stateFilter.ToLowerInvariant() switch
         {
             "active" => FeatureStatusConstants.ActiveStates,

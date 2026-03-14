@@ -330,6 +330,9 @@ public sealed class IssueService(AppDbContext db, IEventBroadcaster broadcaster)
         if (string.IsNullOrWhiteSpace(stateFilter))
             return query;
 
+        if (stateFilter.Equals("open", StringComparison.OrdinalIgnoreCase))
+            return query.Where(i => !CompletionStateConstants.TerminalStates.Contains(i.State));
+
         var states = stateFilter.ToLowerInvariant() switch
         {
             "active" => CompletionStateConstants.ActiveStates,

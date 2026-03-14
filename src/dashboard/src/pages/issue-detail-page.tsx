@@ -143,7 +143,7 @@ export function IssueDetailPage() {
   if (!issue) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/issues`)}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="size-4 mr-1" /> Back
         </Button>
         <div className="text-muted-foreground">Issue not found.</div>
@@ -162,7 +162,7 @@ export function IssueDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/projects/${projectId}/issues`)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="size-4" />
           </Button>
           <div>

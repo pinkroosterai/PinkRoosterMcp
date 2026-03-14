@@ -484,6 +484,9 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         if (string.IsNullOrWhiteSpace(stateFilter))
             return query;
 
+        if (stateFilter.Equals("open", StringComparison.OrdinalIgnoreCase))
+            return query.Where(w => !CompletionStateConstants.TerminalStates.Contains(w.State));
+
         var states = stateFilter.ToLowerInvariant() switch
         {
             "active" => CompletionStateConstants.ActiveStates,
