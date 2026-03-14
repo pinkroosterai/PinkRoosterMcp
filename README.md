@@ -12,7 +12,7 @@ The first project management system built from scratch for AI coding agents — 
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green)](https://modelcontextprotocol.io/)
 [![Docker](https://img.shields.io/badge/Docker-Hub-2496ED)](https://hub.docker.com/r/pinkrooster/pinkroostermcp)
-[![Tests](https://img.shields.io/badge/Tests-644_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/Tests-322_API_+_142_frontend-brightgreen)]()
 
 [Quick Start](#quick-start) · [Why PinkRooster?](#why-pinkrooster) · [Dashboard](#dashboard) · [MCP Tools](#mcp-tools) · [PM Skills](#pm-workflow-skills) · [Getting Started](#getting-started)
 
@@ -67,6 +67,7 @@ Traditional workflow:
 | **Setup time** | 1 command | Account + OAuth + config | Account + API key + config |
 | **State cascades** | Automatic (5 levels deep) | Manual updates | Manual updates |
 | **Work breakdown** | Agent scaffolds from description | You write every ticket | You write every ticket |
+| **Multi-user RBAC** | Built-in (4 roles, per-project) | Org-level permissions | Workspace roles |
 | **Project memories** | Built-in cross-session context | None | None |
 | **Autonomous mode** | `/pm-next --auto` | None | None |
 | **Token-optimized responses** | Purpose-built for agents | Verbose human-facing payloads | Verbose human-facing payloads |
@@ -115,6 +116,10 @@ Persistent knowledge store for decisions, patterns, and context that survives ac
 ### Human-Readable IDs
 
 `proj-1-issue-3`, `proj-1-wp-2-task-5` — readable by both agents and humans in conversation. No GUIDs, no opaque numeric IDs.
+
+### Multi-User Accounts & Per-Project RBAC
+
+Built-in user account system with Argon2id password hashing, session management, and per-project role-based access control. Four roles (SuperUser, Admin, Editor, Viewer) give fine-grained control over who can do what on each project. First user auto-gets SuperUser. API key auth for MCP/programmatic access runs in parallel — no RBAC overhead for agents.
 
 ### Full Observability
 
@@ -214,6 +219,8 @@ Every API request is logged with method, path, status, duration, and caller iden
 | **Phase** | Grouping of related tasks within a work package | Auto-completes when all tasks reach terminal state |
 | **Task** | Atomic unit of work with target files | Same states as Issue, supports dependency blocking |
 | **Project Memory** | Stored knowledge, decisions, patterns, and context | Stateless (no lifecycle) |
+| **User** | Multi-user accounts with Argon2id password hashing | Active / Inactive (soft delete) |
+| **User Project Role** | Per-project role assignment (Admin, Editor, Viewer) | — |
 
 ---
 
@@ -338,8 +345,6 @@ services:
       DATABASE_URL: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD:-pinkrooster}"
       API_KEY: ${API_KEY:-}
       MCP_API_KEY: ${MCP_API_KEY:-}
-      DASHBOARD_USER: ${DASHBOARD_USER:-}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -382,15 +387,15 @@ make dev-api      # API only (hot reload)
 make dev-dashboard # Dashboard only (Vite dev server)
 ```
 
-### Authentication (Optional)
+### Authentication
 
-Everything runs with open access by default. To enable authentication, edit `.env`:
+**Dashboard**: Multi-user authentication is built in. On first visit, you'll see a registration form — the first user automatically becomes SuperUser. Subsequent users are created via the Users management page and assigned per-project roles (Admin, Editor, Viewer).
+
+**API / MCP**: Optional API key authentication. Everything runs with open access by default. To enable, edit `.env`:
 
 ```bash
 API_KEY=your-api-key          # API authentication (required by MCP→API calls)
 MCP_API_KEY=your-mcp-key      # MCP server authentication (optional, separate from API_KEY)
-DASHBOARD_USER=admin           # Dashboard login
-DASHBOARD_PASSWORD=secret      # Dashboard password
 ```
 
 ### Troubleshooting
@@ -414,7 +419,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-644 tests: 277 API integration tests + 112 unit tests + 255 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
+464+ tests: 322 API integration tests + 142 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
 
 ---
 
@@ -423,7 +428,7 @@ cd src/dashboard && npm test
 | Layer | Technology |
 |-------|-----------|
 | MCP Server | .NET 9, [ModelContextProtocol SDK](https://github.com/modelcontextprotocol/csharp-sdk) |
-| REST API | .NET 9, ASP.NET Core |
+| REST API | .NET 9, ASP.NET Core, Argon2id (Konscious.Security.Cryptography) |
 | Database | PostgreSQL 17, EF Core 9 |
 | Dashboard | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui, TanStack Query/Table, Recharts |
 | Testing | xUnit v3, Testcontainers, Respawn, Vitest, React Testing Library, MSW |

@@ -1,4 +1,4 @@
-import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut } from "lucide-react";
+import { LayoutDashboard, ScrollText, FolderOpen, Bug, Layers, Lightbulb, HelpCircle, LogOut, Users, User } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -20,7 +20,7 @@ import { useAuth } from "@/components/auth-provider";
 export function AppSidebar() {
   const location = useLocation();
   const { selectedProject } = useProjectContext();
-  const { isProtected, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
 
   const projectItems = selectedProject
     ? [
@@ -51,6 +51,19 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {user?.globalRole === "SuperUser" && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith("/users")}
+                  >
+                    <Link to="/users">
+                      <Users />
+                      <span>Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -115,13 +128,27 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {isProtected && (
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={logout}>
-                <LogOut />
-                <span>Sign out</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+          {isAuthenticated && user && (
+            <>
+              <SidebarSeparator />
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/profile"}
+                >
+                  <Link to="/profile">
+                    <User />
+                    <span>{user.displayName}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={logout}>
+                  <LogOut />
+                  <span>Sign out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
           )}
         </SidebarMenu>
       </SidebarFooter>

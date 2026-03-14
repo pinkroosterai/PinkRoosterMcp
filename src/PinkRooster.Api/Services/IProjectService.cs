@@ -5,7 +5,7 @@ namespace PinkRooster.Api.Services;
 
 public interface IProjectService
 {
-    Task<List<ProjectResponse>> GetAllAsync(CancellationToken ct = default);
+    Task<List<ProjectResponse>> GetAllAsync(long? userId = null, CancellationToken ct = default);
     Task<ProjectResponse?> GetByPathAsync(string projectPath, CancellationToken ct = default);
     Task<(ProjectResponse Project, bool IsNew)> CreateOrUpdateAsync(
         CreateOrUpdateProjectRequest request, CancellationToken ct = default);

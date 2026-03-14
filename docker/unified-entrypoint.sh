@@ -54,10 +54,6 @@ else
 fi
 sed -i "s|^environment=ASPNETCORE_URLS=\"http://+:8081\"|environment=${MCP_ENV}|" /etc/supervisor/conf.d/pinkrooster.conf
 
-# --- Dashboard auth env (passed to Node.js auth-server via process env) ---
-export DASHBOARD_USER="${DASHBOARD_USER:-}"
-export DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-}"
-
 echo "=== PinkRooster Unified Container ==="
 echo "  API:       http://localhost:8080 (internal)"
 echo "  MCP:       http://localhost:8081 (exposed)"

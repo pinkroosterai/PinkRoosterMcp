@@ -6,13 +6,27 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  checkAuthConfig,
+  getCurrentUser,
+  login as apiLogin,
+  logout as apiLogout,
+  register as apiRegister,
+  type AuthUser,
+} from "@/api/auth";
 
 interface AuthContextValue {
   isProtected: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<string | null>;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -21,23 +35,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isProtected, setIsProtected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const checkAuth = useCallback(async () => {
     try {
-      const res = await fetch("/auth/config", { credentials: "include" });
-      if (!res.ok) {
-        // Auth endpoint not available — treat as unprotected
-        setIsProtected(false);
+      const config = await checkAuthConfig();
+      setIsProtected(config.isProtected);
+
+      if (config.isProtected) {
+        // Check if we have a valid session
+        const currentUser = await getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else {
+        // No users yet — show registration
+        setUser(null);
         setIsAuthenticated(false);
-        return;
       }
-      const data = await res.json();
-      setIsProtected(data.protected);
-      setIsAuthenticated(!data.protected || data.authenticated);
     } catch {
-      // Network error — treat as unprotected
+      // API not available — treat as unprotected
       setIsProtected(false);
       setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -48,22 +72,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [checkAuth]);
 
   const login = useCallback(
-    async (username: string, password: string): Promise<string | null> => {
+    async (email: string, password: string): Promise<string | null> => {
       try {
-        const res = await fetch("/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ username, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          return data.error || "Login failed";
-        }
+        const response = await apiLogin(email, password);
+        setUser(response.user);
         setIsAuthenticated(true);
+        setIsProtected(true);
         return null;
-      } catch {
-        return "Network error";
+      } catch (err) {
+        return err instanceof Error ? err.message : "Login failed";
+      }
+    },
+    [],
+  );
+
+  const register = useCallback(
+    async (
+      email: string,
+      password: string,
+      displayName: string,
+    ): Promise<string | null> => {
+      try {
+        await apiRegister(email, password, displayName);
+        // Auto-login after registration
+        const response = await apiLogin(email, password);
+        setUser(response.user);
+        setIsAuthenticated(true);
+        setIsProtected(true);
+        return null;
+      } catch (err) {
+        return err instanceof Error ? err.message : "Registration failed";
       }
     },
     [],
@@ -71,19 +109,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch("/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await apiLogout();
     } catch {
       // Ignore logout errors
     }
+    setUser(null);
     setIsAuthenticated(false);
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ isProtected, isAuthenticated, isLoading, login, logout }}
+      value={{
+        isProtected,
+        isAuthenticated,
+        isLoading,
+        user,
+        login,
+        logout,
+        register,
+      }}
     >
       {children}
     </AuthContext.Provider>

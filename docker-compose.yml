@@ -44,8 +44,6 @@ services:
       DATABASE_URL: "Host=postgres;Database=pinkrooster;Username=pinkrooster;Password=${POSTGRES_PASSWORD}"
       API_KEY: ${API_KEY:-}
       MCP_API_KEY: ${MCP_API_KEY:-}
-      DASHBOARD_USER: ${DASHBOARD_USER:-}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

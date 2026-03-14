@@ -2,10 +2,9 @@ import path from "path"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
-import { authPlugin } from "./vite-auth-plugin"
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), authPlugin()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Lightbulb, Package, Paperclip, Clock, Pencil, X, Save } from "lucide-react";
 import { useFeatureRequest, useDeleteFeatureRequest, useUpdateFeatureRequest, useManageUserStories } from "@/hooks/use-feature-requests";
+import { usePermissions } from "@/hooks/use-permissions";
 import { updateFeatureRequestSchema, type UpdateFeatureRequestInput, featureCategories, priorities, featureStatuses } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,7 @@ export function FeatureRequestDetailPage() {
   const navigate = useNavigate();
 
   const { data: fr, isLoading } = useFeatureRequest(projectId, frNumber);
+  const { canEdit, canDelete } = usePermissions(projectId);
   const deleteFr = useDeleteFeatureRequest();
   const updateFr = useUpdateFeatureRequest();
   const manageStories = useManageUserStories();
@@ -259,17 +261,21 @@ export function FeatureRequestDetailPage() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Pencil className="size-4 mr-1" /> Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="size-4 mr-1" /> Delete
-              </Button>
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Pencil className="size-4 mr-1" /> Edit
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="size-4 mr-1" /> Delete
+                </Button>
+              )}
             </>
           )}
         </div>

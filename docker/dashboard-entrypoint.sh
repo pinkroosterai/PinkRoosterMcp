@@ -1,3 +1,2 @@
 #!/bin/sh
-# Start the auth server in the background
-node /opt/auth-server.mjs &
+# Dashboard entrypoint — auth is now handled by the API server

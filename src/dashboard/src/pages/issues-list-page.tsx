@@ -4,6 +4,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Bug, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedBadge } from "@/components/animated-badge";
@@ -102,6 +103,7 @@ export function IssuesListPage() {
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
   const { data: issues, isLoading } = useIssues(projectId, stateFilter);
   const { data: summary } = useIssueSummary(projectId);
+  const { canCreate } = usePermissions(projectId);
   const deleteIssue = useDeleteIssue();
   const [issueToDelete, setIssueToDelete] = useState<Issue | null>(null);
   const { rowClassName } = useRowHighlight(issues ?? [], (i) => i.issueId);
@@ -195,11 +197,13 @@ export function IssuesListPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
           <Bug className="size-6" /> Issues
         </h1>
-        <Button asChild>
-          <Link to={`/projects/${projectId}/issues/new`}>
-            <Plus className="size-4 mr-1.5" /> Create Issue
-          </Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link to={`/projects/${projectId}/issues/new`}>
+              <Plus className="size-4 mr-1.5" /> Create Issue
+            </Link>
+          </Button>
+        )}
       </div>
 
       {summary && (() => {
@@ -269,11 +273,13 @@ export function IssuesListPage() {
             <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
               Create your first issue to start tracking bugs and defects.
             </p>
-            <Button asChild>
-              <Link to={`/projects/${projectId}/issues/new`}>
-                <Plus className="size-4 mr-1.5" /> Create Issue
-              </Link>
-            </Button>
+            {canCreate && (
+              <Button asChild>
+                <Link to={`/projects/${projectId}/issues/new`}>
+                  <Plus className="size-4 mr-1.5" /> Create Issue
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

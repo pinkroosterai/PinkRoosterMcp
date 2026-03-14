@@ -27,5 +27,3 @@ services:
     environment:
       API_URL: http://api:8080
       API_KEY: ${API_KEY}
-      DASHBOARD_USER: ${DASHBOARD_USER:-}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}

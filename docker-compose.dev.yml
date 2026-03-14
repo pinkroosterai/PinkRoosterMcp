@@ -66,8 +66,6 @@ services:
       - "3000:80"
     environment:
       API_KEY: ${API_KEY:-}
-      DASHBOARD_USER: ${DASHBOARD_USER:-}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     depends_on:
       api:
         condition: service_healthy

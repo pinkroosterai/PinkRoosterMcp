@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using PinkRooster.Api.Middleware;
 using PinkRooster.Api.Services;
@@ -21,9 +23,13 @@ builder.Services.AddScoped<IPhaseService, PhaseService>();
 builder.Services.AddScoped<IWorkPackageTaskService, WorkPackageTaskService>();
 builder.Services.AddScoped<IStateCascadeService, StateCascadeService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IProjectRoleService, ProjectRoleService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddSingleton<ActivityLogChannel>();
 builder.Services.AddHostedService<ActivityLogWriterService>();
+builder.Services.AddHostedService<SessionCleanupService>();
 
 // Controllers + Swagger
 builder.Services.AddControllers()
@@ -43,9 +49,43 @@ builder.Services.AddCors(options =>
                 builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
                 ?? ["http://localhost:3000"])
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
+
+// Rate limiting (disabled in Testing environment for integration tests)
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.AddFixedWindowLimiter("auth-login", opt =>
+        {
+            opt.PermitLimit = 5;
+            opt.Window = TimeSpan.FromMinutes(1);
+            opt.QueueLimit = 0;
+        });
+
+        options.AddFixedWindowLimiter("auth-register", opt =>
+        {
+            opt.PermitLimit = 3;
+            opt.Window = TimeSpan.FromHours(1);
+            opt.QueueLimit = 0;
+        });
+
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 100,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+    });
+}
 
 var app = builder.Build();
 
@@ -80,7 +120,11 @@ if (!app.Environment.IsDevelopment())
 
 // Middleware pipeline
 app.UseCors();
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseRateLimiter();
+app.UseMiddleware<SessionAuthMiddleware>();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
+app.UseMiddleware<ProjectAuthorizationMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 // Endpoints

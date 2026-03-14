@@ -9,9 +9,27 @@ namespace PinkRooster.Api.Services;
 
 public sealed class ProjectService(AppDbContext db) : IProjectService
 {
-    public async Task<List<ProjectResponse>> GetAllAsync(CancellationToken ct = default)
+    public async Task<List<ProjectResponse>> GetAllAsync(long? userId = null, CancellationToken ct = default)
     {
-        return await db.Projects
+        var query = db.Projects.AsQueryable();
+
+        // Filter by user access if userId is provided
+        if (userId is not null)
+        {
+            // Check if user is SuperUser (global access)
+            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is not null && user.GlobalRole != GlobalRole.SuperUser)
+            {
+                // Non-SuperUser: only show projects where user has a role
+                var accessibleProjectIds = db.UserProjectRoles
+                    .Where(r => r.UserId == userId)
+                    .Select(r => r.ProjectId);
+
+                query = query.Where(p => accessibleProjectIds.Contains(p.Id));
+            }
+        }
+
+        return await query
             .OrderByDescending(p => p.CreatedAt)
             .Select(p => ToResponse(p))
             .ToListAsync(ct);

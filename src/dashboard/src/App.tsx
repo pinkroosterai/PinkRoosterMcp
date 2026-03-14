@@ -20,6 +20,10 @@ import { WorkPackageDetailPage } from "@/pages/work-package-detail-page";
 import { FeatureRequestDetailPage } from "@/pages/feature-request-detail-page";
 import { WorkPackageCreatePage } from "@/pages/work-package-create-page";
 import { SkillsHelpPage } from "@/pages/skills-help-page";
+import { UsersListPage } from "@/pages/users-list-page";
+import { UserCreatePage } from "@/pages/user-create-page";
+import { UserDetailPage } from "@/pages/user-detail-page";
+import { ProfilePage } from "@/pages/profile-page";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +35,7 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isProtected, isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -41,7 +45,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isProtected && !isAuthenticated) {
+  // Show login/register page when:
+  // - Users exist but not authenticated (login mode)
+  // - No users exist yet (registration mode)
+  if (!isAuthenticated) {
     return <LoginPage />;
   }
 
@@ -71,6 +78,10 @@ function App() {
                       <Route path="projects/:id/work-packages" element={<WorkPackagesListPage />} />
                       <Route path="projects/:id/work-packages/new" element={<WorkPackageCreatePage />} />
                       <Route path="projects/:id/work-packages/:wpNumber" element={<WorkPackageDetailPage />} />
+                      <Route path="users" element={<UsersListPage />} />
+                      <Route path="users/new" element={<UserCreatePage />} />
+                      <Route path="users/:id" element={<UserDetailPage />} />
+                      <Route path="profile" element={<ProfilePage />} />
                       <Route path="activity" element={<ActivityLogPage />} />
                       <Route path="help" element={<SkillsHelpPage />} />
                     </Route>

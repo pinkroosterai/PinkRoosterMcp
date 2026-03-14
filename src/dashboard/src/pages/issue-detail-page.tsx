@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package, Pencil, X, Save } from "lucide-react";
 import { useIssue, useIssueAuditLog, useDeleteIssue, useUpdateIssue } from "@/hooks/use-issues";
+import { usePermissions } from "@/hooks/use-permissions";
 import { updateIssueSchema, type UpdateIssueInput, issueTypes, issueSeverities, priorities, completionStates } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ export function IssueDetailPage() {
 
   const { data: issue, isLoading } = useIssue(projectId, issueNumber);
   const { data: auditLog, isLoading: auditLoading } = useIssueAuditLog(projectId, issueNumber);
+  const { canEdit, canDelete } = usePermissions(projectId);
   const deleteIssue = useDeleteIssue();
   const updateIssue = useUpdateIssue();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -233,17 +235,21 @@ export function IssueDetailPage() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Pencil className="size-4 mr-1" /> Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="size-4 mr-1" /> Delete
-              </Button>
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Pencil className="size-4 mr-1" /> Edit
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="size-4 mr-1" /> Delete
+                </Button>
+              )}
             </>
           )}
         </div>

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock, Pencil, X, Save } from "lucide-react";
 import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask, useUpdateWorkPackage, useUpdateTask } from "@/hooks/use-work-packages";
+import { usePermissions } from "@/hooks/use-permissions";
 import { updateWorkPackageSchema, type UpdateWorkPackageInput, workPackageTypes, priorities, completionStates } from "@/lib/schemas";
 import type { TaskDep, Phase as PhaseType, WpTask, WorkPackage, StateChangeDto } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,7 @@ export function WorkPackageDetailPage() {
   const navigate = useNavigate();
 
   const { data: wp, isLoading } = useWorkPackage(projectId, wpNumber);
+  const { canEdit, canDelete } = usePermissions(projectId);
   const deleteWorkPackage = useDeleteWorkPackage();
   const deletePhase = useDeletePhase();
   const deleteTask = useDeleteTask();
@@ -344,17 +346,21 @@ export function WorkPackageDetailPage() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Pencil className="size-4 mr-1" /> Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="size-4 mr-1" /> Delete
-              </Button>
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Pencil className="size-4 mr-1" /> Edit
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="size-4 mr-1" /> Delete
+                </Button>
+              )}
             </>
           )}
         </div>

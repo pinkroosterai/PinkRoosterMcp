@@ -51,10 +51,9 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 
-# Install nginx, Node.js (for auth server), supervisor, and curl (healthchecks)
+# Install nginx, supervisor, and curl (healthchecks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
-    nodejs \
     supervisor \
     curl \
  && rm -rf /var/lib/apt/lists/*
@@ -68,7 +67,6 @@ COPY --from=dashboard-build /app/dist /usr/share/nginx/html
 
 # --- Config files ---
 COPY docker/nginx-unified.conf /etc/nginx/sites-available/default
-COPY docker/auth-server.mjs /opt/auth-server.mjs
 COPY docker/supervisord.conf /etc/supervisor/conf.d/pinkrooster.conf
 COPY docker/unified-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

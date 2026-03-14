@@ -4,6 +4,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Layers, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useWorkPackages, useWorkPackageSummary, useDeleteWorkPackage } from "@/hooks/use-work-packages";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedBadge } from "@/components/animated-badge";
@@ -117,6 +118,7 @@ export function WorkPackagesListPage() {
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
   const { data: workPackages, isLoading } = useWorkPackages(projectId, stateFilter);
   const { data: summary } = useWorkPackageSummary(projectId);
+  const { canCreate } = usePermissions(projectId);
   const deleteWp = useDeleteWorkPackage();
   const [wpToDelete, setWpToDelete] = useState<WorkPackage | null>(null);
   const { rowClassName } = useRowHighlight(workPackages ?? [], (wp) => wp.workPackageId);
@@ -224,11 +226,13 @@ export function WorkPackagesListPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Layers className="size-6" /> Work Packages
         </h1>
-        <Button asChild>
-          <Link to={`/projects/${projectId}/work-packages/new`}>
-            <Plus className="size-4 mr-1.5" /> Create Work Package
-          </Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link to={`/projects/${projectId}/work-packages/new`}>
+              <Plus className="size-4 mr-1.5" /> Create Work Package
+            </Link>
+          </Button>
+        )}
       </div>
 
       {summary && (() => {
@@ -298,11 +302,13 @@ export function WorkPackagesListPage() {
             <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
               No work packages yet. Create one to start planning.
             </p>
-            <Button asChild>
-              <Link to={`/projects/${projectId}/work-packages/new`}>
-                <Plus className="size-4 mr-1.5" /> Create Work Package
-              </Link>
-            </Button>
+            {canCreate && (
+              <Button asChild>
+                <Link to={`/projects/${projectId}/work-packages/new`}>
+                  <Plus className="size-4 mr-1.5" /> Create Work Package
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

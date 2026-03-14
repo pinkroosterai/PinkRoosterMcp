@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Lightbulb, Plus } from "lucide-react";
 import { useFeatureRequests, useDeleteFeatureRequest } from "@/hooks/use-feature-requests";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedBadge } from "@/components/animated-badge";
@@ -61,6 +62,7 @@ export function FeatureRequestsListPage() {
 
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
   const { data: featureRequests, isLoading } = useFeatureRequests(projectId, stateFilter);
+  const { canCreate } = usePermissions(projectId);
   const deleteFr = useDeleteFeatureRequest();
   const [frToDelete, setFrToDelete] = useState<FeatureRequest | null>(null);
   const { rowClassName } = useRowHighlight(featureRequests ?? [], (fr) => fr.featureRequestId);
@@ -154,11 +156,13 @@ export function FeatureRequestsListPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
           <Lightbulb className="size-6" /> Feature Requests
         </h1>
-        <Button asChild>
-          <Link to={`/projects/${projectId}/feature-requests/new`}>
-            <Plus className="size-4 mr-1.5" /> Create Feature Request
-          </Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link to={`/projects/${projectId}/feature-requests/new`}>
+              <Plus className="size-4 mr-1.5" /> Create Feature Request
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -184,11 +188,13 @@ export function FeatureRequestsListPage() {
             <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm">
               Create your first feature request to start tracking ideas.
             </p>
-            <Button asChild>
-              <Link to={`/projects/${projectId}/feature-requests/new`}>
-                <Plus className="size-4 mr-1.5" /> Create Feature Request
-              </Link>
-            </Button>
+            {canCreate && (
+              <Button asChild>
+                <Link to={`/projects/${projectId}/feature-requests/new`}>
+                  <Plus className="size-4 mr-1.5" /> Create Feature Request
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

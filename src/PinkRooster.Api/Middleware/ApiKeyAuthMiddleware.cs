@@ -29,8 +29,13 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration co
     {
         var path = context.Request.Path.Value ?? "";
 
-        // Allow health endpoint without auth
-        if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+        // Allow health and auth endpoints without API key
+        if (path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/auth/", StringComparison.OrdinalIgnoreCase))
+            return next(context);
+
+        // Already authenticated via session cookie — skip API key check
+        if (context.Items.ContainsKey(AuthConstants.CallerIdentityKey))
             return next(context);
 
         // No keys configured — open access

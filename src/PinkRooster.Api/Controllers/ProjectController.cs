@@ -19,7 +19,8 @@ public sealed class ProjectController(IProjectService projectService) : Controll
             return project is null ? NotFound() : Ok(project);
         }
 
-        var projects = await projectService.GetAllAsync(ct);
+        var userId = HttpContext.Items.TryGetValue("UserId", out var uid) ? uid as long? : null;
+        var projects = await projectService.GetAllAsync(userId, ct);
         return Ok(projects);
     }
 
