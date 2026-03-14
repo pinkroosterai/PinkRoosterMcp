@@ -1,35 +1,37 @@
 ---
 name: pm-cleanup
 description: >-
-  Two-mode cleanup: (1) Codebase mode — analyze code for dead code, unused imports,
-  inconsistencies, and structural debt, then scaffold a work package with cleanup tasks.
-  (2) Project mode — identify and remove stale, cancelled, or rejected PinkRooster
-  entities. Use when the user says "clean up", "remove dead code", "tidy up",
-  "clean the project", or "remove stale items".
-argument-hint: "[--code] [--project] [--dry-run] [--scope path/to/dir]"
+  Analyze codebase for dead code, unused imports, inconsistencies, and structural
+  debt, then scaffold a work package with cleanup tasks. Never modifies code
+  directly — changes flow through the normal implement/test/commit pipeline.
+  Use when the user says "clean up the code", "remove dead code", "tidy up",
+  "find unused code", "code hygiene", or "clean up imports".
+argument-hint: "[--dry-run] [--scope path/to/dir]"
 ---
 
-# Project & Codebase Cleanup
+# Codebase Cleanup
 
-Two complementary cleanup modes that keep both the codebase and the project board clean.
-By default, runs both modes. Use flags to run one at a time.
+Analyze the codebase for cleanup opportunities — dead code, unused imports,
+inconsistencies, and structural debt — then scaffold a tracked work package so
+fixes go through the normal `/pm-implement` pipeline with tests and commits.
+
+The key difference from `/pm-audit`: audit finds **bugs and vulnerabilities** that
+create Issues. Cleanup finds **hygiene debt** that creates a single Chore WP with tasks.
 
 ## Step 0: Parse Arguments
 
 Parse `$ARGUMENTS` for flags:
 
-- **`--code`**: Run codebase cleanup only (dead code, unused imports, structural issues)
-- **`--project`**: Run project board cleanup only (stale entities in PinkRooster)
-- **`--dry-run`**: Show findings/candidates without creating WPs or deleting entities
-- **`--scope <path>`**: Limit codebase analysis to a specific directory (e.g., `src/PinkRooster.Api`)
-- **No flags**: Run both modes sequentially (codebase first, then project board)
+- **`--dry-run`**: Show findings without scaffolding a WP
+- **`--scope <path>`**: Limit analysis to a specific directory (e.g., `src/PinkRooster.Api`)
+- If the user provides a plain description like "clean up the MCP tools", infer
+  `--scope src/PinkRooster.Mcp`
 
 ## Step 1: Resolve Project
 
 - Current directory: !`pwd`
 - Call `mcp__pinkrooster__get_project_status` with `projectPath` set to the directory above
 - Extract the `projectId`
-- Note the counts for context
 
 ## Step 2: Load Existing Issues (Deduplication)
 
@@ -40,11 +42,7 @@ Load existing issues to avoid creating duplicate cleanup tasks:
 
 Compile a deduplication list of existing issue names and descriptions.
 
----
-
-# MODE A: Codebase Cleanup (runs when `--code` or no flag)
-
-## Step 3A: Launch Codebase Analysis Agent
+## Step 3: Launch Codebase Analysis Agent
 
 Spawn an Explore agent with `subagent_type: "Explore"` and thoroughness "very thorough":
 
@@ -88,7 +86,7 @@ Skip trivial style issues a linter handles. Focus on things that reduce maintena
 burden, eliminate confusion, or improve code health.
 ```
 
-## Step 4A: Collect, Verify, and Deduplicate Findings
+## Step 4: Collect, Verify, and Deduplicate Findings
 
 When the agent completes:
 
@@ -113,7 +111,7 @@ When the agent completes:
 
 5. **Sort by impact**: Safe + Trivial/Small first (quick wins), then Medium, then Risky last.
 
-## Step 5A: Present Findings and Get Confirmation
+## Step 5: Present Findings and Get Confirmation
 
 ```
 ## Codebase Cleanup Analysis
@@ -136,6 +134,8 @@ When the agent completes:
 **If `--dry-run`**: Show the table and stop.
 "Dry run complete. {taskCount} cleanup tasks identified. Run without `--dry-run` to scaffold a work package."
 
+**If no findings**: "Codebase is clean — no cleanup opportunities found in {scope or 'project'}."
+
 **Otherwise**: Use `AskUserQuestion`:
 - Question: "Which cleanup tasks should I scaffold into a work package?"
 - Header: "Scaffold cleanup"
@@ -145,7 +145,7 @@ When the agent completes:
   - "Let me pick" — then ask per-task
   - "None — just keep the report"
 
-## Step 6A: Scaffold Cleanup Work Package
+## Step 6: Scaffold Cleanup Work Package
 
 For confirmed tasks, call `mcp__pinkrooster__scaffold_work_package` with:
 
@@ -163,11 +163,12 @@ For confirmed tasks, call `mcp__pinkrooster__scaffold_work_package` with:
     - `implementationNotes`: Specific file paths, line numbers, and what to do
     - `targetFiles`: Actual file paths from the analysis
   - Acceptance criteria:
-    - "Solution builds with zero errors after cleanup"
-    - "All existing tests pass unchanged"
-    - "No new warnings introduced"
+    - `{name: "Solution builds", description: "dotnet build PinkRooster.slnx completes with 0 errors after all cleanup tasks.", verificationMethod: "AutomatedTest"}`
+    - `{name: "Tests pass unchanged", description: "All existing tests pass without modification — cleanup must not change behavior.", verificationMethod: "AutomatedTest"}`
+    - `{name: "No new warnings", description: "Build warning count does not increase after cleanup.", verificationMethod: "AgentReview"}`
 
-Report the scaffolded WP:
+## Step 7: Report
+
 ```
 ## Scaffolded: {wpId} "Codebase cleanup"
 
@@ -175,140 +176,25 @@ Report the scaffolded WP:
 - **Files affected**: {count}
 - **Estimated effort**: {complexity}/10
 
+### Task Summary
+| # | Task ID | Name | Category | Effort |
+|---|---------|------|----------|--------|
+| 1 | {taskId} | {name} | {category} | {effort} |
+| ... |
+
 ### Next Steps
 - Implement cleanup: `/pm-implement {wpId}` or `/pm-next`
-- View details: `/pm-status`
-```
-
----
-
-# MODE B: Project Board Cleanup (runs when `--project` or no flag)
-
-## Step 3B: Load All Items
-
-Make these calls to get all items across all states:
-
-1. `mcp__pinkrooster__get_issue_overview` with `projectId` (no filter — all states)
-2. `mcp__pinkrooster__get_feature_requests` with `projectId` (no filter — all states)
-3. `mcp__pinkrooster__get_work_packages` with `projectId` (no filter — all states)
-
-## Step 4B: Identify Cleanup Candidates
-
-Scan all items and categorize cleanup candidates by reason:
-
-### Category 1: Cancelled Items
-- Work packages in `Cancelled` state
-- Issues in `Cancelled` state
-
-### Category 2: Rejected/Deferred FRs
-- Feature requests in `Rejected` status
-- Feature requests in `Deferred` status older than 30 days
-
-### Category 3: Replaced Items
-- Work packages in `Replaced` state
-- Issues in `Replaced` state
-
-### Category 4: Stale Items
-- WPs with tasks marked `Implementing` for >14 days with no updates
-  (call `mcp__pinkrooster__get_work_package_details` to check task timestamps)
-- Issues in `Implementing` state with no linked WP and no updates for >14 days
-
-### Exclusions
-- Never suggest deleting Projects
-- Never suggest deleting active or inactive (in-progress) items unless stale
-- Never suggest deleting items that are blocking other non-terminal items
-- Never suggest deleting items with linked non-terminal WPs
-
-## Step 5B: Present Candidates
-
-```
-## Project Board Cleanup — {projectId}
-
-**Scanned**: {issueCount} issues, {frCount} FRs, {wpCount} WPs
-**Candidates found**: {candidateCount}
-
-| # | ID | Name | Type | State/Status | Reason |
-|---|-----|------|------|-------------|--------|
-| 1 | {id} | {name} | Issue/FR/WP | {state} | {reason} |
-| ... |
-
-### Warnings
-- Deleting a WP also deletes all its phases and tasks
-- Deleting an Issue/FR clears links from associated WPs (WPs are NOT deleted)
-```
-
-**If `--dry-run`**: Show the table and stop.
-
-**If no candidates**: "No cleanup candidates found. Project board is clean."
-
-**Otherwise**: Use `AskUserQuestion`:
-- Question: "Which items should I delete?"
-- Header: "Delete"
-- multiSelect: true
-- Options: Build from candidates (up to 4):
-  `[{label: "#1 {id}", description: "{name} ({type}, {state}) — {reason}"},
-    ...,
-    {label: "All ({N})", description: "Delete all cleanup candidates"},
-    {label: "None", description: "Cancel — keep all items"}]`
-
-## Step 6B: Delete Selected Items
-
-For each selected item, call `mcp__pinkrooster__delete_entity` with:
-- `entityType`: `Issue`, `FeatureRequest`, or `WorkPackage`
-- `entityId`: the item's composite ID
-
-Collect results (success/failure) for each deletion.
-
-## Step 7B: Report Results
-
-```
-## Project Board Cleanup Complete
-
-### Deleted {count} items
-| # | ID | Name | Type | Result |
-|---|-----|------|------|--------|
-| 1 | {id} | {name} | {type} | Deleted |
-| ... |
-
-### Project After Cleanup
-- Issues: {newCount} (was {oldCount})
-- Feature Requests: {newCount} (was {oldCount})
-- Work Packages: {newCount} (was {oldCount})
-```
-
----
-
-# Step 8: Combined Summary (when both modes ran)
-
-```
-## Cleanup Complete — {projectId}
-
-### Codebase Cleanup
-- Scaffolded: {wpId} with {taskCount} cleanup tasks
-- Start implementing: `/pm-implement {wpId}`
-
-### Project Board Cleanup
-- Deleted: {deletedCount} stale entities
-- Remaining: {issueCount} issues, {frCount} FRs, {wpCount} WPs
-
-### Next Steps
-- Implement cleanup tasks: `/pm-implement {wpId}` or `/pm-next`
 - View project status: `/pm-status`
-- Triage remaining items: `/pm-triage`
-- Re-run cleanup: `/pm-cleanup`
+- Clean up stale project entities: `/pm-housekeeping`
 ```
 
 ## Constraints
 
-- **Codebase mode**: Never directly modify code — always scaffold a WP so changes go
-  through the normal implement → test → commit pipeline via `/pm-implement`
-- **Project mode**: ALWAYS confirm before deletion — never delete without user approval
-- Never delete Projects (too destructive, cascades to everything)
-- Never delete active/in-progress items unless flagged as stale (>14 days no update)
-- Always warn that WP deletion cascades to phases and tasks
-- Always warn that Issue/FR deletion clears WP links
-- `--dry-run` shows findings/candidates without creating WPs or deleting entities
+- **Never directly modify code** — always scaffold a WP so changes go through the
+  normal implement → test → commit pipeline via `/pm-implement`
 - Verify findings before including them — false positives waste implementation time
 - Group related findings into logical tasks (3-8 tasks per WP, not 1:1 with findings)
 - Maximum 10 tasks per cleanup WP — if more findings exist, note them for a follow-up run
-- If an entity deletion fails, report the error and continue with remaining items
+- `--dry-run` shows findings without scaffolding
+- A clean codebase should produce few or no tasks — don't manufacture work to fill a quota
+- Skip trivial style issues that linters handle (formatting, trailing whitespace, etc.)

@@ -124,6 +124,6 @@ Choose the most relevant suggestions based on what happened:
 - If completing a **phase or WP** and it has **unverified acceptance criteria**: "Verify criteria first? `/pm-verify {phaseId or wpId}` — then re-run `/pm-done`"
 - If an **auto-unblock** occurred: "**{entityId}** was unblocked. Start it: `/pm-implement {entityId}`" or "Pick up next priority: `/pm-next`"
 - If a **WP was auto-completed**: "Work package complete. Pick up next priority: `/pm-next`" or "Check progress: `/pm-status`"
-- If the completed WP had **cancelled or replaced tasks**: "WP had cancelled/replaced items. Run `/pm-cleanup` to remove them."
+- If the completed WP had **cancelled or replaced tasks**: "WP had cancelled/replaced items. Run `/pm-housekeeping` to remove them."
 - If a **single task** was completed and the WP has remaining non-terminal tasks: "Continue implementing: `/pm-implement {wpId}`"
 - **Always** after any completion: "Pick up next work: `/pm-next`" or "Check progress: `/pm-status`"

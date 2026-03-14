@@ -97,7 +97,7 @@ If the item has an `affectedComponent` (issues), use Grep to check code health i
 - Items that appear done but aren't marked → `/pm-done {entityId}`
 - FRs lacking detail (no user stories, vague description) → `/pm-refine-fr {frId}`
 - New work to track → `/pm-plan <description>`
-- Stale/cancelled items accumulating → `/pm-cleanup` to remove them
+- Stale/cancelled items accumulating → `/pm-housekeeping` to remove them
 - Stale items to close → cancel via dashboard (http://localhost:3000)
 ```
 
