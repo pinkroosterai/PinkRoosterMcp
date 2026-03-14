@@ -4,6 +4,8 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Trash2, Lightbulb, Plus } from "lucide-react";
 import { useFeatureRequests, useDeleteFeatureRequest } from "@/hooks/use-feature-requests";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageTransition } from "@/components/page-transition";
+import { TableSkeleton } from "@/components/loading-skeletons";
 import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedBadge } from "@/components/animated-badge";
@@ -151,6 +153,7 @@ export function FeatureRequestsListPage() {
   ];
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
@@ -179,7 +182,7 @@ export function FeatureRequestsListPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading feature requests...</div>
+        <TableSkeleton rows={8} columns={6} />
       ) : !featureRequests?.length ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -233,5 +236,6 @@ export function FeatureRequestsListPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

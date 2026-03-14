@@ -155,7 +155,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={`${onRowClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} ${rowClassName?.(row.original) ?? ""}`.trim()}
+                  className={`hover:bg-accent/50 transition-colors ${onRowClick ? "cursor-pointer" : ""} ${rowClassName?.(row.original) ?? ""}`.trim()}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

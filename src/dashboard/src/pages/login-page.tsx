@@ -1,5 +1,4 @@
 import { useState, useEffect, lazy, Suspense, type FormEvent } from "react";
-import { Lock, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,13 +66,11 @@ export function LoginPage() {
 
   if (mode === "register") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background bg-[radial-gradient(ellipse_at_top,hsl(350_80%_55%/0.08),transparent_60%)] p-4">
         <Card className="glass-card w-full max-w-sm">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <UserPlus className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle className="text-xl">PinkRooster</CardTitle>
+            <img src="/logo_transparent.png" alt="PinkRoosterMCP" className="mx-auto mb-2 h-32 w-32" />
+            <CardTitle className="text-xl">PinkRoosterMCP</CardTitle>
             <p className="text-sm text-muted-foreground">
               {isProtected
                 ? "Create a new account"
@@ -172,13 +169,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background bg-[radial-gradient(ellipse_at_top,hsl(350_80%_55%/0.08),transparent_60%)] p-4">
       <Card className="glass-card w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Lock className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-xl">PinkRooster</CardTitle>
+          <img src="/logo_transparent.png" alt="PinkRoosterMCP" className="mx-auto mb-2 h-32 w-32" />
+          <CardTitle className="text-xl">PinkRoosterMCP</CardTitle>
           <p className="text-sm text-muted-foreground">
             Sign in to access the dashboard
           </p>

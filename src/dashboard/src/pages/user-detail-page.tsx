@@ -26,6 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageTransition } from "@/components/page-transition";
+import { DetailSkeleton } from "@/components/loading-skeletons";
 
 const roleColors: Record<string, string> = {
   SuperUser: "bg-purple-500/15 text-purple-400 border-purple-500/30",
@@ -85,11 +87,7 @@ export function UserDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading user...</p>
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!user) {
@@ -101,6 +99,7 @@ export function UserDetailPage() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -229,6 +228,7 @@ export function UserDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }
 

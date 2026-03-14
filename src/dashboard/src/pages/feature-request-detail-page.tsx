@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ArrowLeft, Trash2, Lightbulb, Package, Paperclip, Clock, Pencil, X, Save } from "lucide-react";
 import { useFeatureRequest, useDeleteFeatureRequest, useUpdateFeatureRequest, useManageUserStories } from "@/hooks/use-feature-requests";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageTransition } from "@/components/page-transition";
+import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateFeatureRequestSchema, type UpdateFeatureRequestInput, featureCategories, priorities, featureStatuses } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -167,7 +169,7 @@ export function FeatureRequestDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="text-muted-foreground">Loading...</div>;
+    return <DetailSkeleton />;
   }
 
   if (!fr) {
@@ -212,6 +214,7 @@ export function FeatureRequestDetailPage() {
   };
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -551,5 +554,6 @@ export function FeatureRequestDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

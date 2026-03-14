@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ArrowLeft, Trash2, Paperclip, Clock, FileText, Shield, Package, Pencil, X, Save } from "lucide-react";
 import { useIssue, useIssueAuditLog, useDeleteIssue, useUpdateIssue } from "@/hooks/use-issues";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageTransition } from "@/components/page-transition";
+import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateIssueSchema, type UpdateIssueInput, issueTypes, issueSeverities, priorities, completionStates } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -166,7 +168,7 @@ export function IssueDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="text-muted-foreground">Loading...</div>;
+    return <DetailSkeleton />;
   }
 
   if (!issue) {
@@ -186,6 +188,7 @@ export function IssueDetailPage() {
   const hasResolution = issue.rootCause || issue.resolution;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -630,5 +633,6 @@ export function IssueDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

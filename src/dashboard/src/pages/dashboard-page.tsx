@@ -1,11 +1,15 @@
 import { Link, useNavigate } from "react-router";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { AnimatedCount } from "@/components/animated-count";
+import { PageTransition } from "@/components/page-transition";
+import { DashboardSkeleton } from "@/components/loading-skeletons";
 import { useProjectContext } from "@/hooks/use-project-context";
 import { useProjectStatus, useNextActions } from "@/hooks/use-projects";
+import { useAuth } from "@/components/auth-provider";
 import { stateColorClass, priorityAccent } from "@/lib/state-colors";
 import { AnimatedBadge } from "@/components/animated-badge";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -75,7 +79,8 @@ function MiniDonut({ percent, size = 56 }: { percent: number; size?: number }) {
 export function DashboardPage() {
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
-  const { data: projectStatus } = useProjectStatus(selectedProject?.id);
+  const { user } = useAuth();
+  const { data: projectStatus, isLoading } = useProjectStatus(selectedProject?.id);
   const { data: nextActions } = useNextActions(selectedProject?.id, 10);
 
   if (!selectedProject) {
@@ -97,9 +102,17 @@ export function DashboardPage() {
     );
   }
 
+  if (isLoading) return <DashboardSkeleton />;
+
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="animate-in-right">
+        {user && (
+          <p className="text-sm text-muted-foreground mb-1">
+            Welcome back, {user.displayName}
+          </p>
+        )}
         <h1 className="text-2xl font-bold">{selectedProject.name}</h1>
       </div>
 
@@ -117,8 +130,9 @@ export function DashboardPage() {
       {/* Entity summary cards with progress — staggered entrance */}
       {projectStatus && (
         <div className="grid gap-4 md:grid-cols-3 stagger-children">
+          <motion.div whileHover={{ scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
           <Card
-            className="glass-card card-hover accent-emerald cursor-pointer"
+            className="glass-card card-hover accent-emerald cursor-pointer h-full"
             onClick={() => navigate(`/projects/${selectedProject.id}/issues`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -143,9 +157,11 @@ export function DashboardPage() {
               />
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
           <Card
-            className="glass-card card-hover accent-blue cursor-pointer"
+            className="glass-card card-hover accent-blue cursor-pointer h-full"
             onClick={() => navigate(`/projects/${selectedProject.id}/feature-requests`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -170,9 +186,11 @@ export function DashboardPage() {
               />
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
           <Card
-            className="glass-card card-hover accent-purple cursor-pointer"
+            className="glass-card card-hover accent-purple cursor-pointer h-full"
             onClick={() => navigate(`/projects/${selectedProject.id}/work-packages`)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -197,6 +215,7 @@ export function DashboardPage() {
               />
             </CardContent>
           </Card>
+          </motion.div>
         </div>
       )}
 
@@ -232,5 +251,6 @@ export function DashboardPage() {
         </CardContent>
       </Card>
     </div>
+    </PageTransition>
   );
 }

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ArrowLeft, Trash2, Layers, ChevronDown, ChevronRight, CheckCircle2, Circle, Clock, Pencil, X, Save } from "lucide-react";
 import { useWorkPackage, useDeleteWorkPackage, useDeletePhase, useDeleteTask, useUpdateWorkPackage, useUpdateTask } from "@/hooks/use-work-packages";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageTransition } from "@/components/page-transition";
+import { DetailSkeleton } from "@/components/loading-skeletons";
 import { updateWorkPackageSchema, type UpdateWorkPackageInput, workPackageTypes, priorities, completionStates } from "@/lib/schemas";
 import type { TaskDep, Phase as PhaseType, WpTask, WorkPackage, StateChangeDto } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -237,11 +239,7 @@ export function WorkPackageDetailPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!wp) {
@@ -260,6 +258,7 @@ export function WorkPackageDetailPage() {
     (wp.blockedBy && wp.blockedBy.length > 0) || (wp.blocking && wp.blocking.length > 0);
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -924,5 +923,6 @@ export function WorkPackageDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

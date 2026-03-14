@@ -3,6 +3,8 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Users, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsers } from "@/api/users";
+import { PageTransition } from "@/components/page-transition";
+import { TableSkeleton } from "@/components/loading-skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,14 +65,11 @@ export function UsersListPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading users...</p>
-      </div>
-    );
+    return <TableSkeleton rows={5} columns={4} />;
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
@@ -106,5 +105,6 @@ export function UsersListPage() {
         />
       )}
     </div>
+    </PageTransition>
   );
 }

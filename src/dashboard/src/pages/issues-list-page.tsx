@@ -5,6 +5,8 @@ import { Trash2, Bug, Plus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIssues, useIssueSummary, useDeleteIssue } from "@/hooks/use-issues";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageTransition } from "@/components/page-transition";
+import { TableSkeleton } from "@/components/loading-skeletons";
 import { useRowHighlight } from "@/hooks/use-row-highlight";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedBadge } from "@/components/animated-badge";
@@ -192,6 +194,7 @@ export function IssuesListPage() {
   ];
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
@@ -264,7 +267,7 @@ export function IssuesListPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading issues...</div>
+        <TableSkeleton rows={8} columns={6} />
       ) : !issues?.length ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -318,5 +321,6 @@ export function IssuesListPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

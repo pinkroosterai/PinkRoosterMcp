@@ -4,6 +4,7 @@ import { User, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/components/auth-provider";
+import { PageTransition } from "@/components/page-transition";
 import { updateProfile, changePassword } from "@/api/auth";
 import { changePasswordSchema, type ChangePasswordInput } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,7 @@ export function ProfilePage() {
   if (!user) return null;
 
   return (
+    <PageTransition>
     <div className="space-y-6 max-w-lg">
       <h1 className="text-2xl font-bold flex items-center gap-2 animate-in-right">
         <User className="size-6" /> Profile
@@ -198,5 +200,6 @@ export function ProfilePage() {
         </CardContent>
       </Card>
     </div>
+    </PageTransition>
   );
 }
