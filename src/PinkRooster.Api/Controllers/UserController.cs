@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
+using PinkRooster.Shared.Constants;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
 
@@ -13,7 +15,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     public async Task<ActionResult<List<AuthUserResponse>>> GetAll(CancellationToken ct)
     {
         if (!IsSuperUserOrApiKey())
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         var users = await userService.GetAllAsync(ct);
         return Ok(users);
@@ -24,7 +26,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     {
         // SuperUser, API key, or self can view
         if (!IsSuperUserOrApiKey() && !IsSelf(id))
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         var user = await userService.GetByIdAsync(id, ct);
         return user is null ? NotFound() : Ok(user);
@@ -34,7 +36,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     public async Task<ActionResult<AuthUserResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         if (!IsSuperUserOrApiKey())
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         try
         {
@@ -44,7 +46,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { message = ex.Message });
+            return this.ProblemConflict(ex.Message);
         }
     }
 
@@ -53,7 +55,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     {
         // SuperUser, API key, or self (limited to profile fields)
         if (!IsSuperUserOrApiKey() && !IsSelf(id))
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         // Non-SuperUser self-edit: only allow displayName changes (email change must go through /api/auth/me with password verification)
         GlobalRole? globalRole = null;
@@ -74,7 +76,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     public async Task<IActionResult> Deactivate(long id, CancellationToken ct)
     {
         if (!IsSuperUserOrApiKey())
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         var deactivated = await userService.DeactivateAsync(id, ct);
         return deactivated ? NoContent() : NotFound();
@@ -84,20 +86,20 @@ public sealed class UserController(IUserService userService) : ControllerBase
 
     private bool IsApiKeyCaller()
     {
-        return HttpContext.Items.ContainsKey("CallerIdentity") &&
-               !HttpContext.Items.ContainsKey("UserId");
+        return HttpContext.Items.ContainsKey(AuthConstants.CallerIdentityKey) &&
+               !HttpContext.Items.ContainsKey(AuthConstants.UserIdKey);
     }
 
     private bool IsSuperUser()
     {
         // Check via a simple query — but we already have the user from session middleware
         // For now, we check the CallerIdentity pattern. A more robust approach would cache the user's role.
-        if (!HttpContext.Items.TryGetValue("UserId", out var userIdObj) || userIdObj is not long)
+        if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long)
             return false;
 
         // We need to check GlobalRole — use a simple approach via the auth pipeline
         // The ProjectAuthorizationMiddleware already exempts non-project routes, so we handle auth here
-        return HttpContext.Items.TryGetValue("UserGlobalRole", out var roleObj) &&
+        return HttpContext.Items.TryGetValue(AuthConstants.UserGlobalRoleKey, out var roleObj) &&
                roleObj is string role && role == "SuperUser";
     }
 
@@ -105,7 +107,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
 
     private bool IsSelf(long targetUserId)
     {
-        return HttpContext.Items.TryGetValue("UserId", out var userIdObj) &&
+        return HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) &&
                userIdObj is long userId && userId == targetUserId;
     }
 }

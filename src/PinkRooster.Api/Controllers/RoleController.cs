@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
+using PinkRooster.Shared.Constants;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 using PinkRooster.Shared.Enums;
@@ -16,7 +18,7 @@ public sealed class RoleController(IProjectRoleService projectRoleService) : Con
     {
         // Only SuperUser and Admin can view roles
         if (!await HasRoleManagementAccess(projectId, ct))
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         var roles = await projectRoleService.GetProjectRolesAsync(projectId, ct);
         return Ok(roles);
@@ -29,18 +31,18 @@ public sealed class RoleController(IProjectRoleService projectRoleService) : Con
         // API key callers can assign any role
         if (!IsApiKeyCaller())
         {
-            if (!HttpContext.Items.TryGetValue("UserId", out var callerIdObj) || callerIdObj is not long callerId)
+            if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var callerIdObj) || callerIdObj is not long callerId)
                 return Unauthorized();
 
             var callerRole = await projectRoleService.GetEffectiveRoleAsync(callerId, projectId, ct);
 
             // Only SuperUser and Admin can assign roles
             if (callerRole is not ("SuperUser" or "Admin"))
-                return StatusCode(403, new { error = "Insufficient permissions" });
+                return this.ProblemForbidden("Insufficient permissions");
 
             // Admin cannot assign Admin role — only SuperUser can
             if (callerRole == "Admin" && request.Role == ProjectRole.Admin)
-                return StatusCode(403, new { error = "Only SuperUser can assign the Admin role." });
+                return this.ProblemForbidden("Only SuperUser can assign the Admin role.");
         }
 
         var result = await projectRoleService.AssignRoleAsync(userId, projectId, request.Role, ct);
@@ -52,7 +54,7 @@ public sealed class RoleController(IProjectRoleService projectRoleService) : Con
         long projectId, long userId, CancellationToken ct)
     {
         if (!await HasRoleManagementAccess(projectId, ct))
-            return StatusCode(403, new { error = "Insufficient permissions" });
+            return this.ProblemForbidden("Insufficient permissions");
 
         var removed = await projectRoleService.RemoveRoleAsync(userId, projectId, ct);
         return removed ? NoContent() : NotFound();
@@ -61,8 +63,8 @@ public sealed class RoleController(IProjectRoleService projectRoleService) : Con
     private bool IsApiKeyCaller()
     {
         // API key callers have CallerIdentity set but no UserId
-        return HttpContext.Items.ContainsKey("CallerIdentity") &&
-               !HttpContext.Items.ContainsKey("UserId");
+        return HttpContext.Items.ContainsKey(AuthConstants.CallerIdentityKey) &&
+               !HttpContext.Items.ContainsKey(AuthConstants.UserIdKey);
     }
 
     private async Task<bool> HasRoleManagementAccess(long projectId, CancellationToken ct)
@@ -71,7 +73,7 @@ public sealed class RoleController(IProjectRoleService projectRoleService) : Con
         if (IsApiKeyCaller())
             return true;
 
-        if (!HttpContext.Items.TryGetValue("UserId", out var userIdObj) || userIdObj is not long userId)
+        if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long userId)
             return false;
 
         var role = await projectRoleService.GetEffectiveRoleAsync(userId, projectId, ct);

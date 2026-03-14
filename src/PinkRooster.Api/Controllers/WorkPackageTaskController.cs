@@ -22,7 +22,7 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.ProblemBadRequest(ex.Message);
         }
     }
 
@@ -63,7 +63,7 @@ public sealed class WorkPackageTaskController(IWorkPackageTaskService taskServic
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.ProblemBadRequest(ex.Message);
         }
     }
 

@@ -32,7 +32,7 @@ public sealed partial class ProjectAuthorizationMiddleware(RequestDelegate next)
         }
 
         // API key callers bypass RBAC (CallerIdentity set but no UserId)
-        if (context.Items.ContainsKey(AuthConstants.CallerIdentityKey) && !context.Items.ContainsKey("UserId"))
+        if (context.Items.ContainsKey(AuthConstants.CallerIdentityKey) && !context.Items.ContainsKey(AuthConstants.UserIdKey))
         {
             await next(context);
             return;
@@ -48,7 +48,7 @@ public sealed partial class ProjectAuthorizationMiddleware(RequestDelegate next)
         }
 
         var projectId = long.Parse(match.Groups[1].Value);
-        var userId = (long)context.Items["UserId"]!;
+        var userId = (long)context.Items[AuthConstants.UserIdKey]!;
 
         var roleService = context.RequestServices.GetRequiredService<IProjectRoleService>();
         var effectiveRole = await roleService.GetEffectiveRoleAsync(userId, projectId);

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using PinkRooster.Api.Extensions;
 using PinkRooster.Api.Services;
+using PinkRooster.Shared.Constants;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.DTOs.Responses;
 
@@ -43,7 +45,7 @@ public sealed class AuthController(
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { message = ex.Message });
+            return this.ProblemConflict(ex.Message);
         }
     }
 
@@ -55,7 +57,7 @@ public sealed class AuthController(
         var result = await authService.LoginAsync(request, ct);
 
         if (result is null)
-            return Unauthorized(new { message = "Invalid email or password." });
+            return this.ProblemUnauthorized("Invalid email or password.");
 
         var (response, sessionToken) = result.Value;
 
@@ -83,8 +85,8 @@ public sealed class AuthController(
     public async Task<ActionResult<UserPermissionsResponse>> GetPermissions(
         [FromQuery] long projectId, CancellationToken ct)
     {
-        if (!HttpContext.Items.TryGetValue("UserId", out var userIdObj) || userIdObj is not long userId)
-            return Unauthorized(new { message = "Not authenticated." });
+        if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long userId)
+            return this.ProblemUnauthorized("Not authenticated.");
 
         var permissions = await projectRoleService.GetUserPermissionsAsync(userId, projectId, ct);
         return Ok(permissions);
@@ -94,17 +96,17 @@ public sealed class AuthController(
     public async Task<ActionResult<AuthUserResponse>> UpdateProfile(
         UpdateProfileRequest request, CancellationToken ct)
     {
-        if (!HttpContext.Items.TryGetValue("UserId", out var userIdObj) || userIdObj is not long userId)
-            return Unauthorized(new { message = "Not authenticated." });
+        if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long userId)
+            return this.ProblemUnauthorized("Not authenticated.");
 
         // Require current password when changing email
         if (request.Email is not null)
         {
             if (string.IsNullOrEmpty(request.CurrentPassword))
-                return BadRequest(new { message = "Current password is required to change email." });
+                return this.ProblemBadRequest("Current password is required to change email.");
 
             if (!await userService.VerifyPasswordAsync(userId, request.CurrentPassword, ct))
-                return BadRequest(new { message = "Current password is incorrect." });
+                return this.ProblemBadRequest("Current password is incorrect.");
         }
 
         var user = await userService.UpdateProfileAsync(userId, request.DisplayName, request.Email, ct);
@@ -115,12 +117,12 @@ public sealed class AuthController(
     public async Task<IActionResult> ChangePassword(
         ChangePasswordRequest request, CancellationToken ct)
     {
-        if (!HttpContext.Items.TryGetValue("UserId", out var userIdObj) || userIdObj is not long userId)
-            return Unauthorized(new { message = "Not authenticated." });
+        if (!HttpContext.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long userId)
+            return this.ProblemUnauthorized("Not authenticated.");
 
         var changed = await userService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct);
         if (!changed)
-            return BadRequest(new { message = "Current password is incorrect." });
+            return this.ProblemBadRequest("Current password is incorrect.");
 
         return Ok(new { message = "Password changed successfully." });
     }
@@ -130,11 +132,11 @@ public sealed class AuthController(
     {
         var token = Request.Cookies[CookieName];
         if (token is null)
-            return Unauthorized(new { message = "Not authenticated." });
+            return this.ProblemUnauthorized("Not authenticated.");
 
         var user = await authService.GetCurrentUserAsync(token, ct);
         if (user is null)
-            return Unauthorized(new { message = "Session expired." });
+            return this.ProblemUnauthorized("Session expired.");
 
         return Ok(user);
     }

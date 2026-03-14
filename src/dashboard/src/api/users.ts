@@ -50,7 +50,7 @@ export async function createUser(data: CreateUserData): Promise<AuthUser> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Failed to create user");
+    throw new Error(body?.detail ?? body?.message ?? "Failed to create user");
   }
   return res.json();
 }
@@ -100,7 +100,7 @@ export async function assignRole(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.error ?? "Failed to assign role");
+    throw new Error(body?.detail ?? body?.error ?? "Failed to assign role");
   }
   return res.json();
 }

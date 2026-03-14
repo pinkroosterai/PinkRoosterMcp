@@ -37,6 +37,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -104,16 +105,23 @@ if (enableSwagger)
     app.UseSwaggerUI();
 }
 
-// Global exception handler for non-Development (suppresses stack traces)
+// Global exception handler — returns RFC 7807 ProblemDetails
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler(errorApp =>
     {
         errorApp.Run(async context =>
         {
-            context.Response.StatusCode = 500;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync("""{"error":"An internal error occurred."}""");
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/problem+json";
+            var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "An internal error occurred.",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+                Instance = context.Request.Path
+            };
+            await context.Response.WriteAsJsonAsync(problem);
         });
     });
 }

@@ -43,8 +43,8 @@ public sealed class SessionAuthMiddleware(RequestDelegate next, IWebHostEnvironm
             {
                 // Valid session — set caller identity, user ID, and global role
                 context.Items[AuthConstants.CallerIdentityKey] = user.Email;
-                context.Items["UserId"] = user.Id;
-                context.Items["UserGlobalRole"] = user.GlobalRole.ToString();
+                context.Items[AuthConstants.UserIdKey] = user.Id;
+                context.Items[AuthConstants.UserGlobalRoleKey] = user.GlobalRole.ToString();
             }
             else
             {

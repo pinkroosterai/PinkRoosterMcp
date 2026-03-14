@@ -37,7 +37,7 @@ export async function login(
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Login failed");
+    throw new Error(body?.detail ?? body?.message ?? "Login failed");
   }
 
   return res.json();
@@ -57,7 +57,7 @@ export async function register(
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Registration failed");
+    throw new Error(body?.detail ?? body?.message ?? "Registration failed");
   }
 
   return res.json();
@@ -114,7 +114,7 @@ export async function updateProfile(data: {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Failed to update profile");
+    throw new Error(body?.detail ?? body?.message ?? "Failed to update profile");
   }
   return res.json();
 }
@@ -131,7 +131,7 @@ export async function changePassword(data: {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Failed to change password");
+    throw new Error(body?.detail ?? body?.message ?? "Failed to change password");
   }
 }
 

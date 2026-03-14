@@ -72,7 +72,7 @@ public sealed class WorkPackageController(IWorkPackageService workPackageService
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.ProblemBadRequest(ex.Message);
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class WorkPackageController(IWorkPackageService workPackageService
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.ProblemBadRequest(ex.Message);
         }
     }
 

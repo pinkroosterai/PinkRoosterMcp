@@ -56,7 +56,7 @@ public sealed class FeatureRequestController(IFeatureRequestService featureReque
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.ProblemBadRequest(ex.Message);
         }
     }
 
