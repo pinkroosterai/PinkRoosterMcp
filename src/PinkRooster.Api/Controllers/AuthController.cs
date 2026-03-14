@@ -13,15 +13,14 @@ namespace PinkRooster.Api.Controllers;
 public sealed class AuthController(
     IAuthService authService,
     IProjectRoleService projectRoleService,
-    IUserService userService,
-    IWebHostEnvironment env) : ControllerBase
+    IUserService userService) : ControllerBase
 {
     private const string CookieName = "pinkrooster_session";
 
     private CookieOptions SessionCookieOptions => new()
     {
         HttpOnly = true,
-        Secure = !env.IsDevelopment() && !env.IsEnvironment("Testing"),
+        Secure = Request.IsHttps,
         SameSite = SameSiteMode.Strict,
         Path = "/"
     };
