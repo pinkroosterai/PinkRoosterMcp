@@ -14,6 +14,9 @@ import {
   ArrowRight,
   Terminal,
   Zap,
+  MessageSquare,
+  ScanSearch,
+  Bug,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,6 +149,34 @@ const skills: SkillInfo[] = [
       "Analyze the codebase from a product manager's perspective and suggest realistic, user-facing feature enhancements. Cross-references existing items to avoid duplicates and creates selected suggestions as feature requests.",
     usage: "/pm-explore [--limit N]",
     args: "Optional: --limit N to cap suggestions (default 5)",
+    stateChanges: [],
+    readOnly: true,
+  },
+  {
+    name: "pm-brainstorm",
+    icon: MessageSquare,
+    description:
+      "Interactive feature brainstorming through guided discovery, web research, and codebase analysis. Helps explore vague ideas through Socratic dialogue before creating well-formed feature requests.",
+    usage: "/pm-brainstorm [topic]",
+    args: "Optional: topic or area to brainstorm (e.g., 'dashboard UX', 'notifications'). If omitted, discovers topic interactively",
+    stateChanges: [],
+  },
+  {
+    name: "pm-audit",
+    icon: ScanSearch,
+    description:
+      "Proactive codebase audit using parallel analysis agents across quality, security, performance, and architecture domains. Discovers real problems and creates tracked issues from confirmed findings.",
+    usage: "/pm-audit [--focus domain] [--scope path]",
+    args: "Optional: --focus quality|security|performance|architecture, --scope path/to/dir. Supports natural language (e.g., 'check the API for security issues')",
+    stateChanges: [],
+  },
+  {
+    name: "pm-troubleshoot",
+    icon: Bug,
+    description:
+      "Diagnose the root cause of a bug, error, crash, or unexpected behavior. Traces through code, logs, services, database state, and git history to find why something is broken. Researches error messages online for known issues.",
+    usage: "/pm-troubleshoot <description>",
+    args: "Description of the problem, error message, or stack trace",
     stateChanges: [],
     readOnly: true,
   },
