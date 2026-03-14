@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Webhook, CheckCircle, XCircle, Clock, Circle } from "lucide-react";
+import { Webhook, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useWebhooks, useWebhookDeliveries } from "@/hooks/use-webhooks";
 import { PageTransition } from "@/components/page-transition";
 import { TableSkeleton } from "@/components/loading-skeletons";
