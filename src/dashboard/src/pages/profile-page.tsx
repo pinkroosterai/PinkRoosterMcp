@@ -1,16 +1,30 @@
-import { useState, type FormEvent } from "react";
+import { useState, lazy, Suspense, type FormEvent } from "react";
 import { toast } from "sonner";
 import { User, Lock } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/components/auth-provider";
 import { updateProfile, changePassword } from "@/api/auth";
+import { changePasswordSchema, type ChangePasswordInput } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const PasswordStrengthBar = lazy(() => import("react-password-strength-bar"));
 
 export function ProfilePage() {
   const { user } = useAuth();
 
+  // ── Profile form (keeps manual state for email change password requirement) ──
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [profilePassword, setProfilePassword] = useState("");
@@ -18,12 +32,6 @@ export function ProfilePage() {
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const emailChanged = email !== (user?.email ?? "");
-
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   async function handleProfileSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,32 +58,27 @@ export function ProfilePage() {
     }
   }
 
-  async function handlePasswordSubmit(e: FormEvent) {
-    e.preventDefault();
-    setPasswordError(null);
+  // ── Change password form (react-hook-form + Zod) ──
+  const pwForm = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+    mode: "onTouched",
+  });
 
-    if (newPassword.length < 8) {
-      setPasswordError("New password must be at least 8 characters");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match");
-      return;
-    }
+  const [pwServerError, setPwServerError] = useState<string | null>(null);
 
-    setPasswordLoading(true);
+  async function onPasswordSubmit(data: ChangePasswordInput) {
+    setPwServerError(null);
     try {
-      await changePassword({ currentPassword, newPassword });
+      await changePassword({ currentPassword: data.currentPassword, newPassword: data.newPassword });
       toast.success("Password changed successfully");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      pwForm.reset();
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Failed to change password");
-    } finally {
-      setPasswordLoading(false);
+      setPwServerError(err instanceof Error ? err.message : "Failed to change password");
     }
   }
+
+  const newPasswordValue = pwForm.watch("newPassword");
 
   if (!user) return null;
 
@@ -142,44 +145,56 @@ export function ProfilePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="currentPassword" className="text-sm font-medium">Current Password</label>
-              <Input
-                id="currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
+          <Form {...pwForm}>
+            <form onSubmit={pwForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={pwForm.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="newPassword" className="text-sm font-medium">New Password</label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                minLength={8}
-                required
+              <FormField
+                control={pwForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <Suspense fallback={null}>
+                      <PasswordStrengthBar password={newPasswordValue} minLength={8} />
+                    </Suspense>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm New Password</label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={8}
-                required
+              <FormField
+                control={pwForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-            <Button type="submit" disabled={passwordLoading}>
-              {passwordLoading ? "Changing..." : "Change Password"}
-            </Button>
-          </form>
+              {pwServerError && <p className="text-sm text-destructive">{pwServerError}</p>}
+              <Button type="submit" disabled={pwForm.formState.isSubmitting}>
+                {pwForm.formState.isSubmitting ? "Changing..." : "Change Password"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>

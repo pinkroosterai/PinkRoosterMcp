@@ -1,9 +1,22 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, lazy, Suspense, type FormEvent } from "react";
 import { Lock, UserPlus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
+import { registerSchema, type RegisterInput } from "@/lib/schemas";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const PasswordStrengthBar = lazy(() => import("react-password-strength-bar"));
 
 export function LoginPage() {
   const { isProtected, login, register } = useAuth();
@@ -15,46 +28,42 @@ export function LoginPage() {
     setMode(isProtected ? "login" : "register");
   }, [isProtected]);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // ── Login form (simple, no Zod needed) ──
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
+    setLoginError(null);
+    setLoginLoading(true);
 
-    const err = await login(email, password);
+    const err = await login(loginEmail, loginPassword);
     if (err) {
-      setError(err);
-      setLoading(false);
+      setLoginError(err);
+      setLoginLoading(false);
     }
   }
 
-  async function handleRegister(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
+  // ── Register form (react-hook-form + Zod) ──
+  const regForm = useForm<RegisterInput>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: "", password: "", confirmPassword: "", displayName: "" },
+    mode: "onTouched",
+  });
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
+  const [regServerError, setRegServerError] = useState<string | null>(null);
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    setLoading(true);
-    const err = await register(email, password, displayName);
+  async function onRegister(data: RegisterInput) {
+    setRegServerError(null);
+    const err = await register(data.email, data.password, data.displayName);
     if (err) {
-      setError(err);
-      setLoading(false);
+      setRegServerError(err);
     }
   }
+
+  const passwordValue = regForm.watch("password");
 
   if (mode === "register") {
     return (
@@ -72,100 +81,90 @@ export function LoginPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="displayName"
-                  className="text-sm font-medium leading-none"
-                >
-                  Display Name
-                </label>
-                <Input
-                  id="displayName"
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  autoComplete="name"
-                  autoFocus
-                  required
+            <Form {...regForm}>
+              <form onSubmit={regForm.handleSubmit(onRegister)} className="space-y-4">
+                <FormField
+                  control={regForm.control}
+                  name="displayName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input autoComplete="name" autoFocus {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium leading-none"
-                >
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
+                <FormField
+                  control={regForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" autoComplete="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium leading-none"
-                >
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
+                <FormField
+                  control={regForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" autoComplete="new-password" {...field} />
+                      </FormControl>
+                      <Suspense fallback={null}>
+                        <PasswordStrengthBar password={passwordValue} minLength={8} />
+                      </Suspense>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="confirmPassword"
-                  className="text-sm font-medium leading-none"
-                >
-                  Confirm Password
-                </label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
+                <FormField
+                  control={regForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" autoComplete="new-password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading
-                  ? "Creating account..."
-                  : isProtected
-                    ? "Create Account"
-                    : "Create Admin Account"}
-              </Button>
-              {isProtected && (
-                <p className="text-center text-sm text-muted-foreground">
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("login");
-                      setError(null);
-                    }}
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    Sign in
-                  </button>
-                </p>
-              )}
-            </form>
+                {regServerError && (
+                  <p className="text-sm text-destructive">{regServerError}</p>
+                )}
+                <Button type="submit" className="w-full" disabled={regForm.formState.isSubmitting}>
+                  {regForm.formState.isSubmitting
+                    ? "Creating account..."
+                    : isProtected
+                      ? "Create Account"
+                      : "Create Admin Account"}
+                </Button>
+                {isProtected && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("login");
+                        setRegServerError(null);
+                      }}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                )}
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>
@@ -196,8 +195,8 @@ export function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
                 autoComplete="email"
                 autoFocus
                 required
@@ -213,17 +212,17 @@ export function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
                 autoComplete="current-password"
                 required
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
+            {loginError && (
+              <p className="text-sm text-destructive">{loginError}</p>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+            <Button type="submit" className="w-full" disabled={loginLoading}>
+              {loginLoading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
         </CardContent>
