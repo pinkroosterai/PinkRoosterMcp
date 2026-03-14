@@ -5,6 +5,8 @@ export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
     queryFn: getProjects,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
   });
 }
 

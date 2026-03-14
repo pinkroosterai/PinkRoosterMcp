@@ -74,6 +74,38 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         var project = await db.Projects.FindAsync([id], ct);
         if (project is null) return false;
 
+        // Delete children in dependency order (leaves first)
+        var wpIds = await db.WorkPackages.Where(w => w.ProjectId == id).Select(w => w.Id).ToListAsync(ct);
+        if (wpIds.Count > 0)
+        {
+            var phaseIds = await db.WorkPackagePhases.Where(p => wpIds.Contains(p.WorkPackageId)).Select(p => p.Id).ToListAsync(ct);
+
+            await db.TaskAuditLogs.Where(a => wpIds.Contains(a.Task.WorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackageTaskDependencies.Where(d => wpIds.Contains(d.DependentTask.WorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackageTasks.Where(t => wpIds.Contains(t.WorkPackageId)).ExecuteDeleteAsync(ct);
+
+            await db.PhaseAuditLogs.Where(a => phaseIds.Contains(a.PhaseId)).ExecuteDeleteAsync(ct);
+            await db.AcceptanceCriteria.Where(ac => phaseIds.Contains(ac.PhaseId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackagePhases.Where(p => wpIds.Contains(p.WorkPackageId)).ExecuteDeleteAsync(ct);
+
+            await db.WorkPackageAuditLogs.Where(a => wpIds.Contains(a.WorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackageDependencies.Where(d => wpIds.Contains(d.DependentWorkPackageId) || wpIds.Contains(d.DependsOnWorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackageIssueLinks.Where(l => wpIds.Contains(l.WorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackageFeatureRequestLinks.Where(l => wpIds.Contains(l.WorkPackageId)).ExecuteDeleteAsync(ct);
+            await db.WorkPackages.Where(w => w.ProjectId == id).ExecuteDeleteAsync(ct);
+        }
+
+        await db.IssueAuditLogs.Where(a => a.Issue.ProjectId == id).ExecuteDeleteAsync(ct);
+        await db.Issues.Where(i => i.ProjectId == id).ExecuteDeleteAsync(ct);
+
+        await db.FeatureRequestAuditLogs.Where(a => a.FeatureRequest.ProjectId == id).ExecuteDeleteAsync(ct);
+        await db.FeatureRequests.Where(fr => fr.ProjectId == id).ExecuteDeleteAsync(ct);
+
+        await db.ProjectMemoryAuditLogs.Where(a => a.ProjectMemory.ProjectId == id).ExecuteDeleteAsync(ct);
+        await db.ProjectMemories.Where(m => m.ProjectId == id).ExecuteDeleteAsync(ct);
+
+        await db.UserProjectRoles.Where(r => r.ProjectId == id).ExecuteDeleteAsync(ct);
+
         db.Projects.Remove(project);
         await db.SaveChangesAsync(ct);
         return true;
