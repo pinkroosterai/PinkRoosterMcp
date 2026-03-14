@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
+using PinkRooster.Mcp.Helpers;
 using PinkRooster.Mcp.Inputs;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
@@ -34,7 +35,7 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectId(project.ProjectId, out var projId))
             return OperationResult.Error($"Failed to parse project ID '{project.ProjectId}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var status = await apiClient.GetProjectStatusAsync(projId, ct);
 
@@ -42,11 +43,7 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
                 return OperationResult.Error($"Project {project.ProjectId} not found.");
 
             return JsonSerializer.Serialize(status, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to fetch project status: {ex.Message}");
-        }
+        }, "get project status");
     }
 
     [McpServerTool(Name = "get_next_actions", ReadOnly = true,
@@ -69,7 +66,7 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
             return OperationResult.Error(
                 $"Invalid project ID '{projectId}'. Expected format: 'proj-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var entityTypeStr = entityType?.ToString().ToLowerInvariant();
             var items = await apiClient.GetNextActionsAsync(projId, limit, entityTypeStr, ct);
@@ -78,11 +75,7 @@ public sealed class ProjectTools(PinkRoosterApiClient apiClient)
                 return OperationResult.Error($"Project {projectId} not found.");
 
             return JsonSerializer.Serialize(items, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to fetch next actions: {ex.Message}");
-        }
+        }, "get next actions");
     }
 
     [McpServerTool(Name = "create_or_update_project",

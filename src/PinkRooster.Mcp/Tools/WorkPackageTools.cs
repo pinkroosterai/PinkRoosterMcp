@@ -29,7 +29,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Filter by state category. Omit for all work packages.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseProjectId(projectId, out var projId))
                 return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
@@ -56,11 +56,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             }).ToList();
 
             return JsonSerializer.Serialize(items, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to get work packages: {ex.Message}");
-        }
+        }, "get work packages");
     }
 
     // ── 2. get_work_package_details ──
@@ -76,7 +72,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("Work package ID (e.g. 'proj-1-wp-2').")] string workPackageId,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
                 return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
@@ -112,11 +108,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             };
 
             return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to get work package details: {ex.Message}");
-        }
+        }, "get work package details");
     }
 
     // ── 3. create_or_update_work_package ──
@@ -145,7 +137,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseProjectId(projectId, out var projId))
                 return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
@@ -156,11 +148,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
 
             return await CreateNewWorkPackage(projId, name, description, type, priority, plan,
                 estimatedComplexity, estimationRationale, state, linkedIssueIds, linkedFeatureRequestIds, attachments, ct);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update work package: {ex.Message}");
-        }
+        }, "create/update work package");
     }
 
     // ── 4. scaffold_work_package ──
@@ -193,7 +181,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseProjectId(projectId, out var projId))
                 return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
@@ -258,15 +246,7 @@ public sealed class WorkPackageTools(PinkRoosterApiClient apiClient)
             };
 
             return JsonSerializer.Serialize(response, JsonDefaults.Indented);
-        }
-        catch (HttpRequestException ex)
-        {
-            return OperationResult.Error($"Scaffold failed: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Unexpected error during scaffold: {ex.Message}");
-        }
+        }, "scaffold work package");
     }
 
     // ── Private helpers ──

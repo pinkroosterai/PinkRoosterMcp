@@ -35,7 +35,7 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (taskId is not null)
                 return await UpdateExistingTask(taskId, name, description, sortOrder,
@@ -46,11 +46,7 @@ public sealed class TaskTools(PinkRoosterApiClient apiClient)
 
             return await CreateNewTask(phaseId, name, description, sortOrder,
                 implementationNotes, state, targetFiles, attachments, ct);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update task: {ex.Message}");
-        }
+        }, "create/update task");
     }
 
     [McpServerTool(Name = "batch_update_task_states",

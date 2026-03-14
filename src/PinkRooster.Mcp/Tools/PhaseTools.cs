@@ -33,7 +33,7 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
         [Description("Tasks to create or update. For new tasks: provide name and description. For existing tasks: provide taskNumber and fields to change.")] List<PhaseTaskInput>? tasks = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseWorkPackageId(workPackageId, out var projId, out var wpNumber))
                 return OperationResult.Error($"Invalid work package ID format: '{workPackageId}'. Expected 'proj-{{number}}-wp-{{number}}'.");
@@ -44,11 +44,7 @@ public sealed class PhaseTools(PinkRoosterApiClient apiClient)
 
             return await CreateNewPhase(projId, wpNumber, name, description, sortOrder,
                 acceptanceCriteria, tasks, ct);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update phase: {ex.Message}");
-        }
+        }, "create/update phase");
     }
 
     [McpServerTool(Name = "verify_acceptance_criteria",

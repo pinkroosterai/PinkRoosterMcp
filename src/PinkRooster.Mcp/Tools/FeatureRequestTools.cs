@@ -41,7 +41,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectId(projectId, out var projId))
             return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (featureRequestId is not null)
                 return await UpdateExisting(projId, featureRequestId, name, description, category,
@@ -49,11 +49,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
 
             return await CreateNew(projId, name, description, category,
                 priority, status, businessValue, userStories, requester, acceptanceSummary, attachments, ct);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update feature request: {ex.Message}");
-        }
+        }, "create/update feature request");
     }
 
     [McpServerTool(Name = "get_feature_request_details", ReadOnly = true,
@@ -69,7 +65,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var projId, out var frNumber))
             return OperationResult.Error($"Invalid feature request ID format: '{featureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var fr = await apiClient.GetFeatureRequestAsync(projId, frNumber, ct);
             if (fr is null)
@@ -98,11 +94,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
             };
 
             return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to fetch feature request: {ex.Message}");
-        }
+        }, "get feature request details");
     }
 
     [McpServerTool(Name = "get_feature_requests", ReadOnly = true,
@@ -120,7 +112,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectId(projectId, out var projId))
             return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var stateFilterStr = stateFilter?.ToString().ToLowerInvariant();
             var frs = await apiClient.GetFeatureRequestsByProjectAsync(projId, stateFilterStr, ct);
@@ -142,11 +134,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
             }).ToList();
 
             return JsonSerializer.Serialize(items, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to fetch feature requests: {ex.Message}");
-        }
+        }, "get feature requests");
     }
 
     [McpServerTool(Name = "manage_user_stories",
@@ -168,7 +156,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseFeatureRequestId(featureRequestId, out var projId, out var frNumber))
             return OperationResult.Error($"Invalid feature request ID format: '{featureRequestId}'. Expected 'proj-{{number}}-fr-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var request = new ManageUserStoriesRequest
             {
@@ -193,11 +181,7 @@ public sealed class FeatureRequestTools(PinkRoosterApiClient apiClient)
 
             return OperationResult.Success(featureRequestId,
                 $"User story {actionVerb} '{featureRequestId}'. Total stories: {fr.UserStories.Count}.");
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to manage user stories: {ex.Message}");
-        }
+        }, "manage user stories");
     }
 
     // ── Private helpers ──

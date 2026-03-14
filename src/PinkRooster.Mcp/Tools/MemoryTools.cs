@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using PinkRooster.Mcp.Clients;
+using PinkRooster.Mcp.Helpers;
 using PinkRooster.Mcp.Responses;
 using PinkRooster.Shared.DTOs.Requests;
 using PinkRooster.Shared.Helpers;
@@ -26,7 +27,7 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectId(projectId, out var projId))
             return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var memories = await apiClient.GetMemoriesByProjectAsync(projId, namePattern, tag, ct);
 
@@ -36,11 +37,7 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
                     (tag is not null ? $" with tag '{tag}'" : "") + ".");
 
             return JsonSerializer.Serialize(memories, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to list memories: {ex.Message}");
-        }
+        }, "list memories");
     }
 
     [McpServerTool(Name = "get_memory_details", ReadOnly = true,
@@ -57,18 +54,14 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectMemoryId(memoryId, out var projId, out var memoryNumber))
             return OperationResult.Error($"Invalid memory ID format: '{memoryId}'. Expected 'proj-{{number}}-mem-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var memory = await apiClient.GetMemoryAsync(projId, memoryNumber, ct);
             if (memory is null)
                 return OperationResult.Warning($"Memory '{memoryId}' not found.");
 
             return JsonSerializer.Serialize(memory, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to fetch memory: {ex.Message}");
-        }
+        }, "get memory details");
     }
 
     [McpServerTool(Name = "create_or_update_memory",
@@ -95,7 +88,7 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
         if (string.IsNullOrWhiteSpace(content))
             return OperationResult.Error("'content' is required.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var request = new UpsertProjectMemoryRequest
             {
@@ -108,11 +101,7 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
             var verb = memory.WasMerged ? "merged into" : "created";
             return OperationResult.Success(memory.MemoryId,
                 $"Memory '{name}' {verb} as '{memory.MemoryId}'.");
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update memory: {ex.Message}");
-        }
+        }, "create/update memory");
     }
 
     [McpServerTool(Name = "delete_memory",
@@ -128,17 +117,13 @@ public sealed class MemoryTools(PinkRoosterApiClient apiClient)
         if (!IdParser.TryParseProjectMemoryId(memoryId, out var projId, out var memoryNumber))
             return OperationResult.Error($"Invalid memory ID format: '{memoryId}'. Expected 'proj-{{number}}-mem-{{number}}'.");
 
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             var deleted = await apiClient.DeleteMemoryAsync(projId, memoryNumber, ct);
             if (!deleted)
                 return OperationResult.Warning($"Memory '{memoryId}' not found.");
 
             return OperationResult.Success(memoryId, $"Memory '{memoryId}' deleted.");
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to delete memory: {ex.Message}");
-        }
+        }, "delete memory");
     }
 }

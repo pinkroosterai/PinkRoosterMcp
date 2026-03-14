@@ -43,7 +43,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("File attachments.")] List<FileReferenceInput>? attachments = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseProjectId(projectId, out var projId))
                 return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
@@ -56,11 +56,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             return await CreateNewIssue(projId, name, description, issueType, severity,
                 priority, state, stepsToReproduce, expectedBehavior, actualBehavior,
                 affectedComponent, stackTrace, rootCause, resolution, attachments, ct);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to create/update issue: {ex.Message}");
-        }
+        }, "create/update issue");
     }
 
     [McpServerTool(Name = "get_issue_details", ReadOnly = true,
@@ -73,7 +69,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("Issue ID (e.g. 'proj-1-issue-3').")] string issueId,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseIssueId(issueId, out var projId, out var issueNumber))
                 return OperationResult.Error($"Invalid issue ID format: '{issueId}'. Expected 'proj-{{number}}-issue-{{number}}'.");
@@ -109,11 +105,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             };
 
             return JsonSerializer.Serialize(detail, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to get issue details: {ex.Message}");
-        }
+        }, "get issue details");
     }
 
     [McpServerTool(Name = "get_issue_overview", ReadOnly = true,
@@ -128,7 +120,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
         [Description("Filter by state category. Omit for all issues.")] StateFilterCategory? stateFilter = null,
         CancellationToken ct = default)
     {
-        try
+        return await ToolErrorHandler.ExecuteAsync(async () =>
         {
             if (!IdParser.TryParseProjectId(projectId, out var projId))
                 return OperationResult.Error($"Invalid project ID format: '{projectId}'. Expected 'proj-{{number}}'.");
@@ -153,11 +145,7 @@ public sealed class IssueTools(PinkRoosterApiClient apiClient)
             }).ToList();
 
             return JsonSerializer.Serialize(items, JsonDefaults.Indented);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Error($"Failed to get issue overview: {ex.Message}");
-        }
+        }, "get issue overview");
     }
 
     // ── Private helpers ──
