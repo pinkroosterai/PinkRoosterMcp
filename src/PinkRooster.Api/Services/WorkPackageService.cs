@@ -297,6 +297,12 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             await cascadeService.AutoUnblockDependentWpsAsync(wp, stateChanges, ct);
         }
 
+        // Cancellation cascade: if WP was cancelled, cancel all non-terminal children
+        if (request.State == CompletionState.Cancelled && oldState != CompletionState.Cancelled)
+        {
+            await cascadeService.CascadeCancellationToChildrenAsync(wp, changedBy, stateChanges, ct);
+        }
+
         if (auditEntries.Count > 0)
             db.WorkPackageAuditLogs.AddRange(auditEntries);
 

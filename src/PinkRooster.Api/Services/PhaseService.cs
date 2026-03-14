@@ -185,8 +185,17 @@ public sealed class PhaseService(AppDbContext db, IStateCascadeService cascadeSe
         if (request.SortOrder is not null)
             AuditHelper.AuditAndSetValue(phaseAuditEntries, phaseAudit, "SortOrder", phase.SortOrder, request.SortOrder.Value, v => phase.SortOrder = v);
 
+        var oldPhaseState = phase.State;
         if (request.State is not null)
             AuditHelper.AuditAndSetEnum(phaseAuditEntries, phaseAudit, "State", phase.State, request.State.Value, v => phase.State = v);
+
+        // Phase cancellation cascade: cancel all non-terminal tasks
+        if (request.State == CompletionState.Cancelled && oldPhaseState != CompletionState.Cancelled)
+            await cascadeService.CascadePhaseCancellationAsync(phase, wp, changedBy, stateChanges, ct);
+
+        // WP auto-activation: if phase was directly set to active and WP is NotStarted
+        if (request.State is not null && oldPhaseState != request.State.Value)
+            cascadeService.AutoActivateWpFromPhase(phase, wp, changedBy, stateChanges);
 
         // AcceptanceCriteria: full replacement if provided
         if (request.AcceptanceCriteria is not null)

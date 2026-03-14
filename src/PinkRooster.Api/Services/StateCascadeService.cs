@@ -82,14 +82,14 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
             if (!CompletionStateConstants.TerminalStates.Contains(phase.State))
             {
                 var oldPhaseState = phase.State;
-                phase.State = CompletionState.Completed;
+                phase.State = InferTerminalState(phaseTasks.Select(t => t.State));
 
                 db.PhaseAuditLogs.Add(new PhaseAuditLog
                 {
                     PhaseId = phase.Id,
                     FieldName = "State",
                     OldValue = oldPhaseState.ToString(),
-                    NewValue = CompletionState.Completed.ToString(),
+                    NewValue = phase.State.ToString(),
                     ChangedBy = changedBy,
                     ChangedAt = now
                 });
@@ -99,8 +99,8 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
                     EntityType = "Phase",
                     EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
                     OldState = oldPhaseState.ToString(),
-                    NewState = CompletionState.Completed.ToString(),
-                    Reason = "Auto-completed: all tasks reached terminal state"
+                    NewState = phase.State.ToString(),
+                    Reason = $"Auto-{phase.State.ToString().ToLowerInvariant()}: all tasks reached terminal state"
                 });
             }
         }
@@ -156,17 +156,16 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
             if (!CompletionStateConstants.TerminalStates.Contains(wp.State))
             {
                 var oldWpState = wp.State;
-                wp.State = CompletionState.Completed;
+                wp.State = InferTerminalState(allPhases.Select(p => p.State));
 
-                // Use shared timestamp logic (fixes the inline-assignment divergence)
-                StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, CompletionState.Completed);
+                StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, wp.State);
 
                 db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
                 {
                     WorkPackageId = wp.Id,
                     FieldName = "State",
                     OldValue = oldWpState.ToString(),
-                    NewValue = CompletionState.Completed.ToString(),
+                    NewValue = wp.State.ToString(),
                     ChangedBy = changedBy,
                     ChangedAt = now
                 });
@@ -176,8 +175,8 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
                     EntityType = "WorkPackage",
                     EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
                     OldState = oldWpState.ToString(),
-                    NewState = CompletionState.Completed.ToString(),
-                    Reason = "Auto-completed: all phases reached terminal state"
+                    NewState = wp.State.ToString(),
+                    Reason = $"Auto-{wp.State.ToString().ToLowerInvariant()}: all phases reached terminal state"
                 });
             }
         }
@@ -347,6 +346,148 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
             NewState = CompletionState.Blocked.ToString(),
             Reason = $"Auto-blocked: dependency on 'proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{blockerTask.TaskNumber}' added"
         });
+    }
+
+    public async Task CascadeCancellationToChildrenAsync(
+        WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var phases = await db.WorkPackagePhases
+            .Where(p => p.WorkPackageId == wp.Id)
+            .ToListAsync(ct);
+
+        var tasks = await db.WorkPackageTasks
+            .Where(t => t.WorkPackageId == wp.Id)
+            .ToListAsync(ct);
+
+        foreach (var task in tasks.Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State)))
+        {
+            var oldState = task.State;
+            task.State = CompletionState.Cancelled;
+            StateTransitionHelper.ApplyStateTimestamps(task, oldState, CompletionState.Cancelled);
+
+            db.TaskAuditLogs.Add(new TaskAuditLog
+            {
+                TaskId = task.Id,
+                FieldName = "State",
+                OldValue = oldState.ToString(),
+                NewValue = CompletionState.Cancelled.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "Task",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
+                OldState = oldState.ToString(),
+                NewState = CompletionState.Cancelled.ToString(),
+                Reason = "Auto-cancelled: parent work package was cancelled"
+            });
+        }
+
+        foreach (var phase in phases.Where(p => !CompletionStateConstants.TerminalStates.Contains(p.State)))
+        {
+            var oldState = phase.State;
+            phase.State = CompletionState.Cancelled;
+
+            db.PhaseAuditLogs.Add(new PhaseAuditLog
+            {
+                PhaseId = phase.Id,
+                FieldName = "State",
+                OldValue = oldState.ToString(),
+                NewValue = CompletionState.Cancelled.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "Phase",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
+                OldState = oldState.ToString(),
+                NewState = CompletionState.Cancelled.ToString(),
+                Reason = "Auto-cancelled: parent work package was cancelled"
+            });
+        }
+    }
+
+    public async Task CascadePhaseCancellationAsync(
+        WorkPackagePhase phase, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var tasks = await db.WorkPackageTasks
+            .Where(t => t.PhaseId == phase.Id)
+            .ToListAsync(ct);
+
+        foreach (var task in tasks.Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State)))
+        {
+            var oldState = task.State;
+            task.State = CompletionState.Cancelled;
+            StateTransitionHelper.ApplyStateTimestamps(task, oldState, CompletionState.Cancelled);
+
+            db.TaskAuditLogs.Add(new TaskAuditLog
+            {
+                TaskId = task.Id,
+                FieldName = "State",
+                OldValue = oldState.ToString(),
+                NewValue = CompletionState.Cancelled.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "Task",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
+                OldState = oldState.ToString(),
+                NewState = CompletionState.Cancelled.ToString(),
+                Reason = "Auto-cancelled: parent phase was cancelled"
+            });
+        }
+    }
+
+    public void AutoActivateWpFromPhase(WorkPackagePhase phase, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges)
+    {
+        if (wp.State != CompletionState.NotStarted) return;
+        if (!CompletionStateConstants.ActiveStates.Contains(phase.State)) return;
+
+        var oldWpState = wp.State;
+        wp.State = phase.State;
+        StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, phase.State);
+
+        db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
+        {
+            WorkPackageId = wp.Id,
+            FieldName = "State",
+            OldValue = oldWpState.ToString(),
+            NewValue = phase.State.ToString(),
+            ChangedBy = changedBy,
+            ChangedAt = DateTimeOffset.UtcNow
+        });
+
+        stateChanges?.Add(new StateChangeDto
+        {
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
+            OldState = oldWpState.ToString(),
+            NewState = phase.State.ToString(),
+            Reason = "Auto-activated: phase transitioned to active state"
+        });
+    }
+
+    /// <summary>
+    /// Determines the appropriate terminal state from children: Cancelled if ALL are Cancelled,
+    /// otherwise Completed (mixed terminal states default to Completed).
+    /// </summary>
+    private static CompletionState InferTerminalState(IEnumerable<CompletionState> childStates)
+    {
+        var states = childStates.ToList();
+        if (states.Count > 0 && states.All(s => s == CompletionState.Cancelled))
+            return CompletionState.Cancelled;
+        return CompletionState.Completed;
     }
 
     public async Task<bool> HasCircularWpDependencyAsync(long dependentId, long dependsOnId, CancellationToken ct)

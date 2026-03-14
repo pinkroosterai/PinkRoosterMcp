@@ -36,6 +36,21 @@ public interface IStateCascadeService
     void AutoBlockTaskIfNeeded(WorkPackageTask dependentTask, WorkPackageTask blockerTask, WorkPackage wp, List<StateChangeDto>? stateChanges);
 
     /// <summary>
+    /// When a WP is cancelled, cascades cancellation to all non-terminal phases and tasks.
+    /// </summary>
+    Task CascadeCancellationToChildrenAsync(WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct);
+
+    /// <summary>
+    /// When a phase is cancelled, cascades cancellation to all non-terminal tasks in that phase.
+    /// </summary>
+    Task CascadePhaseCancellationAsync(WorkPackagePhase phase, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct);
+
+    /// <summary>
+    /// When a phase is directly updated to an active state and the WP is NotStarted, auto-activates the WP.
+    /// </summary>
+    void AutoActivateWpFromPhase(WorkPackagePhase phase, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges);
+
+    /// <summary>
     /// BFS cycle detection for work package dependencies.
     /// </summary>
     Task<bool> HasCircularWpDependencyAsync(long dependentId, long dependsOnId, CancellationToken ct);
