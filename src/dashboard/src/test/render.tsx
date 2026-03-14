@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import type { Project } from "@/types";
 import { ProjectProvider } from "@/hooks/use-project-context";
+import { AuthContext } from "@/components/auth-provider";
 
 interface CustomRenderOptions extends Omit<RenderOptions, "wrapper"> {
   route?: string;
@@ -25,6 +26,17 @@ function createTestQueryClient() {
   });
 }
 
+const testAuthValue = {
+  isProtected: true,
+  isAuthenticated: true,
+  isLoading: false,
+  authError: false,
+  user: { id: 1, email: "test@example.com", displayName: "Test User", globalRole: "SuperUser", isActive: true },
+  login: async () => null,
+  logout: async () => {},
+  register: async () => null,
+};
+
 export function renderWithProviders(
   ui: ReactElement,
   options: CustomRenderOptions = {},
@@ -36,9 +48,11 @@ export function renderWithProviders(
     return (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[route]}>
-          <ProjectProvider>
-            {children}
-          </ProjectProvider>
+          <AuthContext.Provider value={testAuthValue}>
+            <ProjectProvider>
+              {children}
+            </ProjectProvider>
+          </AuthContext.Provider>
         </MemoryRouter>
       </QueryClientProvider>
     );

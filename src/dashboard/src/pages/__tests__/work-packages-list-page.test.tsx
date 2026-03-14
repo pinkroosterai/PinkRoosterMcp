@@ -87,7 +87,7 @@ describe("WorkPackagesListPage", () => {
   it("shows loading state before data loads", () => {
     renderPage();
 
-    expect(screen.getByText("Loading work packages...")).toBeInTheDocument();
+    expect(document.querySelector("[data-slot='skeleton']")).toBeInTheDocument();
   });
 
   it("shows delete confirmation dialog", async () => {

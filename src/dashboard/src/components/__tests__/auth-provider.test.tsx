@@ -1,9 +1,16 @@
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
 import { server } from "@/test/mocks/server";
-import { renderWithProviders } from "@/test/render";
 import { AuthProvider, useAuth } from "../auth-provider";
+
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+}
 
 function AuthStatus() {
   const { isProtected, isAuthenticated, isLoading, login, logout } = useAuth();
@@ -14,26 +21,31 @@ function AuthStatus() {
     <div>
       <p>Protected: {String(isProtected)}</p>
       <p>Authenticated: {String(isAuthenticated)}</p>
-      <button onClick={() => login("admin", "secret")}>Login</button>
-      <button onClick={() => login("admin", "wrong")}>Bad Login</button>
+      <button onClick={() => login("admin@test.com", "secret")}>Login</button>
+      <button onClick={() => login("admin@test.com", "wrong")}>Bad Login</button>
       <button onClick={() => logout()}>Logout</button>
     </div>
   );
 }
 
 function renderAuth() {
-  return renderWithProviders(
-    <AuthProvider>
-      <AuthStatus />
-    </AuthProvider>,
+  const queryClient = createQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthStatus />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe("AuthProvider", () => {
   it("renders children when auth is not protected", async () => {
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: false, authenticated: false }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: false }),
       ),
     );
 
@@ -42,13 +54,16 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(screen.getByText("Protected: false")).toBeInTheDocument();
     });
-    expect(screen.getByText("Authenticated: true")).toBeInTheDocument();
+    expect(screen.getByText("Authenticated: false")).toBeInTheDocument();
   });
 
-  it("shows unauthenticated when protected and no token", async () => {
+  it("shows unauthenticated when protected and no session", async () => {
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: true, authenticated: false }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
+      ),
+      http.get("/api/auth/me", () =>
+        new HttpResponse(null, { status: 401 }),
       ),
     );
 
@@ -60,10 +75,19 @@ describe("AuthProvider", () => {
     expect(screen.getByText("Authenticated: false")).toBeInTheDocument();
   });
 
-  it("shows authenticated when protected with valid token", async () => {
+  it("shows authenticated when protected with valid session", async () => {
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: true, authenticated: true }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
+      ),
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({
+          id: 1,
+          email: "admin@test.com",
+          displayName: "Admin",
+          globalRole: "SuperUser",
+          isActive: true,
+        }),
       ),
     );
 
@@ -78,21 +102,21 @@ describe("AuthProvider", () => {
     const user = userEvent.setup();
 
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: true, authenticated: false }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
       ),
-      http.post("/auth/login", async ({ request }) => {
-        const body = (await request.json()) as {
-          username: string;
-          password: string;
-        };
-        if (body.username === "admin" && body.password === "secret") {
-          return HttpResponse.json({ token: "test-token-123" });
+      http.get("/api/auth/me", () =>
+        new HttpResponse(null, { status: 401 }),
+      ),
+      http.post("/api/auth/login", async ({ request }) => {
+        const body = (await request.json()) as { email: string; password: string };
+        if (body.email === "admin@test.com" && body.password === "secret") {
+          return HttpResponse.json({
+            user: { id: 1, email: "admin@test.com", displayName: "Admin", globalRole: "SuperUser", isActive: true },
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+          });
         }
-        return HttpResponse.json(
-          { error: "Invalid credentials" },
-          { status: 401 },
-        );
+        return HttpResponse.json({ message: "Invalid credentials" }, { status: 401 });
       }),
     );
 
@@ -120,7 +144,7 @@ describe("AuthProvider", () => {
         <div>
           <button
             onClick={async () => {
-              loginError = await login("admin", "wrong");
+              loginError = await login("admin@test.com", "wrong");
             }}
           >
             Bad Login
@@ -131,21 +155,26 @@ describe("AuthProvider", () => {
     }
 
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: true, authenticated: false }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
       ),
-      http.post("/auth/login", () =>
-        HttpResponse.json(
-          { error: "Invalid credentials" },
-          { status: 401 },
-        ),
+      http.get("/api/auth/me", () =>
+        new HttpResponse(null, { status: 401 }),
+      ),
+      http.post("/api/auth/login", () =>
+        HttpResponse.json({ message: "Invalid credentials" }, { status: 401 }),
       ),
     );
 
-    renderWithProviders(
-      <AuthProvider>
-        <AuthWithError />
-      </AuthProvider>,
+    const queryClient = createQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AuthProvider>
+            <AuthWithError />
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
@@ -162,14 +191,20 @@ describe("AuthProvider", () => {
   it("logout clears authenticated state", async () => {
     const user = userEvent.setup();
 
-    let callCount = 0;
     server.use(
-      http.get("/auth/config", () => {
-        callCount++;
-        // First call: authenticated. After logout the state is set directly.
-        return HttpResponse.json({ protected: true, authenticated: true });
-      }),
-      http.post("/auth/logout", () => HttpResponse.json({ success: true })),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
+      ),
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({
+          id: 1,
+          email: "admin@test.com",
+          displayName: "Admin",
+          globalRole: "SuperUser",
+          isActive: true,
+        }),
+      ),
+      http.post("/api/auth/logout", () => HttpResponse.json({ success: true })),
     );
 
     renderAuth();
@@ -185,9 +220,9 @@ describe("AuthProvider", () => {
     });
   });
 
-  it("treats network errors as unprotected", async () => {
+  it("treats network errors as auth error", async () => {
     server.use(
-      http.get("/auth/config", () => HttpResponse.error()),
+      http.get("/api/auth/config", () => HttpResponse.error()),
     );
 
     renderAuth();

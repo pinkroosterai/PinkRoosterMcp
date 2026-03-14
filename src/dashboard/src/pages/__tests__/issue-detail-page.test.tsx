@@ -283,7 +283,7 @@ describe("IssueDetailPage", () => {
   it("shows loading state before data loads", () => {
     renderPage();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(document.querySelector("[data-slot='skeleton']")).toBeInTheDocument();
   });
 
   it("hides reproduction section when no reproduction data", async () => {

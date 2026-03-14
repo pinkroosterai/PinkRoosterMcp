@@ -375,7 +375,7 @@ describe("WorkPackageDetailPage", () => {
   it("shows loading state before data loads", () => {
     renderPage();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(document.querySelector("[data-slot='skeleton']")).toBeInTheDocument();
   });
 
   it("closes delete dialog on Escape key", async () => {

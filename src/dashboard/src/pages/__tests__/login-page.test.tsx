@@ -1,22 +1,37 @@
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
 import { server } from "@/test/mocks/server";
-import { renderWithProviders } from "@/test/render";
 import { AuthProvider } from "@/components/auth-provider";
 import { LoginPage } from "../login-page";
 
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+}
+
 function renderLogin() {
   server.use(
-    http.get("/auth/config", () =>
-      HttpResponse.json({ protected: true, authenticated: false }),
+    http.get("/api/auth/config", () =>
+      HttpResponse.json({ isProtected: true }),
+    ),
+    http.get("/api/auth/me", () =>
+      new HttpResponse(null, { status: 401 }),
     ),
   );
 
-  return renderWithProviders(
-    <AuthProvider>
-      <LoginPage />
-    </AuthProvider>,
+  const queryClient = createQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -25,12 +40,10 @@ describe("LoginPage", () => {
     renderLogin();
 
     await waitFor(() => {
-      expect(screen.getByText("PinkRooster")).toBeInTheDocument();
+      expect(screen.getByText("Sign in to access the dashboard")).toBeInTheDocument();
     });
-    expect(
-      screen.getByText("Sign in to access the dashboard"),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByText("PinkRoosterMCP")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Sign in" }),
@@ -41,28 +54,36 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
 
     server.use(
-      http.get("/auth/config", () =>
-        HttpResponse.json({ protected: true, authenticated: false }),
+      http.get("/api/auth/config", () =>
+        HttpResponse.json({ isProtected: true }),
       ),
-      http.post("/auth/login", () =>
+      http.get("/api/auth/me", () =>
+        new HttpResponse(null, { status: 401 }),
+      ),
+      http.post("/api/auth/login", () =>
         HttpResponse.json(
-          { error: "Invalid credentials" },
+          { message: "Invalid credentials" },
           { status: 401 },
         ),
       ),
     );
 
-    renderWithProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
+    const queryClient = createQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AuthProvider>
+            <LoginPage />
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Username")).toBeInTheDocument();
+      expect(screen.getByText("Sign in to access the dashboard")).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText("Username"), "admin");
+    await user.type(screen.getByLabelText("Email"), "admin@test.com");
     await user.type(screen.getByLabelText("Password"), "wrong");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
@@ -71,14 +92,14 @@ describe("LoginPage", () => {
     });
   });
 
-  it("requires username and password fields", async () => {
+  it("requires email and password fields", async () => {
     renderLogin();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Username")).toBeInTheDocument();
+      expect(screen.getByText("Sign in to access the dashboard")).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText("Username")).toBeRequired();
+    expect(screen.getByLabelText("Email")).toBeRequired();
     expect(screen.getByLabelText("Password")).toBeRequired();
   });
 });

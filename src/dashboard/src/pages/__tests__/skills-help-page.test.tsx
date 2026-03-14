@@ -90,14 +90,14 @@ describe("SkillsHelpPage", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     const badges = screen.getAllByText("Read-only");
-    expect(badges).toHaveLength(3);
+    expect(badges).toHaveLength(4);
   });
 
   it("shows auto-state propagation for skills that have it", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     const propagationHeaders = screen.getAllByText("Auto-State Propagation");
-    // pm-next, pm-done, pm-implement, pm-scaffold = 4 skills with state changes
-    expect(propagationHeaders).toHaveLength(4);
+    // pm-next, pm-done, pm-implement, pm-scaffold, pm-cleanup = 5 skills with state changes
+    expect(propagationHeaders).toHaveLength(5);
   });
 });
