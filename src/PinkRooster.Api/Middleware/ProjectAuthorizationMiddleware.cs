@@ -48,7 +48,14 @@ public sealed partial class ProjectAuthorizationMiddleware(RequestDelegate next)
         }
 
         var projectId = long.Parse(match.Groups[1].Value);
-        var userId = (long)context.Items[AuthConstants.UserIdKey]!;
+
+        if (!context.Items.TryGetValue(AuthConstants.UserIdKey, out var userIdObj) || userIdObj is not long userId)
+        {
+            // No authenticated session — unauthenticated requests to project routes are rejected
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsJsonAsync(new { error = "Authentication required" });
+            return;
+        }
 
         var roleService = context.RequestServices.GetRequiredService<IProjectRoleService>();
         var effectiveRole = await roleService.GetEffectiveRoleAsync(userId, projectId);
