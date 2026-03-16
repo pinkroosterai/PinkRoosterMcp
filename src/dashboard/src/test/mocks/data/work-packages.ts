@@ -62,6 +62,8 @@ export function createWorkPackage(overrides?: Partial<WorkPackage>): WorkPackage
     startedAt: null,
     completedAt: null,
     resolvedAt: null,
+    taskCount: 1,
+    completedTaskCount: 0,
     attachments: [],
     phases: [createPhase()],
     blockedBy: [],
