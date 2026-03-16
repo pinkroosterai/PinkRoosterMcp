@@ -104,6 +104,8 @@ export interface WorkPackage {
   startedAt: string | null;
   completedAt: string | null;
   resolvedAt: string | null;
+  taskCount: number;
+  completedTaskCount: number;
   attachments: FileReference[];
   phases: Phase[];
   blockedBy: WorkPackageDep[];

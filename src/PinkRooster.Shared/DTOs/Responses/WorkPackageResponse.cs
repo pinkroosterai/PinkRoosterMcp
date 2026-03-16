@@ -26,6 +26,8 @@ public sealed class WorkPackageResponse
     public List<PhaseResponse> Phases { get; init; } = [];
     public List<DependencyResponse> BlockedBy { get; init; } = [];
     public List<DependencyResponse> Blocking { get; init; } = [];
+    public int TaskCount { get; set; }
+    public int CompletedTaskCount { get; set; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public List<StateChangeDto>? StateChanges { get; set; }

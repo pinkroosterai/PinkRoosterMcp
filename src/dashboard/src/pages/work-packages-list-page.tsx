@@ -75,14 +75,8 @@ const typeVariant: Record<string, "default" | "secondary" | "outline" | "destruc
 };
 
 function computeProgress(wp: WorkPackage): { completed: number; total: number; percent: number } {
-  let completed = 0;
-  let total = 0;
-  for (const phase of wp.phases) {
-    for (const task of phase.tasks) {
-      total++;
-      if (task.state === "Completed") completed++;
-    }
-  }
+  const total = wp.taskCount;
+  const completed = wp.completedTaskCount;
   return { completed, total, percent: total > 0 ? (completed / total) * 100 : 0 };
 }
 

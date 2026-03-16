@@ -23,7 +23,28 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync(ct);
 
-        return wps.Select(ToListResponse).ToList();
+        var wpIds = wps.Select(w => w.Id).ToList();
+        var taskCounts = await db.WorkPackageTasks
+            .Where(t => wpIds.Contains(t.WorkPackageId))
+            .GroupBy(t => t.WorkPackageId)
+            .Select(g => new
+            {
+                WorkPackageId = g.Key,
+                Total = g.Count(),
+                Completed = g.Count(t => CompletionStateConstants.TerminalStates.Contains(t.State))
+            })
+            .ToDictionaryAsync(x => x.WorkPackageId, ct);
+
+        return wps.Select(w =>
+        {
+            var response = ToListResponse(w);
+            if (taskCounts.TryGetValue(w.Id, out var counts))
+            {
+                response.TaskCount = counts.Total;
+                response.CompletedTaskCount = counts.Completed;
+            }
+            return response;
+        }).ToList();
     }
 
     public async Task<WorkPackageResponse?> GetByNumberAsync(
