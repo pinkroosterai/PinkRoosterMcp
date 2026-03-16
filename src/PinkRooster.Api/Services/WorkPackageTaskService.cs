@@ -118,138 +118,18 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
         var auditEntries = new List<TaskAuditLog>();
         var now = DateTimeOffset.UtcNow;
         var audit = () => new TaskAuditLog { TaskId = task.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
-
-        // Track state before changes for timestamp logic
         var oldState = task.State;
         var oldPhaseId = task.PhaseId;
 
-        if (request.Name is not null)
-            AuditHelper.AuditAndSet(auditEntries, audit, "Name", task.Name, request.Name, v => task.Name = v);
-
-        if (request.Description is not null)
-            AuditHelper.AuditAndSet(auditEntries, audit, "Description", task.Description, request.Description, v => task.Description = v);
-
-        if (request.SortOrder is not null)
-            AuditHelper.AuditAndSetValue(auditEntries, audit, "SortOrder", task.SortOrder, request.SortOrder.Value, v => task.SortOrder = v);
-
-        if (request.ImplementationNotes is not null)
-            AuditHelper.AuditAndSet(auditEntries, audit, "ImplementationNotes", task.ImplementationNotes, request.ImplementationNotes, v => task.ImplementationNotes = v);
-
-        if (request.State is not null)
-            AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", task.State, request.State.Value, v => task.State = v);
-
-        if (request.TargetFiles is not null)
-        {
-            var oldJson = JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
-            task.TargetFiles = StateTransitionHelper.MapFileReferences(request.TargetFiles);
-            var newJson = JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
-
-            if (oldJson != newJson)
-            {
-                auditEntries.Add(new TaskAuditLog
-                {
-                    TaskId = task.Id,
-                    FieldName = "TargetFiles",
-                    OldValue = oldJson,
-                    NewValue = newJson,
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-            }
-        }
-
-        if (request.Attachments is not null)
-        {
-            var oldJson = JsonSerializer.Serialize(task.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-            task.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
-            var newJson = JsonSerializer.Serialize(task.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-
-            if (oldJson != newJson)
-            {
-                auditEntries.Add(new TaskAuditLog
-                {
-                    TaskId = task.Id,
-                    FieldName = "Attachments",
-                    OldValue = oldJson,
-                    NewValue = newJson,
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-            }
-        }
-
-        // PhaseId move: validate target phase exists in same WP
-        if (request.PhaseId is not null && request.PhaseId.Value != task.PhaseId)
-        {
-            var targetPhase = await db.WorkPackagePhases
-                .FirstOrDefaultAsync(p => p.Id == request.PhaseId.Value && p.WorkPackageId == wp.Id, ct)
-                ?? throw new InvalidOperationException($"Target phase {request.PhaseId.Value} not found in work package {wpNumber}");
-
-            auditEntries.Add(new TaskAuditLog
-            {
-                TaskId = task.Id,
-                FieldName = "PhaseId",
-                OldValue = task.PhaseId.ToString(),
-                NewValue = targetPhase.Id.ToString(),
-                ChangedBy = changedBy,
-                ChangedAt = now
-            });
-
-            task.PhaseId = targetPhase.Id;
-            task.Phase = targetPhase;
-        }
-
-        // Apply blocked state logic and state-driven timestamps if state changed
-        if (request.State is not null && oldState != request.State.Value)
-        {
-            var newState = request.State.Value;
-
-            // Soft warning: moving to active state while non-terminal blockers exist
-            if (CompletionStateConstants.ActiveStates.Contains(newState))
-            {
-                var activeBlockerCount = task.BlockedBy
-                    .Count(d => d.DependsOnTask is null || !CompletionStateConstants.TerminalStates.Contains(d.DependsOnTask.State));
-
-                if (activeBlockerCount > 0)
-                {
-                    stateChanges.Add(new StateChangeDto
-                    {
-                        EntityType = "Task",
-                        EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
-                        OldState = oldState.ToString(),
-                        NewState = newState.ToString(),
-                        Reason = $"Warning: task has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
-                    });
-                }
-            }
-
-            StateTransitionHelper.ApplyBlockedStateLogic(task, oldState, newState);
-            StateTransitionHelper.ApplyStateTimestamps(task, oldState, newState);
-        }
+        AuditAndUpdateTaskFields(task, request, auditEntries, audit);
+        AuditTaskFileReferences(task, request, auditEntries, changedBy, now);
+        await HandleTaskPhaseMoveAsync(task, request, wp, wpNumber, auditEntries, changedBy, now, ct);
+        HandleTaskStateTransition(task, oldState, request, projectId, wpNumber, taskNumber, stateChanges);
 
         if (auditEntries.Count > 0)
             db.TaskAuditLogs.AddRange(auditEntries);
 
-        // Upward propagation check after state change
-        if (request.State is not null && oldState != request.State.Value)
-        {
-            await cascadeService.PropagateStateUpwardAsync(task.PhaseId, wp, changedBy, stateChanges, ct);
-
-            // If task was moved between phases, also check old phase
-            if (oldPhaseId != task.PhaseId)
-                await cascadeService.PropagateStateUpwardAsync(oldPhaseId, wp, changedBy, stateChanges, ct);
-
-            // Dep-completion auto-unblock: if task transitioned to terminal, unblock dependent tasks
-            if (CompletionStateConstants.TerminalStates.Contains(request.State.Value))
-                await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
-        }
-
-        // If phase changed (without state change), check both old and new phase
-        if (request.PhaseId is not null && request.PhaseId.Value != oldPhaseId && (request.State is null || oldState == request.State.Value))
-        {
-            await cascadeService.PropagateStateUpwardAsync(task.PhaseId, wp, changedBy, stateChanges, ct);
-            await cascadeService.PropagateStateUpwardAsync(oldPhaseId, wp, changedBy, stateChanges, ct);
-        }
+        await PropagateTaskCascadesAsync(task, oldState, oldPhaseId, request, wp, changedBy, stateChanges, ct);
 
         await db.SaveChangesAsync(ct);
 
@@ -301,18 +181,16 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
                 continue;
 
             var oldState = task.State;
-            if (oldState == update.State)
+            results.Add(new TaskStateResult
             {
-                results.Add(new TaskStateResult
-                {
-                    TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
-                    OldState = oldState.ToString(),
-                    NewState = update.State.ToString()
-                });
-                continue;
-            }
+                TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
+                OldState = oldState.ToString(),
+                NewState = update.State.ToString()
+            });
 
-            // Audit the state change
+            if (oldState == update.State)
+                continue;
+
             auditEntries.Add(new TaskAuditLog
             {
                 TaskId = task.Id,
@@ -331,29 +209,12 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
 
             if (CompletionStateConstants.TerminalStates.Contains(update.State))
                 terminalTasks.Add(task);
-
-            results.Add(new TaskStateResult
-            {
-                TaskId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-task-{task.TaskNumber}",
-                OldState = oldState.ToString(),
-                NewState = update.State.ToString()
-            });
         }
 
         if (auditEntries.Count > 0)
             db.TaskAuditLogs.AddRange(auditEntries);
 
-        // Run cascades after all state changes are applied
-        foreach (var task in terminalTasks)
-            await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
-
-        // Pre-load phases once for batch propagation (avoids N+1 re-queries per affected phase)
-        var allPhases = affectedPhaseIds.Count > 0
-            ? await db.WorkPackagePhases.Where(p => p.WorkPackageId == wp.Id).ToListAsync(ct)
-            : null;
-
-        foreach (var phaseId in affectedPhaseIds)
-            await cascadeService.PropagateStateUpwardAsync(phaseId, wp, changedBy, stateChanges, ct, allPhases);
+        await ProcessBatchCascadesAsync(terminalTasks, affectedPhaseIds, wp, changedBy, stateChanges, ct);
 
         await db.SaveChangesAsync(ct);
 
@@ -373,6 +234,147 @@ public sealed class WorkPackageTaskService(AppDbContext db, IStateCascadeService
             Results = results,
             StateChanges = stateChanges.Count > 0 ? stateChanges : null
         };
+    }
+
+    // ── UpdateAsync helpers ──
+
+    private static void AuditAndUpdateTaskFields(
+        WorkPackageTask task, UpdateTaskRequest request,
+        List<TaskAuditLog> auditEntries, Func<TaskAuditLog> audit)
+    {
+        if (request.Name is not null)
+            AuditHelper.AuditAndSet(auditEntries, audit, "Name", task.Name, request.Name, v => task.Name = v);
+
+        if (request.Description is not null)
+            AuditHelper.AuditAndSet(auditEntries, audit, "Description", task.Description, request.Description, v => task.Description = v);
+
+        if (request.SortOrder is not null)
+            AuditHelper.AuditAndSetValue(auditEntries, audit, "SortOrder", task.SortOrder, request.SortOrder.Value, v => task.SortOrder = v);
+
+        if (request.ImplementationNotes is not null)
+            AuditHelper.AuditAndSet(auditEntries, audit, "ImplementationNotes", task.ImplementationNotes, request.ImplementationNotes, v => task.ImplementationNotes = v);
+
+        if (request.State is not null)
+            AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", task.State, request.State.Value, v => task.State = v);
+    }
+
+    private static void AuditTaskFileReferences(
+        WorkPackageTask task, UpdateTaskRequest request,
+        List<TaskAuditLog> auditEntries, string changedBy, DateTimeOffset now)
+    {
+        if (request.TargetFiles is not null)
+        {
+            var oldJson = JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
+            task.TargetFiles = StateTransitionHelper.MapFileReferences(request.TargetFiles);
+            var newJson = JsonSerializer.Serialize(task.TargetFiles.Select(f => new { f.FileName, f.RelativePath, f.Description }));
+            if (oldJson != newJson)
+                auditEntries.Add(new TaskAuditLog { TaskId = task.Id, FieldName = "TargetFiles", OldValue = oldJson, NewValue = newJson, ChangedBy = changedBy, ChangedAt = now });
+        }
+
+        if (request.Attachments is not null)
+        {
+            var oldJson = JsonSerializer.Serialize(task.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
+            task.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
+            var newJson = JsonSerializer.Serialize(task.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
+            if (oldJson != newJson)
+                auditEntries.Add(new TaskAuditLog { TaskId = task.Id, FieldName = "Attachments", OldValue = oldJson, NewValue = newJson, ChangedBy = changedBy, ChangedAt = now });
+        }
+    }
+
+    private async Task HandleTaskPhaseMoveAsync(
+        WorkPackageTask task, UpdateTaskRequest request, WorkPackage wp, int wpNumber,
+        List<TaskAuditLog> auditEntries, string changedBy, DateTimeOffset now, CancellationToken ct)
+    {
+        if (request.PhaseId is null || request.PhaseId.Value == task.PhaseId)
+            return;
+
+        var targetPhase = await db.WorkPackagePhases
+            .FirstOrDefaultAsync(p => p.Id == request.PhaseId.Value && p.WorkPackageId == wp.Id, ct)
+            ?? throw new InvalidOperationException($"Target phase {request.PhaseId.Value} not found in work package {wpNumber}");
+
+        auditEntries.Add(new TaskAuditLog
+        {
+            TaskId = task.Id,
+            FieldName = "PhaseId",
+            OldValue = task.PhaseId.ToString(),
+            NewValue = targetPhase.Id.ToString(),
+            ChangedBy = changedBy,
+            ChangedAt = now
+        });
+
+        task.PhaseId = targetPhase.Id;
+        task.Phase = targetPhase;
+    }
+
+    private static void HandleTaskStateTransition(
+        WorkPackageTask task, CompletionState oldState, UpdateTaskRequest request,
+        long projectId, int wpNumber, int taskNumber, List<StateChangeDto> stateChanges)
+    {
+        if (request.State is null || oldState == request.State.Value)
+            return;
+
+        var newState = request.State.Value;
+
+        if (CompletionStateConstants.ActiveStates.Contains(newState))
+        {
+            var activeBlockerCount = task.BlockedBy
+                .Count(d => d.DependsOnTask is null || !CompletionStateConstants.TerminalStates.Contains(d.DependsOnTask.State));
+
+            if (activeBlockerCount > 0)
+            {
+                stateChanges.Add(new StateChangeDto
+                {
+                    EntityType = "Task",
+                    EntityId = $"proj-{projectId}-wp-{wpNumber}-task-{taskNumber}",
+                    OldState = oldState.ToString(),
+                    NewState = newState.ToString(),
+                    Reason = $"Warning: task has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
+                });
+            }
+        }
+
+        StateTransitionHelper.ApplyBlockedStateLogic(task, oldState, newState);
+        StateTransitionHelper.ApplyStateTimestamps(task, oldState, newState);
+    }
+
+    private async Task PropagateTaskCascadesAsync(
+        WorkPackageTask task, CompletionState oldState, long oldPhaseId,
+        UpdateTaskRequest request, WorkPackage wp, string changedBy,
+        List<StateChangeDto> stateChanges, CancellationToken ct)
+    {
+        if (request.State is not null && oldState != request.State.Value)
+        {
+            await cascadeService.PropagateStateUpwardAsync(task.PhaseId, wp, changedBy, stateChanges, ct);
+
+            if (oldPhaseId != task.PhaseId)
+                await cascadeService.PropagateStateUpwardAsync(oldPhaseId, wp, changedBy, stateChanges, ct);
+
+            if (CompletionStateConstants.TerminalStates.Contains(request.State.Value))
+                await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
+        }
+
+        if (request.PhaseId is not null && request.PhaseId.Value != oldPhaseId && (request.State is null || oldState == request.State.Value))
+        {
+            await cascadeService.PropagateStateUpwardAsync(task.PhaseId, wp, changedBy, stateChanges, ct);
+            await cascadeService.PropagateStateUpwardAsync(oldPhaseId, wp, changedBy, stateChanges, ct);
+        }
+    }
+
+    // ── BatchUpdateStatesAsync helpers ──
+
+    private async Task ProcessBatchCascadesAsync(
+        List<WorkPackageTask> terminalTasks, HashSet<long> affectedPhaseIds,
+        WorkPackage wp, string changedBy, List<StateChangeDto> stateChanges, CancellationToken ct)
+    {
+        foreach (var task in terminalTasks)
+            await cascadeService.AutoUnblockDependentTasksAsync(task, wp, stateChanges, ct);
+
+        var allPhases = affectedPhaseIds.Count > 0
+            ? await db.WorkPackagePhases.Where(p => p.WorkPackageId == wp.Id).ToListAsync(ct)
+            : null;
+
+        foreach (var phaseId in affectedPhaseIds)
+            await cascadeService.PropagateStateUpwardAsync(phaseId, wp, changedBy, stateChanges, ct, allPhases);
     }
 
     public async Task<bool> DeleteAsync(
