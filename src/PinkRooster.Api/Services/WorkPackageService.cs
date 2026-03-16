@@ -157,10 +157,37 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
         var auditEntries = new List<WorkPackageAuditLog>();
         var now = DateTimeOffset.UtcNow;
         var audit = () => new WorkPackageAuditLog { WorkPackageId = wp.Id, FieldName = default!, ChangedBy = changedBy, ChangedAt = now };
-
-        // Track state before changes for timestamp logic
         var oldState = wp.State;
 
+        AuditAndUpdateFields(wp, request, auditEntries, audit);
+        await SyncEntityLinksAsync(wp, request, auditEntries, changedBy, now, ct);
+        AuditAttachments(wp, request, auditEntries, changedBy, now);
+        await HandleStateTransitionAsync(wp, oldState, request, projectId, wpNumber, changedBy, stateChanges, ct);
+
+        if (auditEntries.Count > 0)
+            db.WorkPackageAuditLogs.AddRange(auditEntries);
+
+        await db.SaveChangesAsync(ct);
+
+        broadcaster.Publish(new ServerEvent
+        {
+            EventType = "entity:changed",
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{projectId}-wp-{wpNumber}",
+            Action = "updated",
+            ProjectId = projectId,
+            StateChanges = stateChanges.Count > 0 ? stateChanges : null
+        });
+
+        var response = ToResponse(wp);
+        response.StateChanges = stateChanges.Count > 0 ? stateChanges : null;
+        return response;
+    }
+
+    private static void AuditAndUpdateFields(
+        WorkPackage wp, UpdateWorkPackageRequest request,
+        List<WorkPackageAuditLog> auditEntries, Func<WorkPackageAuditLog> audit)
+    {
         if (request.Name is not null)
             AuditHelper.AuditAndSet(auditEntries, audit, "Name", wp.Name, request.Name, v => wp.Name = v);
 
@@ -184,8 +211,12 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
 
         if (request.State is not null)
             AuditHelper.AuditAndSetEnum(auditEntries, audit, "State", wp.State, request.State.Value, v => wp.State = v);
+    }
 
-        // Set-based link replacement: null = don't change, empty = clear all, non-empty = replace all
+    private async Task SyncEntityLinksAsync(
+        WorkPackage wp, UpdateWorkPackageRequest request,
+        List<WorkPackageAuditLog> auditEntries, string changedBy, DateTimeOffset now, CancellationToken ct)
+    {
         if (request.LinkedIssueIds is not null)
         {
             var oldIds = wp.LinkedIssueLinks.Select(l => l.IssueId).OrderBy(x => x).ToList();
@@ -239,88 +270,69 @@ public sealed class WorkPackageService(AppDbContext db, IStateCascadeService cas
                 }
             }
         }
+    }
 
-        if (request.Attachments is not null)
+    private static void AuditAttachments(
+        WorkPackage wp, UpdateWorkPackageRequest request,
+        List<WorkPackageAuditLog> auditEntries, string changedBy, DateTimeOffset now)
+    {
+        if (request.Attachments is null) return;
+
+        var oldJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
+        wp.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
+        var newJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
+
+        if (oldJson != newJson)
         {
-            var oldJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-            wp.Attachments = StateTransitionHelper.MapFileReferences(request.Attachments);
-            var newJson = JsonSerializer.Serialize(wp.Attachments.Select(a => new { a.FileName, a.RelativePath, a.Description }));
-
-            if (oldJson != newJson)
+            auditEntries.Add(new WorkPackageAuditLog
             {
-                auditEntries.Add(new WorkPackageAuditLog
+                WorkPackageId = wp.Id,
+                FieldName = "Attachments",
+                OldValue = oldJson,
+                NewValue = newJson,
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+        }
+    }
+
+    private async Task HandleStateTransitionAsync(
+        WorkPackage wp, CompletionState oldState, UpdateWorkPackageRequest request,
+        long projectId, int wpNumber, string changedBy, List<StateChangeDto> stateChanges, CancellationToken ct)
+    {
+        if (request.State is null || oldState == request.State.Value)
+            return;
+
+        var newState = request.State.Value;
+
+        if (CompletionStateConstants.ActiveStates.Contains(newState))
+        {
+            var activeBlockerCount = await db.WorkPackageDependencies
+                .Where(d => d.DependentWorkPackageId == wp.Id)
+                .Include(d => d.DependsOnWorkPackage)
+                .CountAsync(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnWorkPackage.State), ct);
+
+            if (activeBlockerCount > 0)
+            {
+                stateChanges.Add(new StateChangeDto
                 {
-                    WorkPackageId = wp.Id,
-                    FieldName = "Attachments",
-                    OldValue = oldJson,
-                    NewValue = newJson,
-                    ChangedBy = changedBy,
-                    ChangedAt = now
+                    EntityType = "WorkPackage",
+                    EntityId = $"proj-{projectId}-wp-{wpNumber}",
+                    OldState = oldState.ToString(),
+                    NewState = newState.ToString(),
+                    Reason = $"Warning: entity has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
                 });
             }
         }
 
-        // Apply blocked state logic and state-driven timestamps if state changed
-        if (request.State is not null && oldState != request.State.Value)
-        {
-            var newState = request.State.Value;
+        StateTransitionHelper.ApplyBlockedStateLogic(wp, oldState, newState);
+        StateTransitionHelper.ApplyStateTimestamps(wp, oldState, newState);
 
-            // Soft warning: moving to active state while non-terminal blockers exist
-            if (CompletionStateConstants.ActiveStates.Contains(newState))
-            {
-                var activeBlockerCount = await db.WorkPackageDependencies
-                    .Where(d => d.DependentWorkPackageId == wp.Id)
-                    .Include(d => d.DependsOnWorkPackage)
-                    .CountAsync(d => !CompletionStateConstants.TerminalStates.Contains(d.DependsOnWorkPackage.State), ct);
-
-                if (activeBlockerCount > 0)
-                {
-                    stateChanges.Add(new StateChangeDto
-                    {
-                        EntityType = "WorkPackage",
-                        EntityId = $"proj-{projectId}-wp-{wpNumber}",
-                        OldState = oldState.ToString(),
-                        NewState = newState.ToString(),
-                        Reason = $"Warning: entity has {activeBlockerCount} non-terminal blocker(s) — dependency enforcement is advisory"
-                    });
-                }
-            }
-
-            StateTransitionHelper.ApplyBlockedStateLogic(wp, oldState, newState);
-            StateTransitionHelper.ApplyStateTimestamps(wp, oldState, newState);
-        }
-
-        // Dep-completion auto-unblock: if WP transitioned to terminal, unblock dependents
-        if (request.State is not null && oldState != request.State.Value
-            && CompletionStateConstants.TerminalStates.Contains(request.State.Value))
-        {
+        if (CompletionStateConstants.TerminalStates.Contains(newState))
             await cascadeService.AutoUnblockDependentWpsAsync(wp, stateChanges, ct);
-        }
 
-        // Cancellation cascade: if WP was cancelled, cancel all non-terminal children
-        if (request.State == CompletionState.Cancelled && oldState != CompletionState.Cancelled)
-        {
+        if (newState == CompletionState.Cancelled && oldState != CompletionState.Cancelled)
             await cascadeService.CascadeCancellationToChildrenAsync(wp, changedBy, stateChanges, ct);
-        }
-
-        if (auditEntries.Count > 0)
-            db.WorkPackageAuditLogs.AddRange(auditEntries);
-
-        await db.SaveChangesAsync(ct);
-
-        broadcaster.Publish(new ServerEvent
-        {
-            EventType = "entity:changed",
-            EntityType = "WorkPackage",
-            EntityId = $"proj-{projectId}-wp-{wpNumber}",
-            Action = "updated",
-            ProjectId = projectId,
-            StateChanges = stateChanges.Count > 0 ? stateChanges : null
-        });
-
-        var response = ToResponse(wp);
-        response.StateChanges = stateChanges.Count > 0 ? stateChanges : null;
-        return response;
     }
 
     public async Task<bool> DeleteAsync(long projectId, int wpNumber, CancellationToken ct = default)
