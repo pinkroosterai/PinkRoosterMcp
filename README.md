@@ -12,7 +12,7 @@ The first project management system built from scratch for AI coding agents — 
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green)](https://modelcontextprotocol.io/)
 [![Docker](https://img.shields.io/badge/Docker-Hub-2496ED)](https://hub.docker.com/r/pinkrooster/pinkroostermcp)
-[![Tests](https://img.shields.io/badge/Tests-333_API_+_142_frontend-brightgreen)]()
+[![Tests](https://img.shields.io/badge/Tests-343_API_+_255_frontend-brightgreen)]()
 
 [Quick Start](#quick-start) · [Why PinkRooster?](#why-pinkrooster) · [Dashboard](#dashboard) · [MCP Tools](#mcp-tools) · [PM Skills](#pm-workflow-skills) · [Getting Started](#getting-started)
 
@@ -105,7 +105,7 @@ The agent picks the highest-priority work item, scaffolds a plan if needed, impl
 
 Every tool is designed for AI consumption — compact responses, actionable next steps, and state cascade notifications. Scaffold an entire work package with phases, tasks, and dependencies in a single call.
 
-### 15 PM Workflow Skills
+### 16 PM Workflow Skills
 
 High-level slash commands that encode sophisticated PM workflows: `/pm-scaffold` analyzes your codebase to produce realistic target files and implementation notes. `/pm-implement` handles dependency ordering, test running with auto-fix, and phase verification gates. `/pm-audit` runs parallel analysis agents across quality, security, performance, and architecture domains. `/pm-cleanup` finds dead code and scaffolds fix tasks.
 
@@ -255,7 +255,7 @@ All write operations return structured `OperationResult` JSON with state change 
 
 ## PM Workflow Skills
 
-Fifteen Claude Code slash commands provide high-level project management workflows on top of the MCP tools:
+Sixteen Claude Code slash commands provide high-level project management workflows on top of the MCP tools:
 
 | Command | What it does |
 |---------|-------------|
@@ -270,6 +270,7 @@ Fifteen Claude Code slash commands provide high-level project management workflo
 | `/pm-explore [--limit N]` | Analyze codebase as a PM and suggest user-facing features |
 | `/pm-verify <id>` | Verify acceptance criteria for a phase or work package |
 | `/pm-cleanup [--dry-run]` | Analyze codebase for dead code and debt, scaffold a cleanup work package |
+| `/pm-codesmells` | Scan for code smells using threshold-based metrics — long methods, god classes, deep nesting, and more |
 | `/pm-housekeeping [--dry-run]` | Delete stale, cancelled, rejected, or replaced project entities |
 | `/pm-brainstorm [topic]` | Interactive feature brainstorming via Socratic dialogue and web research |
 | `/pm-audit [--focus domain]` | Proactive codebase audit — creates tracked issues from confirmed findings |
@@ -278,7 +279,7 @@ Fifteen Claude Code slash commands provide high-level project management workflo
 Skills automatically propagate state to related entities. Starting a task activates its work package and linked issue/FR. Completing all tasks cascades completion upward through phases, work packages, and linked entities.
 
 <div align="center">
-<img src="docs/screenshots/skills-help.png" alt="PM Workflow Skills help page showing all fifteen slash commands with usage syntax and auto-state propagation rules" width="900" />
+<img src="docs/screenshots/skills-help.png" alt="PM Workflow Skills help page showing all sixteen slash commands with usage syntax and auto-state propagation rules" width="900" />
 </div>
 
 ---
@@ -423,7 +424,7 @@ dotnet test
 cd src/dashboard && npm test
 ```
 
-700+ tests: 333 API integration tests + 112 unit tests + 255 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
+700+ tests: 343 API integration tests + 112 unit tests + 255 dashboard frontend tests. 98.3% MCP E2E pass rate across 59 test scenarios.
 
 ---
 

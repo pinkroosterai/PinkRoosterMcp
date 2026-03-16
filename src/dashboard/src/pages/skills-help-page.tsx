@@ -18,6 +18,7 @@ import {
   ScanSearch,
   Bug,
   Wrench,
+  Microscope,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -144,6 +145,16 @@ const skills: SkillInfo[] = [
     stateChanges: [
       "Scaffolds a Chore WP (code changes via /pm-implement)",
     ],
+  },
+  {
+    name: "pm-codesmells",
+    icon: Microscope,
+    description:
+      "Scan the codebase for common code smells using threshold-based detection: long methods, god classes, long parameter lists, deep nesting, magic numbers, data clumps, and more. Produces a prioritized overview and proposes PinkRooster issues for confirmed findings.",
+    usage: "/pm-codesmells [--scope path] [--threshold N]",
+    args: "Optional: --scope to limit analysis to a directory, --threshold to adjust sensitivity",
+    stateChanges: [],
+    readOnly: true,
   },
   {
     name: "pm-housekeeping",

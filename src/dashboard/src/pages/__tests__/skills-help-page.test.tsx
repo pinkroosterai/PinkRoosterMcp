@@ -90,7 +90,7 @@ describe("SkillsHelpPage", () => {
     renderWithProviders(<SkillsHelpPage />);
 
     const badges = screen.getAllByText("Read-only");
-    expect(badges).toHaveLength(4);
+    expect(badges).toHaveLength(5);
   });
 
   it("shows auto-state propagation for skills that have it", () => {
