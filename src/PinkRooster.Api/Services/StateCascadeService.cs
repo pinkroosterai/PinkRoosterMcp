@@ -12,105 +12,119 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
         long phaseId, WorkPackage wp, string changedBy, List<StateChangeDto>? stateChanges, CancellationToken ct, List<WorkPackagePhase>? preloadedPhases = null)
     {
         var now = DateTimeOffset.UtcNow;
-
-        // ── Upward activation: auto-activate phase and WP when tasks become active ──
         var phaseTasks = await db.WorkPackageTasks
             .Where(t => t.PhaseId == phaseId)
             .ToListAsync(ct);
 
-        var firstActiveTask = phaseTasks.FirstOrDefault(t => CompletionStateConstants.ActiveStates.Contains(t.State));
-        if (firstActiveTask is not null)
-        {
-            var phase = await db.WorkPackagePhases.FirstAsync(p => p.Id == phaseId, ct);
-            if (phase.State == CompletionState.NotStarted)
-            {
-                var oldPhaseState = phase.State;
-                phase.State = firstActiveTask.State;
+        await AutoActivateFromTaskAsync(phaseTasks, phaseId, wp, changedBy, stateChanges, now, ct);
+        await AutoCompletePhaseAsync(phaseTasks, phaseId, wp, changedBy, stateChanges, now, ct);
 
-                db.PhaseAuditLogs.Add(new PhaseAuditLog
-                {
-                    PhaseId = phase.Id,
-                    FieldName = "State",
-                    OldValue = oldPhaseState.ToString(),
-                    NewValue = firstActiveTask.State.ToString(),
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "Phase",
-                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
-                    OldState = oldPhaseState.ToString(),
-                    NewState = firstActiveTask.State.ToString(),
-                    Reason = "Auto-activated: task transitioned to active state"
-                });
-            }
-
-            if (wp.State == CompletionState.NotStarted)
-            {
-                var oldWpState = wp.State;
-                wp.State = firstActiveTask.State;
-                StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, firstActiveTask.State);
-
-                db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
-                {
-                    WorkPackageId = wp.Id,
-                    FieldName = "State",
-                    OldValue = oldWpState.ToString(),
-                    NewValue = firstActiveTask.State.ToString(),
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "WorkPackage",
-                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
-                    OldState = oldWpState.ToString(),
-                    NewState = firstActiveTask.State.ToString(),
-                    Reason = "Auto-activated: task transitioned to active state"
-                });
-            }
-        }
-
-        // ── Downward completion: auto-complete phase and WP when all tasks are terminal ──
-
-        if (phaseTasks.Count > 0 && phaseTasks.All(t => CompletionStateConstants.TerminalStates.Contains(t.State)))
-        {
-            var phase = await db.WorkPackagePhases.FirstAsync(p => p.Id == phaseId, ct);
-            if (!CompletionStateConstants.TerminalStates.Contains(phase.State))
-            {
-                var oldPhaseState = phase.State;
-                phase.State = InferTerminalState(phaseTasks.Select(t => t.State));
-
-                db.PhaseAuditLogs.Add(new PhaseAuditLog
-                {
-                    PhaseId = phase.Id,
-                    FieldName = "State",
-                    OldValue = oldPhaseState.ToString(),
-                    NewValue = phase.State.ToString(),
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "Phase",
-                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
-                    OldState = oldPhaseState.ToString(),
-                    NewState = phase.State.ToString(),
-                    Reason = $"Auto-{phase.State.ToString().ToLowerInvariant()}: all tasks reached terminal state"
-                });
-            }
-        }
-
-        // Auto-complete empty phases (no tasks = nothing left to do)
-        // Use preloaded phases if available (batch callers), otherwise query
         var allPhases = preloadedPhases ?? await db.WorkPackagePhases
             .Where(p => p.WorkPackageId == wp.Id)
             .ToListAsync(ct);
 
+        await AutoCompleteEmptyPhasesAsync(allPhases, wp, changedBy, stateChanges, now, ct);
+        AutoCompleteWorkPackageFromPhases(allPhases, wp, changedBy, stateChanges, now);
+    }
+
+    private async Task AutoActivateFromTaskAsync(
+        List<WorkPackageTask> phaseTasks, long phaseId, WorkPackage wp, string changedBy,
+        List<StateChangeDto>? stateChanges, DateTimeOffset now, CancellationToken ct)
+    {
+        var firstActiveTask = phaseTasks.FirstOrDefault(t => CompletionStateConstants.ActiveStates.Contains(t.State));
+        if (firstActiveTask is null) return;
+
+        var phase = await db.WorkPackagePhases.FirstAsync(p => p.Id == phaseId, ct);
+        if (phase.State == CompletionState.NotStarted)
+        {
+            var oldPhaseState = phase.State;
+            phase.State = firstActiveTask.State;
+
+            db.PhaseAuditLogs.Add(new PhaseAuditLog
+            {
+                PhaseId = phase.Id,
+                FieldName = "State",
+                OldValue = oldPhaseState.ToString(),
+                NewValue = firstActiveTask.State.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "Phase",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
+                OldState = oldPhaseState.ToString(),
+                NewState = firstActiveTask.State.ToString(),
+                Reason = "Auto-activated: task transitioned to active state"
+            });
+        }
+
+        if (wp.State == CompletionState.NotStarted)
+        {
+            var oldWpState = wp.State;
+            wp.State = firstActiveTask.State;
+            StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, firstActiveTask.State);
+
+            db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
+            {
+                WorkPackageId = wp.Id,
+                FieldName = "State",
+                OldValue = oldWpState.ToString(),
+                NewValue = firstActiveTask.State.ToString(),
+                ChangedBy = changedBy,
+                ChangedAt = now
+            });
+
+            stateChanges?.Add(new StateChangeDto
+            {
+                EntityType = "WorkPackage",
+                EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
+                OldState = oldWpState.ToString(),
+                NewState = firstActiveTask.State.ToString(),
+                Reason = "Auto-activated: task transitioned to active state"
+            });
+        }
+    }
+
+    private async Task AutoCompletePhaseAsync(
+        List<WorkPackageTask> phaseTasks, long phaseId, WorkPackage wp, string changedBy,
+        List<StateChangeDto>? stateChanges, DateTimeOffset now, CancellationToken ct)
+    {
+        if (phaseTasks.Count == 0 || !phaseTasks.All(t => CompletionStateConstants.TerminalStates.Contains(t.State)))
+            return;
+
+        var phase = await db.WorkPackagePhases.FirstAsync(p => p.Id == phaseId, ct);
+        if (CompletionStateConstants.TerminalStates.Contains(phase.State))
+            return;
+
+        var oldPhaseState = phase.State;
+        phase.State = InferTerminalState(phaseTasks.Select(t => t.State));
+
+        db.PhaseAuditLogs.Add(new PhaseAuditLog
+        {
+            PhaseId = phase.Id,
+            FieldName = "State",
+            OldValue = oldPhaseState.ToString(),
+            NewValue = phase.State.ToString(),
+            ChangedBy = changedBy,
+            ChangedAt = now
+        });
+
+        stateChanges?.Add(new StateChangeDto
+        {
+            EntityType = "Phase",
+            EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}-phase-{phase.PhaseNumber}",
+            OldState = oldPhaseState.ToString(),
+            NewState = phase.State.ToString(),
+            Reason = $"Auto-{phase.State.ToString().ToLowerInvariant()}: all tasks reached terminal state"
+        });
+    }
+
+    private async Task AutoCompleteEmptyPhasesAsync(
+        List<WorkPackagePhase> allPhases, WorkPackage wp, string changedBy,
+        List<StateChangeDto>? stateChanges, DateTimeOffset now, CancellationToken ct)
+    {
         var nonTerminalPhaseIds = allPhases
             .Where(p => !CompletionStateConstants.TerminalStates.Contains(p.State))
             .Select(p => p.Id)
@@ -149,37 +163,41 @@ public sealed class StateCascadeService(AppDbContext db) : IStateCascadeService
                 Reason = "Auto-completed: phase has no tasks"
             });
         }
+    }
 
-        // Check if all phases in WP are terminal
-        if (allPhases.Count > 0 && allPhases.All(p => CompletionStateConstants.TerminalStates.Contains(p.State)))
+    private void AutoCompleteWorkPackageFromPhases(
+        List<WorkPackagePhase> allPhases, WorkPackage wp, string changedBy,
+        List<StateChangeDto>? stateChanges, DateTimeOffset now)
+    {
+        if (allPhases.Count == 0 || !allPhases.All(p => CompletionStateConstants.TerminalStates.Contains(p.State)))
+            return;
+
+        if (CompletionStateConstants.TerminalStates.Contains(wp.State))
+            return;
+
+        var oldWpState = wp.State;
+        wp.State = InferTerminalState(allPhases.Select(p => p.State));
+
+        StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, wp.State);
+
+        db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
         {
-            if (!CompletionStateConstants.TerminalStates.Contains(wp.State))
-            {
-                var oldWpState = wp.State;
-                wp.State = InferTerminalState(allPhases.Select(p => p.State));
+            WorkPackageId = wp.Id,
+            FieldName = "State",
+            OldValue = oldWpState.ToString(),
+            NewValue = wp.State.ToString(),
+            ChangedBy = changedBy,
+            ChangedAt = now
+        });
 
-                StateTransitionHelper.ApplyStateTimestamps(wp, oldWpState, wp.State);
-
-                db.WorkPackageAuditLogs.Add(new WorkPackageAuditLog
-                {
-                    WorkPackageId = wp.Id,
-                    FieldName = "State",
-                    OldValue = oldWpState.ToString(),
-                    NewValue = wp.State.ToString(),
-                    ChangedBy = changedBy,
-                    ChangedAt = now
-                });
-
-                stateChanges?.Add(new StateChangeDto
-                {
-                    EntityType = "WorkPackage",
-                    EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
-                    OldState = oldWpState.ToString(),
-                    NewState = wp.State.ToString(),
-                    Reason = $"Auto-{wp.State.ToString().ToLowerInvariant()}: all phases reached terminal state"
-                });
-            }
-        }
+        stateChanges?.Add(new StateChangeDto
+        {
+            EntityType = "WorkPackage",
+            EntityId = $"proj-{wp.ProjectId}-wp-{wp.WorkPackageNumber}",
+            OldState = oldWpState.ToString(),
+            NewState = wp.State.ToString(),
+            Reason = $"Auto-{wp.State.ToString().ToLowerInvariant()}: all phases reached terminal state"
+        });
     }
 
     public async Task AutoUnblockDependentWpsAsync(
