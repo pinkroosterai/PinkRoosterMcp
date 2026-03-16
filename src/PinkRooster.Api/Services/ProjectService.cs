@@ -249,6 +249,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
                 .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedIssueLinks).ThenInclude(l => l.Issue)
                 .Include(t => t.WorkPackage).ThenInclude(w => w.LinkedFeatureRequestLinks).ThenInclude(l => l.FeatureRequest)
                 .Where(t => t.WorkPackage.ProjectId == projectId)
+                .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.WorkPackage.State)
+                    && t.WorkPackage.State != CompletionState.Blocked)
                 .Where(t => !CompletionStateConstants.TerminalStates.Contains(t.State))
                 .Where(t => t.State != CompletionState.Blocked)
                 .Where(t => CompletionStateConstants.ActiveStates.Contains(t.State)
@@ -311,7 +313,8 @@ public sealed class ProjectService(AppDbContext db) : IProjectService
         if (entityType is null or "issue")
         {
             var linkedIssueIds = db.WorkPackageIssueLinks
-                .Where(l => l.WorkPackage.ProjectId == projectId)
+                .Where(l => l.WorkPackage.ProjectId == projectId
+                    && !CompletionStateConstants.TerminalStates.Contains(l.WorkPackage.State))
                 .Select(l => l.IssueId);
 
             var issues = await db.Issues

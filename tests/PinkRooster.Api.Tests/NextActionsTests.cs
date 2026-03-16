@@ -350,6 +350,118 @@ public sealed class NextActionsTests(PostgresFixture postgres) : IntegrationTest
         Assert.Equal("Blocker", items[0].Name);
     }
 
+    // ── Blocked/Terminal WP task exclusion ──
+
+    [Fact]
+    public async Task GetNextActions_ExcludesTasksFromBlockedWps()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Create blocker WP
+        var blockerResp = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
+        {
+            Name = "Blocker", Description = "d", State = CompletionState.Implementing
+        }, ct);
+        var blocker = await blockerResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
+
+        // Create WP with phase and task
+        var wpResp = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
+        {
+            Name = "Dependent WP", Description = "d", State = CompletionState.Implementing
+        }, ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
+
+        var phaseResp = await Client.PostAsJsonAsync(
+            $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
+            new CreatePhaseRequest { Name = "Phase 1" }, ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
+
+        await Client.PostAsJsonAsync(
+            $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
+            new CreateTaskRequest { Name = "Blocked task", Description = "d", State = CompletionState.Implementing }, ct);
+
+        // Block the WP via dependency — WP auto-blocked, but task stays Implementing
+        await Client.PostAsJsonAsync(
+            $"{WpPath(projectId)}/{wp.WorkPackageNumber}/dependencies",
+            new ManageDependencyRequest { DependsOnId = blocker!.Id }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "task"), ct);
+
+        // Task from blocked WP should NOT appear
+        Assert.DoesNotContain(items, i => i.Name == "Blocked task");
+    }
+
+    [Fact]
+    public async Task GetNextActions_ExcludesTasksFromReplacedWps()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Create WP with phase and task
+        var wpResp = await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
+        {
+            Name = "Old WP", Description = "d", State = CompletionState.Implementing
+        }, ct);
+        var wp = await wpResp.Content.ReadFromJsonAsync<WorkPackageResponse>(JsonOptions, ct);
+
+        var phaseResp = await Client.PostAsJsonAsync(
+            $"{WpPath(projectId)}/{wp!.WorkPackageNumber}/phases",
+            new CreatePhaseRequest { Name = "Phase 1" }, ct);
+        var phase = await phaseResp.Content.ReadFromJsonAsync<PhaseResponse>(JsonOptions, ct);
+
+        await Client.PostAsJsonAsync(
+            $"{WpPath(projectId)}/{wp.WorkPackageNumber}/tasks?phaseNumber={phase!.PhaseNumber}",
+            new CreateTaskRequest { Name = "Orphaned task", Description = "d", State = CompletionState.Implementing }, ct);
+
+        // Set WP to Replaced — no downward cascade to tasks
+        await Client.PatchAsJsonAsync(
+            $"{WpPath(projectId)}/{wp.WorkPackageNumber}",
+            new UpdateWorkPackageRequest { State = CompletionState.Replaced }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "task"), ct);
+
+        // Task from replaced WP should NOT appear
+        Assert.DoesNotContain(items, i => i.Name == "Orphaned task");
+    }
+
+    // ── Issue resurfacing after terminal WP ──
+
+    [Fact]
+    public async Task GetNextActions_ResurfacesIssuesLinkedToCancelledWps()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateProjectAsync(ct);
+
+        // Create an issue
+        await Client.PostAsJsonAsync(IssuePath(projectId), new CreateIssueRequest
+        {
+            Name = "Persistent Bug", Description = "d", IssueType = IssueType.Bug,
+            Severity = IssueSeverity.Major, State = CompletionState.Implementing
+        }, ct);
+
+        // Link it to a WP
+        var allIssues = await GetJson<List<IssueResponse>>($"{IssuePath(projectId)}", ct);
+        var issue = allIssues.First(i => i.Name == "Persistent Bug");
+
+        await Client.PostAsJsonAsync(WpPath(projectId), new CreateWorkPackageRequest
+        {
+            Name = "Failed WP", Description = "d", LinkedIssueIds = [issue.Id],
+            State = CompletionState.Implementing
+        }, ct);
+
+        // Cancel the WP
+        await Client.PatchAsJsonAsync(
+            $"{WpPath(projectId)}/1",
+            new UpdateWorkPackageRequest { State = CompletionState.Cancelled }, ct);
+
+        var items = await GetJson<List<NextActionItem>>(NextActionsPath(projectId, entityType: "issue"), ct);
+
+        // Issue should resurface — the only WP link is to a terminal WP
+        Assert.Single(items);
+        Assert.Equal("Persistent Bug", items[0].Name);
+    }
+
     // ── Feature Request inclusion ──
 
     [Fact]
