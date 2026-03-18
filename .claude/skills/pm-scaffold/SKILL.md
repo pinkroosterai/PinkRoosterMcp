@@ -57,23 +57,7 @@ Before creating a new WP, check if one already exists for this work:
 
 If the user selects "View existing", call `mcp__pinkrooster__get_work_package_details` and present it, then re-ask.
 
-## Step 4: Learn from Existing Work Packages
-
-To produce consistent scaffolding, study how the project's existing WPs are structured:
-
-1. Pick 1-2 completed or in-progress WPs from the list (prefer completed — they represent the project's actual standards)
-2. Call `mcp__pinkrooster__get_work_package_details` on them
-3. Note patterns:
-   - How tasks are named and described
-   - Level of detail in `implementationNotes`
-   - How `targetFiles` are specified
-   - Task sizing (how much work per task)
-   - Acceptance criteria style and specificity
-   - How dependencies are structured within phases
-
-Match these patterns in the new WP. If no existing WPs are available, use the patterns in [scaffold-patterns.md](scaffold-patterns.md) as the reference.
-
-## Step 5: Research the Domain (when warranted)
+## Step 4: Research the Domain (when warranted)
 
 For features involving technologies, libraries, or patterns not already established in the codebase, research before scaffolding. Well-informed tasks save implementation time.
 
@@ -92,7 +76,7 @@ For features involving technologies, libraries, or patterns not already establis
 - Use `WebFetch` to pull relevant library docs or API references
 - Fold findings into task `implementationNotes` — mention specific libraries, patterns, or configuration approaches discovered
 
-## Step 6: Analyze Codebase
+## Step 5: Analyze Codebase
 
 Determine which layers of the codebase need changes:
 
@@ -113,7 +97,7 @@ For each affected layer, identify:
 
 Refer to [scaffold-patterns.md](scaffold-patterns.md) for the standard phase structure.
 
-## Step 7: Design Work Package Structure
+## Step 6: Design Work Package Structure
 
 Build the WP following the project's vertical slice pattern:
 
@@ -175,7 +159,7 @@ Each task should represent **15-45 minutes of implementation work**. This keeps 
 - "Add API integration tests for export endpoints" (1 test file, multiple test methods)
 - "Create export list page with TanStack Table" (1 page component following existing list page pattern)
 
-## Step 8: Estimate Complexity
+## Step 7: Estimate Complexity
 
 Rate 1-10 based on:
 - Number of layers affected
@@ -186,7 +170,7 @@ Rate 1-10 based on:
 
 Provide a `estimationRationale` explaining the score.
 
-## Step 9: Create Work Package
+## Step 8: Create Work Package
 
 Call `mcp__pinkrooster__scaffold_work_package` with:
 - `projectId`
@@ -200,7 +184,7 @@ Call `mcp__pinkrooster__scaffold_work_package` with:
 - `linkedIssueIds`: `[issueId]` if scaffolding from an issue
 - `linkedFeatureRequestIds`: `[frId]` if scaffolding from an FR
 
-## Step 10: Auto-Transition Linked Entities
+## Step 9: Auto-Transition Linked Entities
 
 Automatically update the source entity state to reflect that planning/scaffolding has occurred. No user confirmation needed — scaffolding inherently means planning is underway.
 
@@ -216,7 +200,7 @@ Automatically update the source entity state to reflect that planning/scaffoldin
   - Report: "Auto-transitioned issue {issueId} → Designing (work package scaffolded)"
 - If the issue is already in an active or terminal state: no change needed
 
-## Step 11: Report
+## Step 10: Report
 
 ```
 ## Scaffolded: {wpId} "{wpName}"
@@ -257,7 +241,6 @@ Automatically update the source entity state to reflect that planning/scaffoldin
 - Always analyze the codebase before scaffolding — never guess at file paths
 - Use `targetFiles` with real paths found during analysis
 - Follow the vertical slice pattern from scaffold-patterns.md
-- Match the style of existing WPs in the project — study them before designing the new one
 - Keep tasks right-sized: 15-45 minutes of work each, targeting 1-3 files per task
 - Include `implementationNotes` with specific guidance for every task, incorporating research findings where applicable
 - Write acceptance criteria that are specific and testable — vague criteria like "works correctly" waste verification time
